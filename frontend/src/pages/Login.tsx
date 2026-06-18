@@ -1,33 +1,50 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Leaf, Loader2 } from 'lucide-react'
-import { useAuth } from '@/context/AuthContext'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useState } from "react";
+import { Link, useNavigate, Navigate } from "react-router-dom";
+import { Leaf, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { getDashboardPath } from "@/lib/roles";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Login() {
-  const { login } = useAuth()
-  const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { login, user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (user) return <Navigate to={getDashboardPath(user.role)} replace />;
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      const user = await login(form.email, form.password)
-      navigate(user.role === 'admin' ? '/admin' : user.role === 'dietitian' ? '/dietitian' : '/user')
+      const user = await login(form.email, form.password);
+      navigate(getDashboardPath(user.role));
     } catch (err) {
-      setError((err as Error).message)
+      setError((err as Error).message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-900 to-emerald-600 p-4">
@@ -50,25 +67,46 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, email: e.target.value }))
+                }
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="••••••••" value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, password: e.target.value }))
+                }
+                required
+              />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Signing in…' : 'Sign In'}
+              {loading ? "Signing in…" : "Sign In"}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" className="font-medium text-primary hover:underline">Create one</Link>
+            Don&apos;t have an account?{" "}
+            <Link
+              to="/register"
+              className="font-medium text-primary hover:underline"
+            >
+              Create one
+            </Link>
           </p>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

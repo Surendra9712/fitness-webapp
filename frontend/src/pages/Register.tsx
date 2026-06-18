@@ -1,34 +1,82 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Leaf, Loader2 } from 'lucide-react'
-import { useAuth } from '@/context/AuthContext'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useState } from "react";
+import { Link, useNavigate, Navigate } from "react-router-dom";
+import { Leaf, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { getDashboardPath } from "@/lib/roles";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useForm, Controller } from "react-hook-form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 export default function Register() {
-  const { register } = useAuth()
-  const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user' })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { register: registerUser, user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      const user = await register(form.name, form.email, form.password, form.role)
-      navigate(user.role === 'dietitian' ? '/dietitian' : '/user')
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent" />
+      </div>
+    );
   }
+
+  if (user) return <Navigate to={getDashboardPath(user.role)} replace />;
+
+  const schema = z.object({
+    name: z.string().min(1, "Full name is required"),
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    role: z.enum(["user", "dietitian"]),
+  });
+
+  type FormValues = z.infer<typeof schema>;
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: "", email: "", password: "", role: "user" },
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    setError("");
+    setLoading(true);
+    try {
+      const user = await registerUser(
+        data.name,
+        data.email,
+        data.password,
+        data.role,
+      );
+      navigate(getDashboardPath(user.role));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-900 to-emerald-600 p-4">
@@ -48,43 +96,77 @@ export default function Register() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="Jane Doe" value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+              <Input id="name" placeholder="Jane Doe" {...register("name")} />
+              {errors.name && (
+                <p className="text-sm text-red-500">{errors.name.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                {...register("email")}
+              />
+              {errors.email && (
+                <p className="text-sm text-red-500">{errors.email.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="Min 6 characters" minLength={6} value={form.password}
-                onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
+              <Input
+                id="password"
+                type="password"
+                placeholder="Min 6 characters"
+                {...register("password")}
+              />
+              {errors.password && (
+                <p className="text-sm text-red-500">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>I am a…</Label>
-              <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Member / User</SelectItem>
-                  <SelectItem value="dietitian">Dietitian</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="role"
+                render={({ field }: { field: any }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">Customer</SelectItem>
+                      <SelectItem value="dietitian">Trainer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.role && (
+                <p className="text-sm text-red-500">{errors.role.message}</p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Creating…' : 'Create Account'}
+              {loading ? "Creating…" : "Create Account"}
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link>
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="font-medium text-primary hover:underline"
+            >
+              Sign in
+            </Link>
           </p>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

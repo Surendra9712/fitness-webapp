@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Flame, Zap, TrendingDown, Clock, Salad, Dumbbell, ClipboardList } from 'lucide-react'
 import { api } from '@/api/client'
+import { useAuth } from '@/context/AuthContext'
+import { calcCalorieTarget } from '@/lib/roles'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +13,7 @@ import type { DashboardStats, ActivePlan } from '@/types'
 const today = new Date().toISOString().split('T')[0]
 
 export default function UserDashboard() {
+  const { user } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [plan, setPlan] = useState<ActivePlan | null>(null)
   const [error, setError] = useState('')
@@ -20,12 +23,16 @@ export default function UserDashboard() {
     api.get<{ plan: ActivePlan | null }>('/user/my-plan').then(d => setPlan(d.plan)).catch(() => {})
   }, [])
 
-  const calTarget = plan?.total_daily_calories ?? 2000
+  const profileTarget = calcCalorieTarget(
+    user?.age, user?.weight_kg, user?.height_cm,
+    user?.gender, user?.goal, user?.activity_level,
+  )
+  const calTarget = plan?.total_daily_calories ?? stats?.calorie_target ?? profileTarget ?? 2000
   const pct = stats ? Math.min(100, Math.round((stats.calories_in / calTarget) * 100)) : 0
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Customer Dashboard</h1>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       {stats && (
@@ -64,9 +71,9 @@ export default function UserDashboard() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { to: '/user/log-meal', icon: <Salad className="h-8 w-8 text-emerald-500" />, label: 'Log Meal' },
-          { to: '/user/log-exercise', icon: <Dumbbell className="h-8 w-8 text-blue-500" />, label: 'Log Exercise' },
-          { to: '/user/my-plan', icon: <ClipboardList className="h-8 w-8 text-purple-500" />, label: 'View Plan' },
+          { to: '/customer/log-meal', icon: <Salad className="h-8 w-8 text-emerald-500" />, label: 'Log Meal' },
+          { to: '/customer/log-exercise', icon: <Dumbbell className="h-8 w-8 text-blue-500" />, label: 'Log Exercise' },
+          { to: '/customer/my-plan', icon: <ClipboardList className="h-8 w-8 text-purple-500" />, label: 'View Plan' },
         ].map(q => (
           <Link key={q.to} to={q.to} className="flex flex-col items-center gap-2 rounded-xl border bg-card p-6 text-sm font-medium shadow-sm transition-colors hover:border-primary hover:bg-primary/5">
             {q.icon}{q.label}
@@ -85,13 +92,13 @@ export default function UserDashboard() {
             <div className="flex flex-wrap gap-2 pt-1">
               <Badge variant="outline" className="capitalize">{plan.goal?.replace('_', ' ')}</Badge>
               {plan.total_daily_calories && <Badge variant="secondary">{plan.total_daily_calories} kcal/day</Badge>}
-              <Badge variant="outline">By {plan.dietitian_name}</Badge>
+              <Badge variant="outline">By Trainer {plan.dietitian_name}</Badge>
             </div>
             <p className="text-xs text-muted-foreground">{plan.start_date} → {plan.end_date ?? 'ongoing'}</p>
           </CardContent>
         </Card>
       ) : (
-        <Alert variant="info"><AlertDescription>No diet plan assigned yet. Contact your dietitian.</AlertDescription></Alert>
+        <Alert variant="info"><AlertDescription>No diet plan assigned yet. Contact your trainer or complete your <Link to="/customer/profile" className="font-medium underline">profile</Link>.</AlertDescription></Alert>
       )}
     </div>
   )

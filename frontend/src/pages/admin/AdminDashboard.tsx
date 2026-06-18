@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ROLE_LABELS } from '@/lib/roles'
 import type { AdminStats, Role } from '@/types'
 
 const roleBadge: Record<Role, 'destructive' | 'info' | 'success'> = {
@@ -27,8 +28,8 @@ export default function AdminDashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: 'Members', value: stats?.users, icon: <Users className="h-4 w-4" />, color: 'text-blue-600' },
-          { label: 'Dietitians', value: stats?.dietitians, icon: <UserCheck className="h-4 w-4" />, color: 'text-purple-600' },
+          { label: 'Customers', value: stats?.users, icon: <Users className="h-4 w-4" />, color: 'text-blue-600' },
+          { label: 'Trainers', value: stats?.dietitians, icon: <UserCheck className="h-4 w-4" />, color: 'text-purple-600' },
           { label: 'Diet Plans', value: stats?.diet_plans, icon: <BookOpen className="h-4 w-4" />, color: 'text-emerald-600' },
           { label: 'Meals in Library', value: stats?.meals, icon: <Salad className="h-4 w-4" />, color: 'text-orange-600' },
         ].map(s => (
@@ -64,7 +65,7 @@ export default function AdminDashboard() {
                 <TableRow key={i}>
                   <TableCell className="font-medium">{u.name}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                  <TableCell><Badge variant={roleBadge[u.role]} className="capitalize">{u.role}</Badge></TableCell>
+                  <TableCell><Badge variant={roleBadge[u.role]}>{ROLE_LABELS[u.role]}</Badge></TableCell>
                   <TableCell className="text-muted-foreground">{new Date(u.created_at!).toLocaleDateString()}</TableCell>
                 </TableRow>
               ))}

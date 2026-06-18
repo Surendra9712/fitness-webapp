@@ -22,7 +22,7 @@ export default function DietitianDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Dietitian Dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Trainer Dashboard</h1>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -46,7 +46,7 @@ export default function DietitianDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Plans</CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/dietitian/plans"><ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/trainer/plans"><ArrowRight className="h-4 w-4" /></Link>
             </Button>
           </CardHeader>
           <CardContent className="p-0">
@@ -70,7 +70,7 @@ export default function DietitianDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Assignments</CardTitle>
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/dietitian/assign"><ArrowRight className="h-4 w-4" /></Link>
+              <Link to="/trainer/assign"><ArrowRight className="h-4 w-4" /></Link>
             </Button>
           </CardHeader>
           <CardContent className="p-0">

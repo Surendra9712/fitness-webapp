@@ -21,7 +21,7 @@ export default function MyDietPlan() {
   if (!plan) return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">My Diet Plan</h1>
-      <Alert variant="info"><AlertDescription>No diet plan assigned yet. Your dietitian will assign one.</AlertDescription></Alert>
+      <Alert variant="info"><AlertDescription>No diet plan assigned yet. Your trainer will assign one.</AlertDescription></Alert>
     </div>
   )
 
@@ -43,7 +43,7 @@ export default function MyDietPlan() {
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="capitalize">{plan.goal?.replace('_',' ')}</Badge>
             {plan.total_daily_calories && <Badge variant="secondary">{plan.total_daily_calories} kcal/day target</Badge>}
-            <Badge variant="outline">By {plan.dietitian_name}</Badge>
+            <Badge variant="outline">Trainer: {plan.dietitian_name}</Badge>
             <Badge variant="secondary">{plan.start_date} → {plan.end_date ?? 'ongoing'}</Badge>
           </div>
         </CardContent>

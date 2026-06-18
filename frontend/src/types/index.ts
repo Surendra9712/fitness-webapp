@@ -120,6 +120,7 @@ export interface DashboardStats {
   net_calories: number
   meals_this_week: number
   exercise_mins_this_week: number
+  calorie_target?: number
 }
 
 export interface AdminStats {

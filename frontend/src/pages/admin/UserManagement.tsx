@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import type { User, Role } from '@/types'
+import { ROLE_LABELS } from '@/lib/roles'
 
 const roleBadge: Record<Role, 'destructive' | 'info' | 'success'> = {
   admin: 'destructive', dietitian: 'info', user: 'success',
@@ -75,8 +76,8 @@ export default function UserManagement() {
                 <Select value={form.role} onValueChange={v => setForm(f => ({...f, role: v}))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="dietitian">Dietitian</SelectItem>
+                    <SelectItem value="user">Customer</SelectItem>
+                    <SelectItem value="dietitian">Trainer</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
@@ -108,7 +109,7 @@ export default function UserManagement() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                  <TableCell><Badge variant={roleBadge[u.role]} className="capitalize">{u.role}</Badge></TableCell>
+                  <TableCell><Badge variant={roleBadge[u.role]}>{ROLE_LABELS[u.role]}</Badge></TableCell>
                   <TableCell>
                     <Badge variant={u.is_active ? 'success' : 'secondary'}>{u.is_active ? 'Active' : 'Disabled'}</Badge>
                   </TableCell>

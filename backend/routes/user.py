@@ -1,14 +1,45 @@
 from flask import Blueprint, request, jsonify
 from database.connection import get_connection
-from middleware.auth import token_required
+from middleware.auth import role_required
 
 user_bp = Blueprint('user', __name__)
+
+
+def _calc_calorie_target(profile):
+    if not profile or not profile.get('age') or not profile.get('weight_kg') or not profile.get('height_cm'):
+        return None
+
+    age = float(profile['age'])
+    weight = float(profile['weight_kg'])
+    height = float(profile['height_cm'])
+    gender = profile.get('gender')
+    goal = profile.get('goal', 'maintain')
+    activity = profile.get('activity_level', 'moderate')
+
+    if gender == 'male':
+        bmr = 10 * weight + 6.25 * height - 5 * age + 5
+    elif gender == 'female':
+        bmr = 10 * weight + 6.25 * height - 5 * age - 161
+    else:
+        bmr = 10 * weight + 6.25 * height - 5 * age - 78
+
+    multipliers = {
+        'sedentary': 1.2, 'light': 1.375, 'moderate': 1.55,
+        'active': 1.725, 'very_active': 1.9,
+    }
+    tdee = bmr * multipliers.get(activity, 1.55)
+
+    if goal == 'lose_weight':
+        return int(tdee - 500)
+    if goal == 'gain_muscle':
+        return int(tdee + 300)
+    return int(tdee)
 
 
 # ── My Diet Plan ──────────────────────────────────────────────────────────────
 
 @user_bp.route('/my-plan', methods=['GET'])
-@token_required
+@role_required('user')
 def my_plan():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -46,7 +77,7 @@ def my_plan():
 # ── Meal Logs ─────────────────────────────────────────────────────────────────
 
 @user_bp.route('/meal-logs', methods=['GET'])
-@token_required
+@role_required('user')
 def get_meal_logs():
     date = request.args.get('date')
     conn = get_connection()
@@ -73,7 +104,7 @@ def get_meal_logs():
 
 
 @user_bp.route('/meal-logs', methods=['POST'])
-@token_required
+@role_required('user')
 def log_meal():
     data = request.get_json() or {}
     if not all([data.get('meal_id'), data.get('logged_date'), data.get('meal_time')]):
@@ -97,7 +128,7 @@ def log_meal():
 
 
 @user_bp.route('/meal-logs/<int:log_id>', methods=['DELETE'])
-@token_required
+@role_required('user')
 def delete_meal_log(log_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -116,7 +147,7 @@ def delete_meal_log(log_id):
 # ── Exercise Logs ─────────────────────────────────────────────────────────────
 
 @user_bp.route('/exercise-logs', methods=['GET'])
-@token_required
+@role_required('user')
 def get_exercise_logs():
     date = request.args.get('date')
     conn = get_connection()
@@ -143,7 +174,7 @@ def get_exercise_logs():
 
 
 @user_bp.route('/exercise-logs', methods=['POST'])
-@token_required
+@role_required('user')
 def log_exercise():
     data = request.get_json() or {}
     if not all([data.get('exercise_id'), data.get('logged_date'), data.get('duration_minutes')]):
@@ -176,7 +207,7 @@ def log_exercise():
 
 
 @user_bp.route('/exercise-logs/<int:log_id>', methods=['DELETE'])
-@token_required
+@role_required('user')
 def delete_exercise_log(log_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -195,7 +226,7 @@ def delete_exercise_log(log_id):
 # ── Progress / Dashboard Summary ──────────────────────────────────────────────
 
 @user_bp.route('/dashboard', methods=['GET'])
-@token_required
+@role_required('user')
 def dashboard():
     today = request.args.get('date')
     conn = get_connection()
@@ -238,6 +269,14 @@ def dashboard():
         )
         exercise_mins = cursor.fetchone()['exercise_mins']
 
+        cursor.execute(
+            "SELECT age, weight_kg, height_cm, gender, goal, activity_level "
+            "FROM user_profiles WHERE user_id = %s",
+            (request.user_id,),
+        )
+        profile = cursor.fetchone()
+        calorie_target = _calc_calorie_target(profile)
+
         return jsonify({
             'date': today,
             'calories_in': int(calories_in),
@@ -245,6 +284,7 @@ def dashboard():
             'net_calories': int(calories_in) - int(calories_out),
             'meals_this_week': int(meals_this_week),
             'exercise_mins_this_week': int(exercise_mins),
+            'calorie_target': calorie_target,
         })
     finally:
         cursor.close()
@@ -254,7 +294,7 @@ def dashboard():
 # ── Available Meals (for logging) ─────────────────────────────────────────────
 
 @user_bp.route('/meals', methods=['GET'])
-@token_required
+@role_required('user')
 def available_meals():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -269,7 +309,7 @@ def available_meals():
 # ── Available Exercises (for logging) ─────────────────────────────────────────
 
 @user_bp.route('/exercises', methods=['GET'])
-@token_required
+@role_required('user')
 def available_exercises():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

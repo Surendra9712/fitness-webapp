@@ -1,6 +1,35 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #f5f6f9;
+  --color-primary-100: #e8eaf1;
+  --color-primary-200: #d6dae7;
+  --color-primary-300: #bac1d6;
+  --color-primary-400: #99a2c1;
+  /* --color-primary-500: #8088b1; */
+  --color-primary-600: #6e73a2;
+  --color-primary-700: #626493;
+  --color-primary-800: #545479;
+  --color-primary-900: #43445e;
+  --color-primary-950: #2e2e3d;
+
+   /* '50': '#f9fbfb', */
+  /* '100': '#f4f5f5', */
+  /* '200': '#e6eaea', */
+  /* '300': '#d3d9d9', */
+  /* '400': '#9facac', */
+  --color-primary-500: #6f7c7c;
+  --color-primary: #6f7c7c;
+  /* '600': '#50605f', */
+  /* '700': '#3b4d4c', */
+  /* '800': '#233332', */
+  /* '900': '#152223', */
+  /* '950': '#060e0f', */
+
+  --color-border: var(--border);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
 
 @layer base {
   :root {
@@ -25,9 +54,60 @@
     --ring: 160 84% 39%;
     --radius: 0.5rem;
   }
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
 }
 
-@layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+@layer utilities {
+  @keyframes enter {
+    from {
+      opacity: var(--tw-enter-opacity, 1);
+      transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1)) rotate(var(--tw-enter-rotate, 0));
+    }
+  }
+  @keyframes exit {
+    to {
+      opacity: var(--tw-exit-opacity, 1);
+      transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
+    }
+  }
+  .animate-in {
+    animation-name: enter;
+    animation-duration: 150ms;
+    --tw-enter-opacity: initial;
+    --tw-enter-scale: initial;
+    --tw-enter-rotate: initial;
+    --tw-enter-translate-x: initial;
+    --tw-enter-translate-y: initial;
+  }
+  .animate-out {
+    animation-name: exit;
+    animation-duration: 150ms;
+    --tw-exit-opacity: initial;
+    --tw-exit-scale: initial;
+    --tw-exit-rotate: initial;
+    --tw-exit-translate-x: initial;
+    --tw-exit-translate-y: initial;
+  }
+  .fade-in { --tw-enter-opacity: 0; }
+  .fade-out { --tw-exit-opacity: 0; }
+  .zoom-in { --tw-enter-scale: 0; }
+  .zoom-out { --tw-exit-scale: 0; }
+  .spin-in { --tw-enter-rotate: 30deg; }
+  .spin-out { --tw-exit-rotate: 30deg; }
+  .slide-in-from-top { --tw-enter-translate-y: -100%; }
+  .slide-in-from-bottom { --tw-enter-translate-y: 100%; }
+  .slide-in-from-left { --tw-enter-translate-x: -100%; }
+  .slide-in-from-right { --tw-enter-translate-x: 100%; }
+  .slide-out-to-top { --tw-exit-translate-y: -100%; }
+  .slide-out-to-bottom { --tw-exit-translate-y: 100%; }
+  .slide-out-to-left { --tw-exit-translate-x: -100%; }
+  .slide-out-to-right { --tw-exit-translate-x: 100%; }
+  .running { animation-play-state: running; }
+  .paused { animation-play-state: paused; }
 }
