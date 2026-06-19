@@ -1,9 +1,38 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
+import re
 from database.connection import get_connection
 from middleware.auth import generate_token, token_required
 
 auth_bp = Blueprint('auth', __name__)
+
+_EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def _validate_register(name, email, password):
+    errors = {}
+    if not name:
+        errors['name'] = 'Full name is required'
+    if not email:
+        errors['email'] = 'Email is required'
+    elif not _EMAIL_RE.match(email):
+        errors['email'] = 'Invalid email address'
+    if not password:
+        errors['password'] = 'Password is required'
+    elif len(password) < 6:
+        errors['password'] = 'Password must be at least 6 characters'
+    return errors
+
+
+def _validate_login(email, password):
+    errors = {}
+    if not email:
+        errors['email'] = 'Email is required'
+    elif not _EMAIL_RE.match(email):
+        errors['email'] = 'Invalid email address'
+    if not password:
+        errors['password'] = 'Password is required'
+    return errors
 
 
 @auth_bp.route('/register', methods=['POST'])
@@ -14,8 +43,10 @@ def register():
     password = data.get('password', '')
     role = data.get('role', 'user')
 
-    if not all([name, email, password]):
-        return jsonify({'error': 'name, email and password are required'}), 400
+    errors = _validate_register(name, email, password)
+    if errors:
+        return jsonify({'errors': errors}), 422
+
     if role not in ('user', 'dietitian'):
         role = 'user'
 
@@ -26,7 +57,7 @@ def register():
     try:
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cursor.fetchone():
-            return jsonify({'error': 'Email already registered'}), 409
+            return jsonify({'errors': {'email': 'Email already registered'}}), 422
 
         cursor.execute(
             "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
@@ -54,6 +85,10 @@ def login():
     data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
+
+    errors = _validate_login(email, password)
+    if errors:
+        return jsonify({'errors': errors}), 422
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

@@ -111,6 +111,91 @@ CREATE TABLE IF NOT EXISTS exercise_logs (
     FOREIGN KEY (exercise_id) REFERENCES exercises(id)  ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS categories (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL,
+    slug        VARCHAR(100) NOT NULL UNIQUE,
+    icon        VARCHAR(10),
+    description TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT IGNORE INTO categories (name, slug, icon) VALUES
+    ('Cardio',      'cardio',      '🏃'),
+    ('Strength',    'strength',    '🏋️'),
+    ('Machines',    'machines',    '⚙️'),
+    ('Recovery',    'recovery',    '🧘'),
+    ('Accessories', 'accessories', '🎽');
+
+CREATE TABLE IF NOT EXISTS products (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    name           VARCHAR(200) NOT NULL,
+    description    TEXT,
+    price          DECIMAL(10,2) NOT NULL DEFAULT 0,
+    stock_quantity INT NOT NULL DEFAULT 0,
+    category_id    INT NOT NULL,
+    image_url      VARCHAR(500),
+    status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    created_by     INT,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id),
+    FOREIGN KEY (created_by)  REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT NOT NULL,
+    status           ENUM('pending','confirmed','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending',
+    total_amount     DECIMAL(10,2) NOT NULL DEFAULT 0,
+    shipping_address TEXT,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+    id                 INT AUTO_INCREMENT PRIMARY KEY,
+    order_id           INT NOT NULL,
+    product_id         INT NOT NULL,
+    quantity           INT NOT NULL DEFAULT 1,
+    price_at_purchase  DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (order_id)   REFERENCES orders(id)   ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS trainer_assignments (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id         INT NOT NULL,
+    trainer_id          INT NOT NULL,
+    status              ENUM('pending_trainer','pending_admin','approved','rejected') NOT NULL DEFAULT 'pending_trainer',
+    customer_note       TEXT,
+    trainer_note        TEXT,
+    admin_note          TEXT,
+    trainer_reviewed_at DATETIME,
+    admin_reviewed_at   DATETIME,
+    reviewed_by_admin   INT,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id)       REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (trainer_id)        REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by_admin) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS product_requests (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL,
+    product_name VARCHAR(200) NOT NULL,
+    description  TEXT,
+    reason       TEXT,
+    status       ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    admin_note   TEXT,
+    reviewed_by  INT,
+    reviewed_at  DATETIME,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id)     REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
 -- Sample exercises
 INSERT IGNORE INTO exercises (name, category, calories_burned_per_hour, description) VALUES
 ('Running',        'cardio',      600, 'Outdoor or treadmill running'),
