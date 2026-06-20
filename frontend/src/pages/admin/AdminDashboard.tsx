@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, UserCheck, BookOpen, Salad, TrendingUp } from 'lucide-react'
+import { Users, UserCheck, Package, ShoppingBag, Bell, TrendingUp } from 'lucide-react'
 import { api } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,12 +26,13 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: 'Customers', value: stats?.users, icon: <Users className="h-4 w-4" />, color: 'text-blue-600' },
           { label: 'Trainers', value: stats?.dietitians, icon: <UserCheck className="h-4 w-4" />, color: 'text-purple-600' },
-          { label: 'Diet Plans', value: stats?.diet_plans, icon: <BookOpen className="h-4 w-4" />, color: 'text-emerald-600' },
-          { label: 'Meals in Library', value: stats?.meals, icon: <Salad className="h-4 w-4" />, color: 'text-orange-600' },
+          { label: 'Active Products', value: stats?.products, icon: <Package className="h-4 w-4" />, color: 'text-emerald-600' },
+          { label: 'Total Orders', value: stats?.orders, icon: <ShoppingBag className="h-4 w-4" />, color: 'text-orange-600' },
+          { label: 'Pending Requests', value: stats?.pending_requests, icon: <Bell className="h-4 w-4" />, color: 'text-red-600' },
         ].map(s => (
           <Card key={s.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

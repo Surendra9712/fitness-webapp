@@ -1,4 +1,4 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Leaf,
   Salad,
@@ -70,8 +70,6 @@ export default function Home() {
     )
   }
 
-  if (user) return <Navigate to={getDashboardPath(user.role)} replace />
-
   return (
     <PublicLayout>
       {/* Hero */}
@@ -92,14 +90,24 @@ export default function Home() {
             meal tracking, and fitness progress — all in one platform.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button size="lg" className="bg-white text-emerald-900 hover:bg-emerald-50" asChild>
-              <Link to="/register">
-                Get Started Free <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10" asChild>
-              <Link to="/login">Sign In</Link>
-            </Button>
+            {user ? (
+              <Button size="lg" className="bg-white text-emerald-900 hover:bg-emerald-50" asChild>
+                <Link to={getDashboardPath(user.role)}>
+                  Go to Dashboard <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button size="lg" className="bg-white text-emerald-900 hover:bg-emerald-50" asChild>
+                  <Link to="/register">
+                    Get Started Free <ArrowRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10" asChild>
+                  <Link to="/login">Sign In</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </section>
