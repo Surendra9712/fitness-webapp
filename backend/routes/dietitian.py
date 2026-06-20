@@ -1,9 +1,22 @@
 from flask import Blueprint, request, jsonify
+from pydantic import BaseModel, ValidationError
+from pydantic import ConfigDict
+from typing import Optional
 from database.connection import get_connection
 from middleware.auth import role_required
+from utils.validation import pydantic_errors
 
 dietitian_bp = Blueprint('dietitian', __name__)
 
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+class AssignmentNoteSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    trainer_note: Optional[str] = None
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @dietitian_bp.route('/users', methods=['GET'])
 @role_required('admin', 'dietitian')
@@ -17,6 +30,7 @@ def list_users():
             "FROM trainer_assignments ta "
             "JOIN users u ON ta.customer_id = u.id "
             "WHERE ta.trainer_id = %s AND ta.status = 'approved' "
+            "AND ta.deleted_at IS NULL AND u.deleted_at IS NULL "
             "ORDER BY u.name",
             (request.user_id,),
         )
@@ -34,13 +48,13 @@ def stats():
     try:
         cursor.execute(
             "SELECT COUNT(*) AS total FROM trainer_assignments "
-            "WHERE trainer_id = %s AND status = 'approved'",
+            "WHERE trainer_id = %s AND status = 'approved' AND deleted_at IS NULL",
             (request.user_id,),
         )
         customers = cursor.fetchone()['total']
         cursor.execute(
             "SELECT COUNT(*) AS total FROM trainer_assignments "
-            "WHERE trainer_id = %s AND status = 'pending_trainer'",
+            "WHERE trainer_id = %s AND status = 'pending_trainer' AND deleted_at IS NULL",
             (request.user_id,),
         )
         pending = cursor.fetchone()['total']
@@ -61,7 +75,7 @@ def list_assignment_requests():
             "SELECT ta.*, u.name AS customer_name, u.email AS customer_email "
             "FROM trainer_assignments ta "
             "JOIN users u ON ta.customer_id = u.id "
-            "WHERE ta.trainer_id = %s "
+            "WHERE ta.trainer_id = %s AND ta.deleted_at IS NULL "
         )
         if status_filter == 'all':
             cursor.execute(base + "ORDER BY ta.created_at DESC", (request.user_id,))
@@ -77,7 +91,11 @@ def list_assignment_requests():
 @dietitian_bp.route('/assignment-requests/<int:aid>/approve', methods=['PUT'])
 @role_required('dietitian')
 def approve_assignment(aid):
-    data = request.get_json() or {}
+    try:
+        body = AssignmentNoteSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -94,7 +112,7 @@ def approve_assignment(aid):
         cursor.execute(
             "UPDATE trainer_assignments SET status='pending_admin', trainer_note=%s, "
             "trainer_reviewed_at=NOW() WHERE id = %s",
-            (data.get('trainer_note'), aid),
+            (body.trainer_note, aid),
         )
         conn.commit()
         return jsonify({'message': 'Approved — awaiting admin confirmation'})
@@ -109,7 +127,11 @@ def approve_assignment(aid):
 @dietitian_bp.route('/assignment-requests/<int:aid>/reject', methods=['PUT'])
 @role_required('dietitian')
 def reject_assignment(aid):
-    data = request.get_json() or {}
+    try:
+        body = AssignmentNoteSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -126,7 +148,7 @@ def reject_assignment(aid):
         cursor.execute(
             "UPDATE trainer_assignments SET status='rejected', trainer_note=%s, "
             "trainer_reviewed_at=NOW() WHERE id = %s",
-            (data.get('trainer_note'), aid),
+            (body.trainer_note, aid),
         )
         conn.commit()
         return jsonify({'message': 'Assignment rejected'})

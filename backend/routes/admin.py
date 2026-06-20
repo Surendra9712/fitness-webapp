@@ -1,9 +1,111 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
+from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
+from pydantic import ConfigDict
+from typing import Literal, Optional
 from database.connection import get_connection
 from middleware.auth import role_required
+from utils.validation import pydantic_errors
 
 admin_bp = Blueprint('admin', __name__)
+
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+class CreateCategorySchema(BaseModel):
+    name: str = Field(min_length=1)
+    slug: str = Field(min_length=1)
+    description: Optional[str] = None
+
+    @field_validator('name', 'slug', mode='before')
+    @classmethod
+    def strip_str(cls, v):
+        return str(v).strip().lower() if isinstance(v, str) else v
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def strip_name(cls, v):
+        return str(v).strip() if isinstance(v, str) else v
+
+
+class UpdateCategorySchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CreateUserSchema(BaseModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+    password: str = Field(min_length=6)
+    role: Literal['admin', 'dietitian', 'user'] = 'user'
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def strip_name(cls, v):
+        return str(v).strip() if isinstance(v, str) else v
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def normalise_email(cls, v):
+        return str(v).strip().lower() if isinstance(v, str) else v
+
+
+class UpdateUserSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    name: Optional[str] = None
+    role: Optional[Literal['admin', 'dietitian', 'user']] = None
+    is_active: Optional[bool] = None
+
+
+class CreateExerciseSchema(BaseModel):
+    name: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    calories_burned_per_hour: int = Field(default=0, ge=0)
+    description: Optional[str] = None
+
+
+class CreateProductSchema(BaseModel):
+    name: str = Field(min_length=1)
+    price: float = Field(gt=0)
+    description: Optional[str] = None
+    stock_quantity: int = Field(default=0, ge=0)
+    category: str = 'strength'
+    image_url: Optional[str] = None
+    status: Literal['active', 'inactive'] = 'active'
+
+
+class UpdateProductSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = Field(default=None, gt=0)
+    stock_quantity: Optional[int] = Field(default=None, ge=0)
+    image_url: Optional[str] = None
+    status: Optional[Literal['active', 'inactive']] = None
+    category: Optional[str] = None
+
+
+class ApproveProductRequestSchema(BaseModel):
+    price: float = Field(gt=0)
+    category: str = 'strength'
+    stock_quantity: int = Field(default=0, ge=0)
+    admin_note: Optional[str] = None
+
+
+class RejectRequestSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    admin_note: Optional[str] = None
+
+
+class UpdateOrderStatusSchema(BaseModel):
+    status: Literal['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+
+
+class TrainerAssignmentNoteSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    admin_note: Optional[str] = None
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
@@ -14,7 +116,10 @@ def list_categories():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT id, name, slug, icon, description FROM categories ORDER BY id")
+        cursor.execute(
+            "SELECT id, name, slug, description FROM categories "
+            "WHERE deleted_at IS NULL ORDER BY id"
+        )
         return jsonify(cursor.fetchall())
     finally:
         cursor.close()
@@ -24,18 +129,17 @@ def list_categories():
 @admin_bp.route('/categories', methods=['POST'])
 @role_required('admin')
 def create_category():
-    data = request.get_json() or {}
-    name = data.get('name', '').strip()
-    slug = data.get('slug', '').strip().lower()
-    if not name or not slug:
-        return jsonify({'error': 'name and slug are required'}), 400
+    try:
+        body = CreateCategorySchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO categories (name, slug, icon, description) VALUES (%s,%s,%s,%s)",
-            (name, slug, data.get('icon'), data.get('description')),
+            "INSERT INTO categories (name, slug, description) VALUES (%s,%s,%s)",
+            (body.name, body.slug, body.description),
         )
         conn.commit()
         return jsonify({'id': cursor.lastrowid, 'message': 'Category created'}), 201
@@ -50,9 +154,12 @@ def create_category():
 @admin_bp.route('/categories/<int:cid>', methods=['PUT'])
 @role_required('admin')
 def update_category(cid):
-    data = request.get_json() or {}
-    allowed = ['name', 'slug', 'icon', 'description']
-    updates = {k: data[k] for k in allowed if k in data}
+    try:
+        body = UpdateCategorySchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    updates = body.model_dump(exclude_unset=True)
     if not updates:
         return jsonify({'error': 'No valid fields'}), 400
 
@@ -78,10 +185,13 @@ def delete_category(cid):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT COUNT(*) AS cnt FROM products WHERE category_id = %s", (cid,))
+        cursor.execute(
+            "SELECT COUNT(*) AS cnt FROM products WHERE category_id = %s AND deleted_at IS NULL",
+            (cid,),
+        )
         if cursor.fetchone()['cnt'] > 0:
             return jsonify({'error': 'Cannot delete category with existing products'}), 409
-        cursor.execute("DELETE FROM categories WHERE id = %s", (cid,))
+        cursor.execute("UPDATE categories SET deleted_at = NOW() WHERE id = %s", (cid,))
         conn.commit()
         return jsonify({'message': 'Category deleted'})
     except Exception as e:
@@ -104,6 +214,7 @@ def list_users():
             "SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at, "
             "p.goal, p.weight_kg, p.height_cm "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
+            "WHERE u.deleted_at IS NULL "
             "ORDER BY u.created_at DESC"
         )
         return jsonify(cursor.fetchall())
@@ -115,32 +226,26 @@ def list_users():
 @admin_bp.route('/users', methods=['POST'])
 @role_required('admin')
 def create_user():
-    data = request.get_json() or {}
-    name = data.get('name', '').strip()
-    email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
-    role = data.get('role', 'user')
+    try:
+        body = CreateUserSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
-    if not all([name, email, password]):
-        return jsonify({'error': 'name, email and password are required'}), 400
-    if role not in ('admin', 'dietitian', 'user'):
-        return jsonify({'error': 'Invalid role'}), 400
-
-    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        cursor.execute("SELECT id FROM users WHERE email = %s", (body.email,))
         if cursor.fetchone():
-            return jsonify({'error': 'Email already registered'}), 409
+            return jsonify({'errors': {'email': 'Email already registered'}}), 422
         cursor.execute(
             "INSERT INTO users (name, email, password_hash, role) VALUES (%s,%s,%s,%s)",
-            (name, email, password_hash, role),
+            (body.name, body.email, password_hash, body.role),
         )
         user_id = cursor.lastrowid
         cursor.execute("INSERT INTO user_profiles (user_id) VALUES (%s)", (user_id,))
         conn.commit()
-        return jsonify({'id': user_id, 'name': name, 'email': email, 'role': role}), 201
+        return jsonify({'id': user_id, 'name': body.name, 'email': body.email, 'role': body.role}), 201
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -152,15 +257,17 @@ def create_user():
 @admin_bp.route('/users/<int:uid>', methods=['PUT'])
 @role_required('admin')
 def update_user(uid):
-    data = request.get_json() or {}
-    allowed = ['name', 'role', 'is_active']
-    updates = {k: data[k] for k in allowed if k in data}
+    try:
+        body = UpdateUserSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    updates = body.model_dump(exclude_unset=True)
     if not updates:
         return jsonify({'error': 'No valid fields'}), 400
 
     set_clause = ', '.join(f"{k} = %s" for k in updates)
     values = list(updates.values()) + [uid]
-
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -181,7 +288,7 @@ def delete_user(uid):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM users WHERE id = %s", (uid,))
+        cursor.execute("UPDATE users SET deleted_at = NOW() WHERE id = %s", (uid,))
         conn.commit()
         return jsonify({'message': 'User deleted'})
     except Exception as e:
@@ -200,7 +307,9 @@ def list_exercises():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT * FROM exercises ORDER BY category, name")
+        cursor.execute(
+            "SELECT * FROM exercises WHERE deleted_at IS NULL ORDER BY category, name"
+        )
         return jsonify(cursor.fetchall())
     finally:
         cursor.close()
@@ -210,16 +319,17 @@ def list_exercises():
 @admin_bp.route('/exercises', methods=['POST'])
 @role_required('admin')
 def create_exercise():
-    data = request.get_json() or {}
-    if not data.get('name') or not data.get('category'):
-        return jsonify({'error': 'name and category are required'}), 400
+    try:
+        body = CreateExerciseSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "INSERT INTO exercises (name, category, calories_burned_per_hour, description) VALUES (%s,%s,%s,%s)",
-            (data['name'], data['category'], int(data.get('calories_burned_per_hour', 0)), data.get('description')),
+            (body.name, body.category, body.calories_burned_per_hour, body.description),
         )
         conn.commit()
         return jsonify({'id': cursor.lastrowid, 'message': 'Exercise created'}), 201
@@ -237,7 +347,7 @@ def delete_exercise(eid):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM exercises WHERE id = %s", (eid,))
+        cursor.execute("UPDATE exercises SET deleted_at = NOW() WHERE id = %s", (eid,))
         conn.commit()
         return jsonify({'message': 'Exercise deleted'})
     except Exception as e:
@@ -251,8 +361,10 @@ def delete_exercise(eid):
 # ── Products ─────────────────────────────────────────────────────────────────
 
 def _resolve_category_id(cursor, slug):
-    """Look up category_id for a slug; raises ValueError if not found."""
-    cursor.execute("SELECT id FROM categories WHERE slug = %s", (slug,))
+    """Look up category_id for a slug; raises ValueError if not found or soft-deleted."""
+    cursor.execute(
+        "SELECT id FROM categories WHERE slug = %s AND deleted_at IS NULL", (slug,)
+    )
     row = cursor.fetchone()
     if not row:
         raise ValueError(f"Unknown category: {slug}")
@@ -261,7 +373,7 @@ def _resolve_category_id(cursor, slug):
 
 PRODUCT_SELECT = (
     "SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
-    "c.slug AS category, c.name AS category_name, c.icon AS category_icon, "
+    "c.slug AS category, c.name AS category_name, "
     "p.image_url, p.status, p.created_at, u.name AS created_by_name "
     "FROM products p "
     "JOIN categories c ON p.category_id = c.id "
@@ -272,11 +384,47 @@ PRODUCT_SELECT = (
 @admin_bp.route('/products', methods=['GET'])
 @role_required('admin')
 def list_products():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 10))))
+    search    = request.args.get('search', '').strip()
+    offset    = (page - 1) * page_size
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute(PRODUCT_SELECT + "ORDER BY p.created_at DESC")
-        return jsonify(cursor.fetchall())
+        if search:
+            like = f"%{search}%"
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM products p "
+                "JOIN categories c ON p.category_id = c.id "
+                "WHERE p.deleted_at IS NULL "
+                "AND (p.name LIKE %s OR p.description LIKE %s OR c.name LIKE %s)",
+                (like, like, like),
+            )
+            total = cursor.fetchone()['total']
+            cursor.execute(
+                PRODUCT_SELECT +
+                "WHERE p.deleted_at IS NULL "
+                "AND (p.name LIKE %s OR p.description LIKE %s OR c.name LIKE %s) "
+                "ORDER BY p.created_at DESC LIMIT %s OFFSET %s",
+                (like, like, like, page_size, offset),
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) AS total FROM products WHERE deleted_at IS NULL")
+            total = cursor.fetchone()['total']
+            cursor.execute(
+                PRODUCT_SELECT + "WHERE p.deleted_at IS NULL ORDER BY p.created_at DESC LIMIT %s OFFSET %s",
+                (page_size, offset),
+            )
+
+        items = cursor.fetchall()
+        return jsonify({
+            'items': items,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),  # ceiling division
+        })
     finally:
         cursor.close()
         conn.close()
@@ -285,22 +433,20 @@ def list_products():
 @admin_bp.route('/products', methods=['POST'])
 @role_required('admin')
 def create_product():
-    data = request.get_json() or {}
-    if not data.get('name') or data.get('price') is None:
-        return jsonify({'error': 'name and price are required'}), 400
+    try:
+        body = CreateProductSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        category_id = _resolve_category_id(cursor, data.get('category', 'strength'))
+        category_id = _resolve_category_id(cursor, body.category)
         cursor.execute(
             "INSERT INTO products (name, description, price, stock_quantity, category_id, image_url, status, created_by) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-            (
-                data['name'], data.get('description'), float(data['price']),
-                int(data.get('stock_quantity', 0)), category_id,
-                data.get('image_url'), data.get('status', 'active'), request.user_id,
-            ),
+            (body.name, body.description, body.price, body.stock_quantity,
+             category_id, body.image_url, body.status, request.user_id),
         )
         conn.commit()
         return jsonify({'id': cursor.lastrowid, 'message': 'Product created'}), 201
@@ -317,15 +463,17 @@ def create_product():
 @admin_bp.route('/products/<int:pid>', methods=['PUT'])
 @role_required('admin')
 def update_product(pid):
-    data = request.get_json() or {}
-    allowed = ['name', 'description', 'price', 'stock_quantity', 'image_url', 'status']
-    updates = {k: data[k] for k in allowed if k in data}
+    try:
+        body = UpdateProductSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        if 'category' in data:
-            updates['category_id'] = _resolve_category_id(cursor, data['category'])
+        updates = body.model_dump(exclude_unset=True)
+        if 'category' in updates:
+            updates['category_id'] = _resolve_category_id(cursor, updates.pop('category'))
 
         if not updates:
             return jsonify({'error': 'No valid fields'}), 400
@@ -351,7 +499,7 @@ def delete_product(pid):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM products WHERE id = %s", (pid,))
+        cursor.execute("UPDATE products SET deleted_at = NOW() WHERE id = %s", (pid,))
         conn.commit()
         return jsonify({'message': 'Product deleted'})
     except Exception as e:
@@ -376,11 +524,12 @@ def list_product_requests():
             "r.name AS reviewed_by_name "
             "FROM product_requests pr JOIN users u ON pr.user_id = u.id "
             "LEFT JOIN users r ON pr.reviewed_by = r.id "
+            "WHERE pr.deleted_at IS NULL "
         )
         if status_filter == 'all':
             cursor.execute(base + "ORDER BY pr.created_at DESC")
         else:
-            cursor.execute(base + "WHERE pr.status = %s ORDER BY pr.created_at DESC", (status_filter,))
+            cursor.execute(base + "AND pr.status = %s ORDER BY pr.created_at DESC", (status_filter,))
         return jsonify(cursor.fetchall())
     finally:
         cursor.close()
@@ -390,9 +539,10 @@ def list_product_requests():
 @admin_bp.route('/product-requests/<int:rid>/approve', methods=['PUT'])
 @role_required('admin')
 def approve_product_request(rid):
-    data = request.get_json() or {}
-    if data.get('price') is None:
-        return jsonify({'error': 'price is required to approve and list the product'}), 400
+    try:
+        body = ApproveProductRequestSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -404,23 +554,20 @@ def approve_product_request(rid):
         if req['status'] != 'pending':
             return jsonify({'error': 'Request already reviewed'}), 400
 
-        category_id = _resolve_category_id(cursor, data.get('category', 'strength'))
+        category_id = _resolve_category_id(cursor, body.category)
 
         cursor.execute(
             "INSERT INTO products (name, description, price, stock_quantity, category_id, status, created_by) "
             "VALUES (%s,%s,%s,%s,%s,'active',%s)",
-            (
-                req['product_name'], req['description'],
-                float(data['price']), int(data.get('stock_quantity', 0)),
-                category_id, request.user_id,
-            ),
+            (req['product_name'], req['description'], body.price,
+             body.stock_quantity, category_id, request.user_id),
         )
         product_id = cursor.lastrowid
 
         cursor.execute(
             "UPDATE product_requests SET status='approved', admin_note=%s, "
             "reviewed_by=%s, reviewed_at=NOW() WHERE id = %s",
-            (data.get('admin_note'), request.user_id, rid),
+            (body.admin_note, request.user_id, rid),
         )
         conn.commit()
         return jsonify({'message': 'Request approved and product added', 'product_id': product_id})
@@ -437,7 +584,11 @@ def approve_product_request(rid):
 @admin_bp.route('/product-requests/<int:rid>/reject', methods=['PUT'])
 @role_required('admin')
 def reject_product_request(rid):
-    data = request.get_json() or {}
+    try:
+        body = RejectRequestSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -451,7 +602,7 @@ def reject_product_request(rid):
         cursor.execute(
             "UPDATE product_requests SET status='rejected', admin_note=%s, "
             "reviewed_by=%s, reviewed_at=NOW() WHERE id = %s",
-            (data.get('admin_note'), request.user_id, rid),
+            (body.admin_note, request.user_id, rid),
         )
         conn.commit()
         return jsonify({'message': 'Request rejected'})
@@ -474,6 +625,7 @@ def list_all_orders():
         cursor.execute(
             "SELECT o.*, u.name AS user_name, u.email AS user_email "
             "FROM orders o JOIN users u ON o.user_id = u.id "
+            "WHERE o.deleted_at IS NULL "
             "ORDER BY o.created_at DESC"
         )
         orders = cursor.fetchall()
@@ -493,16 +645,15 @@ def list_all_orders():
 @admin_bp.route('/orders/<int:oid>/status', methods=['PUT'])
 @role_required('admin')
 def update_order_status(oid):
-    data = request.get_json() or {}
-    status = data.get('status')
-    valid = ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled')
-    if status not in valid:
-        return jsonify({'error': f'status must be one of: {", ".join(valid)}'}), 400
+    try:
+        body = UpdateOrderStatusSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("UPDATE orders SET status = %s WHERE id = %s", (status, oid))
+        cursor.execute("UPDATE orders SET status = %s WHERE id = %s", (body.status, oid))
         conn.commit()
         return jsonify({'message': 'Order status updated'})
     except Exception as e:
@@ -531,11 +682,12 @@ def list_trainer_assignments():
             "JOIN users c ON ta.customer_id = c.id "
             "JOIN users t ON ta.trainer_id  = t.id "
             "LEFT JOIN users a ON ta.reviewed_by_admin = a.id "
+            "WHERE ta.deleted_at IS NULL "
         )
         if status_filter == 'all':
             cursor.execute(base + "ORDER BY ta.created_at DESC")
         else:
-            cursor.execute(base + "WHERE ta.status = %s ORDER BY ta.created_at DESC",
+            cursor.execute(base + "AND ta.status = %s ORDER BY ta.created_at DESC",
                            (status_filter,))
         return jsonify(cursor.fetchall())
     finally:
@@ -546,7 +698,11 @@ def list_trainer_assignments():
 @admin_bp.route('/trainer-assignments/<int:aid>/approve', methods=['PUT'])
 @role_required('admin')
 def approve_trainer_assignment(aid):
-    data = request.get_json() or {}
+    try:
+        body = TrainerAssignmentNoteSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -560,7 +716,7 @@ def approve_trainer_assignment(aid):
         cursor.execute(
             "UPDATE trainer_assignments SET status='approved', admin_note=%s, "
             "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
-            (data.get('admin_note'), request.user_id, aid),
+            (body.admin_note, request.user_id, aid),
         )
         conn.commit()
         return jsonify({'message': 'Trainer assignment approved'})
@@ -575,7 +731,11 @@ def approve_trainer_assignment(aid):
 @admin_bp.route('/trainer-assignments/<int:aid>/reject', methods=['PUT'])
 @role_required('admin')
 def reject_trainer_assignment(aid):
-    data = request.get_json() or {}
+    try:
+        body = TrainerAssignmentNoteSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -589,7 +749,7 @@ def reject_trainer_assignment(aid):
         cursor.execute(
             "UPDATE trainer_assignments SET status='rejected', admin_note=%s, "
             "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
-            (data.get('admin_note'), request.user_id, aid),
+            (body.admin_note, request.user_id, aid),
         )
         conn.commit()
         return jsonify({'message': 'Trainer assignment rejected'})
