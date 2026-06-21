@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { toast } from 'sonner'
 import type { TrainerAssignment, TrainerInfo } from '@/types'
 
 const STATUS_META: Record<string, { label: string; color: string; icon: React.ReactNode; description: string }> = {
@@ -44,7 +45,7 @@ export default function MyTrainer() {
   const [selectedTrainer, setSelectedTrainer] = useState<TrainerInfo | null>(null)
   const [note, setNote] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [error, setError] = useState('')
+  const [cancelOpen, setCancelOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   function loadAssignment() {
@@ -67,33 +68,34 @@ export default function MyTrainer() {
   async function sendRequest() {
     if (!selectedTrainer) return
     setSaving(true)
-    setError('')
     try {
       await api.post('/user/trainer-assignment', {
         trainer_id: selectedTrainer.id,
         customer_note: note.trim() || undefined,
       })
+      toast.success('Request sent successfully')
       setDialogOpen(false)
       setNote('')
       loadAssignment()
     } catch (e) {
-      setError((e as Error).message)
+      toast.error((e as Error).message)
     } finally {
       setSaving(false)
     }
   }
 
   async function cancelRequest() {
-    if (!confirm('Cancel your pending request?')) return
     try {
       await api.delete('/user/trainer-assignment')
+      toast.success('Request cancelled')
       loadAssignment()
     } catch (e) {
-      setError((e as Error).message)
+      toast.error((e as Error).message)
+    } finally {
+      setCancelOpen(false)
     }
   }
 
-  // Loading state
   if (assignment === undefined) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -109,9 +111,6 @@ export default function MyTrainer() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">My Trainer</h1>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-
-      {/* Current assignment status */}
       {assignment && meta && (
         <Card className={`border ${meta.color}`}>
           <CardHeader className="pb-3">
@@ -160,7 +159,11 @@ export default function MyTrainer() {
             </div>
 
             {assignment.status === 'pending_trainer' && (
-              <Button variant="outline" size="sm" className="gap-1.5 text-destructive border-destructive/40 hover:bg-red-50" onClick={cancelRequest}>
+              <Button
+                variant="outline" size="sm"
+                className="gap-1.5 text-destructive border-destructive/40 hover:bg-red-50"
+                onClick={() => setCancelOpen(true)}
+              >
                 <X className="h-3.5 w-3.5" />
                 Cancel Request
               </Button>
@@ -179,7 +182,6 @@ export default function MyTrainer() {
         </Card>
       )}
 
-      {/* Trainer list — shown when no active/pending assignment */}
       {showTrainerList && (
         <Card>
           <CardHeader>
@@ -206,9 +208,8 @@ export default function MyTrainer() {
                     <TableCell className="text-muted-foreground">{t.customer_count ?? 0}</TableCell>
                     <TableCell>
                       <Button
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => { setSelectedTrainer(t); setNote(''); setError(''); setDialogOpen(true) }}
+                        size="sm" className="gap-1.5"
+                        onClick={() => { setSelectedTrainer(t); setNote(''); setDialogOpen(true) }}
                       >
                         <Send className="h-3.5 w-3.5" />
                         Request
@@ -246,13 +247,21 @@ export default function MyTrainer() {
               onChange={e => setNote(e.target.value)}
             />
           </div>
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button onClick={sendRequest} disabled={saving}>{saving ? 'Sending…' : 'Send Request'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title="Cancel trainer request?"
+        description="Your pending request will be withdrawn. You can send a new request anytime."
+        confirmLabel="Cancel Request"
+        onConfirm={cancelRequest}
+      />
     </div>
   )
 }

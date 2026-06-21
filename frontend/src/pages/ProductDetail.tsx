@@ -1,30 +1,15 @@
 import { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  ShoppingCart,
-  Plus,
-  Minus,
-  Package,
-  CheckCircle2,
-} from "lucide-react";
+import { useParams, Link } from "react-router-dom";
+import { ArrowLeft, ShoppingCart, Package } from "lucide-react";
 import { api } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
+import { useCartStore } from "@/store/cartStore";
 import PublicLayout from "@/components/PublicLayout";
+import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogBody,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { toast } from "sonner";
 import type { Product } from "@/types";
 
 type CatMeta = { gradient: string; badgeClass: string; glyph: string };
@@ -61,18 +46,12 @@ const fallbackMeta: CatMeta = CAT_META.machines;
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const { add } = useCartStore();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-
   const [quantity, setQuantity] = useState(1);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [shippingAddress, setShippingAddress] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [orderError, setOrderError] = useState("");
-  const [orderSuccess, setOrderSuccess] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -83,29 +62,6 @@ export default function ProductDetail() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
-
-  async function placeOrder() {
-    if (!product) return;
-    if (!shippingAddress.trim()) {
-      setOrderError("Shipping address is required");
-      return;
-    }
-    setSubmitting(true);
-    setOrderError("");
-    try {
-      await api.post("/user/orders", {
-        items: [{ product_id: product.id, quantity }],
-        shipping_address: shippingAddress,
-      });
-      setOrderSuccess(true);
-      setCheckoutOpen(false);
-      setTimeout(() => navigate("/customer/orders"), 1600);
-    } catch (e) {
-      setOrderError((e as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -142,6 +98,11 @@ export default function ProductDetail() {
   const outOfStock = product.stock_quantity === 0;
   const lowStock = !outOfStock && product.stock_quantity <= 5;
   const orderTotal = Number(product.price) * quantity;
+
+  function handleAddToCart() {
+    add({ product_id: product!.id, name: product!.name, price: Number(product!.price) }, quantity);
+    toast.success(`${product!.name} added to cart`);
+  }
 
   return (
     <PublicLayout>
@@ -204,7 +165,7 @@ export default function ProductDetail() {
             {/* Price */}
             <div>
               <span className="text-4xl font-black tracking-tight text-foreground">
-                ${Number(product.price).toFixed(2)}
+                RS. {Number(product.price).toFixed(2)}
               </span>
               <div className="mt-1 text-sm">
                 {outOfStock ? (
@@ -231,44 +192,19 @@ export default function ProductDetail() {
               />
             )}
 
-            {/* Success state */}
-            {orderSuccess && (
-              <div className="flex items-center gap-2 rounded-lg bg-primary-50 px-4 py-3 text-sm font-medium text-primary-700">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Order placed! Redirecting to your orders…
-              </div>
-            )}
-
             {/* Quantity + CTA */}
-            {!outOfStock && !orderSuccess && (
+            {!outOfStock && (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-muted-foreground">Qty</span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-8 w-8"
-                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="w-10 text-center text-sm font-semibold">
-                      {quantity}
-                    </span>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        setQuantity((q) => Math.min(product.stock_quantity, q + 1))
-                      }
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  <QuantityStepper
+                    value={quantity}
+                    onChange={setQuantity}
+                    min={1}
+                    max={product.stock_quantity}
+                  />
                   <span className="text-sm text-muted-foreground">
-                    = <strong className="text-foreground">${orderTotal.toFixed(2)}</strong>
+                    = <strong className="text-foreground">RS. {orderTotal.toFixed(2)}</strong>
                   </span>
                 </div>
 
@@ -276,34 +212,30 @@ export default function ProductDetail() {
                   <Button
                     size="lg"
                     className="w-full gap-2 bg-foreground text-background hover:bg-foreground/80"
-                    onClick={() => {
-                      setOrderError("");
-                      setCheckoutOpen(true);
-                    }}
+                    onClick={handleAddToCart}
                   >
                     <ShoppingCart className="h-4 w-4" />
-                    Buy Now
+                    Add to Cart
                   </Button>
                 ) : (
-                  <Button
-                    asChild
-                    size="lg"
-                    className="w-full gap-2 bg-foreground text-background hover:bg-foreground/80"
-                  >
-                    <Link to="/login">
-                      <ShoppingCart className="h-4 w-4" />
-                      Sign in to Buy
-                    </Link>
-                  </Button>
-                )}
-
-                {!user && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    Don't have an account?{" "}
-                    <Link to="/register" className="font-semibold text-primary-600 hover:underline">
-                      Register free
-                    </Link>
-                  </p>
+                  <>
+                    <Button
+                      asChild
+                      size="lg"
+                      className="w-full gap-2 bg-foreground text-background hover:bg-foreground/80"
+                    >
+                      <Link to="/login">
+                        <ShoppingCart className="h-4 w-4" />
+                        Sign in to Buy
+                      </Link>
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground">
+                      Don't have an account?{" "}
+                      <Link to="/register" className="font-semibold text-primary-600 hover:underline">
+                        Register free
+                      </Link>
+                    </p>
+                  </>
                 )}
               </div>
             )}
@@ -340,57 +272,6 @@ export default function ProductDetail() {
           </div>
         )}
       </div>
-
-      {/* ── Checkout dialog ── */}
-      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirm Order</DialogTitle>
-          </DialogHeader>
-
-          <DialogBody>
-            <div className="space-y-4">
-              <div className="rounded-lg bg-muted p-4">
-                <p className="font-semibold text-foreground">{product.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {quantity} × ${Number(product.price).toFixed(2)}
-                </p>
-                <p className="mt-2 text-lg font-black text-foreground">
-                  Total: ${orderTotal.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Shipping Address</Label>
-                <Input
-                  placeholder="Enter your shipping address"
-                  value={shippingAddress}
-                  onChange={(e) => setShippingAddress(e.target.value)}
-                />
-              </div>
-
-              {orderError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{orderError}</AlertDescription>
-                </Alert>
-              )}
-            </div>
-          </DialogBody>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCheckoutOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={placeOrder}
-              disabled={submitting}
-              className="bg-primary text-primary-foreground hover:bg-primary-600"
-            >
-              {submitting ? "Placing…" : "Place Order"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PublicLayout>
   );
 }

@@ -28,7 +28,8 @@ http.interceptors.response.use(
         p !== "/" &&
         p !== "/login" &&
         p !== "/register" &&
-        p !== "/products"
+        !p.startsWith("/products") &&
+        !p.startsWith("/payment")
       ) {
         window.location.href = "/";
       }

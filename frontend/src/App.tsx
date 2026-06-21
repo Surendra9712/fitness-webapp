@@ -3,11 +3,13 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
 import { getDashboardPath } from "@/lib/roles";
+import { Toaster } from "@/components/ui/sonner";
 
 import Home from "@/pages/Home";
 import Register from "@/pages/Register";
 import Products from "@/pages/Products";
 import ProductDetail from "@/pages/ProductDetail";
+import PaymentReturn from "@/pages/PaymentReturn";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UserManagement from "@/pages/admin/UserManagement";
@@ -51,11 +53,15 @@ function Layout({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+      <Toaster />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/payment/esewa/success" element={<PaymentReturn />} />
+          <Route path="/payment/esewa/failure" element={<PaymentReturn />} />
+          <Route path="/payment/khalti/return" element={<PaymentReturn />} />
           <Route path="/dashboard" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
           <Route path="/register" element={<Register />} />

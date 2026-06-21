@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { toast } from 'sonner'
 import type { User, Role } from '@/types'
 import { ROLE_LABELS } from '@/lib/roles'
 
@@ -21,31 +22,57 @@ export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'user' })
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
 
-  const load = () => api.get<User[]>('/admin/users').then(setUsers).catch(e => setError((e as Error).message))
+  const load = () =>
+    api.get<User[]>('/admin/users').then(setUsers).catch(e => toast.error((e as Error).message))
+
   useEffect(() => { load() }, [])
 
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setSuccess(''); setLoading(true)
+    e.preventDefault()
+    setLoading(true)
     try {
       await api.post('/admin/users', form)
-      setSuccess('User created'); setForm({ name: '', email: '', password: '', role: 'user' }); setOpen(false); load()
-    } catch (err) { setError((err as Error).message) }
-    finally { setLoading(false) }
+      toast.success('User created')
+      setForm({ name: '', email: '', password: '', role: 'user' })
+      setOpen(false)
+      load()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const toggleActive = async (u: User) => {
-    try { await api.put(`/admin/users/${u.id}`, { is_active: !u.is_active }); load() }
-    catch (err) { setError((err as Error).message) }
+    try {
+      await api.put(`/admin/users/${u.id}`, { is_active: !u.is_active })
+      load()
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
   }
 
-  const deleteUser = async (id: number) => {
-    if (!confirm('Permanently delete this user?')) return
-    try { await api.delete(`/admin/users/${id}`); load() }
-    catch (err) { setError((err as Error).message) }
+  function handleDeleteClick(id: number) {
+    setPendingDeleteId(id)
+    setConfirmOpen(true)
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteId) return
+    try {
+      await api.delete(`/admin/users/${pendingDeleteId}`)
+      toast.success('User deleted')
+      load()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setConfirmOpen(false)
+      setPendingDeleteId(null)
+    }
   }
 
   return (
@@ -90,9 +117,6 @@ export default function UserManagement() {
         </Dialog>
       </div>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-      {success && <Alert variant="success"><AlertDescription>{success}</AlertDescription></Alert>}
-
       <Card>
         <CardHeader><CardTitle>All Users ({users.length})</CardTitle></CardHeader>
         <CardContent className="p-0">
@@ -120,7 +144,7 @@ export default function UserManagement() {
                         {u.is_active ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
                         {u.is_active ? 'Disable' : 'Enable'}
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => deleteUser(u.id)}>Delete</Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(u.id)}>Delete</Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -132,6 +156,15 @@ export default function UserManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete user?"
+        description="This will permanently delete the user account. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }

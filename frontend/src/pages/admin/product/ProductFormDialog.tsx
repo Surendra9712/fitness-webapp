@@ -7,7 +7,6 @@ import { api, ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -31,10 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "sonner";
 import type { Product, Category } from "@/types";
 
-// Keep numeric fields as strings so HTML inputs work naturally;
-// convert to numbers in onSubmit before sending to the API.
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().min(1, "Description is required"),
@@ -86,7 +84,7 @@ export function ProductFormDialog({
     },
   });
 
-  const { isSubmitting, errors } = form.formState;
+  const { isSubmitting } = form.formState;
 
   useEffect(() => {
     if (!open) return;
@@ -116,7 +114,6 @@ export function ProductFormDialog({
   async function onSubmit(values: ProductValues) {
     const payload = {
       ...values,
-      price: parseFloat(values.price),
       stock_quantity: parseInt(values.stock_quantity || "0"),
     };
     try {
@@ -125,6 +122,7 @@ export function ProductFormDialog({
       } else {
         await api.post("/admin/products", payload);
       }
+      toast.success(editing ? "Product updated" : "Product created");
       onOpenChange(false);
       onSaved();
     } catch (err) {
@@ -133,7 +131,7 @@ export function ProductFormDialog({
           form.setError(field as keyof ProductValues, { message });
         });
       } else {
-        form.setError("root", { message: (err as Error).message });
+        toast.error((err as Error).message);
       }
     }
   }
@@ -148,12 +146,6 @@ export function ProductFormDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <DialogBody>
-              {errors.root && (
-                <Alert variant="destructive">
-                  <AlertDescription>{errors.root.message}</AlertDescription>
-                </Alert>
-              )}
-
               <FormField
                 control={form.control}
                 name="name"
@@ -203,7 +195,6 @@ export function ProductFormDialog({
                         <Input
                           type="number"
                           min="0"
-                          step="0.01"
                           placeholder="0"
                           {...field}
                         />

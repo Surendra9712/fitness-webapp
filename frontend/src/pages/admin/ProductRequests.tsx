@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
 import type { ProductRequest, Category } from '@/types'
 
 const statusVariant: Record<string, 'info' | 'success' | 'destructive'> = {
@@ -24,7 +24,6 @@ export default function ProductRequests() {
   const [rejectDialog, setRejectDialog] = useState<ProductRequest | null>(null)
   const [approveForm, setApproveForm] = useState({ price: '', stock_quantity: '', category: '', admin_note: '' })
   const [rejectNote, setRejectNote] = useState('')
-  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -37,16 +36,18 @@ export default function ProductRequests() {
   function load() {
     api.get<ProductRequest[]>(`/admin/product-requests?status=${filter}`)
       .then(setRequests)
-      .catch(e => setError((e as Error).message))
+      .catch(e => toast.error((e as Error).message))
   }
 
   useEffect(() => { load() }, [filter])
 
   async function approve() {
     if (!approveDialog) return
-    if (!approveForm.price) { setError('Price is required'); return }
+    if (!approveForm.price) {
+      toast.error('Price is required')
+      return
+    }
     setSaving(true)
-    setError('')
     try {
       await api.put(`/admin/product-requests/${approveDialog.id}/approve`, {
         price: parseFloat(approveForm.price),
@@ -54,10 +55,11 @@ export default function ProductRequests() {
         category: approveForm.category,
         admin_note: approveForm.admin_note,
       })
+      toast.success(`"${approveDialog.product_name}" approved and added to catalog`)
       setApproveDialog(null)
       load()
     } catch (e) {
-      setError((e as Error).message)
+      toast.error((e as Error).message)
     } finally {
       setSaving(false)
     }
@@ -66,14 +68,14 @@ export default function ProductRequests() {
   async function reject() {
     if (!rejectDialog) return
     setSaving(true)
-    setError('')
     try {
       await api.put(`/admin/product-requests/${rejectDialog.id}/reject`, { admin_note: rejectNote })
+      toast.success('Request rejected')
       setRejectDialog(null)
       setRejectNote('')
       load()
     } catch (e) {
-      setError((e as Error).message)
+      toast.error((e as Error).message)
     } finally {
       setSaving(false)
     }
@@ -93,8 +95,6 @@ export default function ProductRequests() {
           </SelectContent>
         </Select>
       </div>
-
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       <Card>
         <CardContent className="p-0">
@@ -132,14 +132,14 @@ export default function ProductRequests() {
                         <Button
                           size="sm" variant="outline"
                           className="h-7 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => { setApproveForm({ price: '', stock_quantity: '', category: categories[0]?.slug ?? '', admin_note: '' }); setApproveDialog(r); setError('') }}
+                          onClick={() => { setApproveForm({ price: '', stock_quantity: '', category: categories[0]?.slug ?? '', admin_note: '' }); setApproveDialog(r) }}
                         >
                           <CheckCircle className="h-3.5 w-3.5 mr-1" />Approve
                         </Button>
                         <Button
                           size="sm" variant="outline"
                           className="h-7 border-destructive text-destructive hover:bg-red-50"
-                          onClick={() => { setRejectNote(''); setRejectDialog(r); setError('') }}
+                          onClick={() => { setRejectNote(''); setRejectDialog(r) }}
                         >
                           <XCircle className="h-3.5 w-3.5 mr-1" />Reject
                         </Button>
@@ -171,7 +171,7 @@ export default function ProductRequests() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Price ($) *</Label>
+                <Label>Price (Rs.) *</Label>
                 <Input type="number" min="0" step="0.01" value={approveForm.price} onChange={e => setApproveForm(p => ({ ...p, price: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
@@ -192,7 +192,6 @@ export default function ProductRequests() {
               <Label>Note to Customer (optional)</Label>
               <Input placeholder="e.g. Now available in the shop!" value={approveForm.admin_note} onChange={e => setApproveForm(p => ({ ...p, admin_note: e.target.value }))} />
             </div>
-            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveDialog(null)}>Cancel</Button>
@@ -212,7 +211,6 @@ export default function ProductRequests() {
             <Label>Reason for Rejection (optional)</Label>
             <Input placeholder="e.g. Not within our product range" value={rejectNote} onChange={e => setRejectNote(e.target.value)} />
           </div>
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
             <Button variant="destructive" onClick={reject} disabled={saving}>{saving ? 'Rejecting…' : 'Reject'}</Button>

@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { toast } from "sonner";
 import type { Category } from "@/types";
 
 const emptyForm = { name: "", slug: "", description: "" };
@@ -37,14 +38,15 @@ export default function CategoryManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState(emptyForm);
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
 
   function load() {
     api
       .get<Category[]>("/admin/categories")
       .then(setCategories)
-      .catch((e) => setError((e as Error).message));
+      .catch((e) => toast.error((e as Error).message));
   }
 
   useEffect(() => {
@@ -54,18 +56,12 @@ export default function CategoryManagement() {
   function openAdd() {
     setEditing(null);
     setForm(emptyForm);
-    setError("");
     setDialogOpen(true);
   }
 
   function openEdit(c: Category) {
     setEditing(c);
-    setForm({
-      name: c.name,
-      slug: c.slug,
-      description: c.description ?? "",
-    });
-    setError("");
+    setForm({ name: c.name, slug: c.slug, description: c.description ?? "" });
     setDialogOpen(true);
   }
 
@@ -73,46 +69,48 @@ export default function CategoryManagement() {
     setForm((f) => ({
       ...f,
       name,
-      // auto-fill slug only when adding new (not editing)
       ...(editing ? {} : { slug: toSlug(name) }),
     }));
   }
 
   async function save() {
     if (!form.name.trim() || !form.slug.trim()) {
-      setError("Name and slug are required");
+      toast.error("Name and slug are required");
       return;
     }
     setSaving(true);
-    setError("");
     try {
       if (editing) {
         await api.put(`/admin/categories/${editing.id}`, form);
       } else {
         await api.post("/admin/categories", form);
       }
+      toast.success(editing ? "Category updated" : "Category created");
       setDialogOpen(false);
       load();
     } catch (e) {
-      setError((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
   }
 
-  async function del(id: number, name: string) {
-    if (
-      !confirm(
-        `Delete category "${name}"? This will fail if products are assigned to it.`,
-      )
-    )
-      return;
-    setError("");
+  function handleDeleteClick(c: Category) {
+    setPendingDelete(c);
+    setConfirmOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
     try {
-      await api.delete(`/admin/categories/${id}`);
+      await api.delete(`/admin/categories/${pendingDelete.id}`);
+      toast.success(`Category "${pendingDelete.name}" deleted`);
       load();
     } catch (e) {
-      setError((e as Error).message);
+      toast.error((e as Error).message);
+    } finally {
+      setConfirmOpen(false);
+      setPendingDelete(null);
     }
   }
 
@@ -130,12 +128,6 @@ export default function CategoryManagement() {
           Add Category
         </Button>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       <Card>
         <CardContent className="p-0">
@@ -174,7 +166,7 @@ export default function CategoryManagement() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                        onClick={() => del(c.id, c.name)}
+                        onClick={() => handleDeleteClick(c)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -241,12 +233,6 @@ export default function CategoryManagement() {
                 }
               />
             </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
           </div>
 
           <DialogFooter>
@@ -259,6 +245,15 @@ export default function CategoryManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete category?"
+        description={`Delete "${pendingDelete?.name}"? This will fail if products are assigned to it.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

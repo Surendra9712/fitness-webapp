@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { toast } from 'sonner'
 import type { Exercise, ExerciseCategory } from '@/types'
 
 const catVariant: Record<ExerciseCategory, 'warning' | 'destructive' | 'success' | 'info' | 'secondary'> = {
@@ -21,24 +22,44 @@ export default function ExerciseLibrary() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'cardio' as ExerciseCategory, calories_burned_per_hour: '', description: '' })
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
 
-  const load = () => api.get<Exercise[]>('/admin/exercises').then(setExercises).catch(e => setError((e as Error).message))
+  const load = () =>
+    api.get<Exercise[]>('/admin/exercises').then(setExercises).catch(e => toast.error((e as Error).message))
+
   useEffect(() => { load() }, [])
 
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setSuccess('')
+    e.preventDefault()
     try {
       await api.post('/admin/exercises', form)
-      setSuccess('Exercise added'); setForm({ name: '', category: 'cardio', calories_burned_per_hour: '', description: '' }); setOpen(false); load()
-    } catch (err) { setError((err as Error).message) }
+      toast.success('Exercise added')
+      setForm({ name: '', category: 'cardio', calories_burned_per_hour: '', description: '' })
+      setOpen(false)
+      load()
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
   }
 
-  const deleteEx = async (id: number) => {
-    if (!confirm('Delete this exercise?')) return
-    try { await api.delete(`/admin/exercises/${id}`); load() }
-    catch (err) { setError((err as Error).message) }
+  function handleDeleteClick(id: number) {
+    setPendingDeleteId(id)
+    setConfirmOpen(true)
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteId) return
+    try {
+      await api.delete(`/admin/exercises/${pendingDeleteId}`)
+      toast.success('Exercise deleted')
+      load()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setConfirmOpen(false)
+      setPendingDeleteId(null)
+    }
   }
 
   return (
@@ -79,9 +100,6 @@ export default function ExerciseLibrary() {
         </Dialog>
       </div>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-      {success && <Alert variant="success"><AlertDescription>{success}</AlertDescription></Alert>}
-
       <Card>
         <CardHeader><CardTitle>Exercises ({exercises.length})</CardTitle></CardHeader>
         <CardContent className="p-0">
@@ -101,7 +119,7 @@ export default function ExerciseLibrary() {
                   <TableCell>{ex.calories_burned_per_hour}</TableCell>
                   <TableCell className="text-muted-foreground">{ex.description || '—'}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="destructive" onClick={() => deleteEx(ex.id)}>Delete</Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDeleteClick(ex.id)}>Delete</Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -112,6 +130,15 @@ export default function ExerciseLibrary() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete exercise?"
+        description="This will permanently remove the exercise from the library."
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }

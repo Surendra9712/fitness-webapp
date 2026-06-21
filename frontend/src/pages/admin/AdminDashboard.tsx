@@ -3,8 +3,8 @@ import { Users, UserCheck, Package, ShoppingBag, Bell, TrendingUp } from 'lucide
 import { api } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { toast } from 'sonner'
 import { ROLE_LABELS } from '@/lib/roles'
 import type { AdminStats, Role } from '@/types'
 
@@ -14,13 +14,10 @@ const roleBadge: Record<Role, 'destructive' | 'info' | 'success'> = {
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null)
-  const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get<AdminStats>('/admin/stats').then(setStats).catch(e => setError((e as Error).message))
+    api.get<AdminStats>('/admin/stats').then(setStats).catch(e => toast.error((e as Error).message))
   }, [])
-
-  if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
 
   return (
     <div className="space-y-6">

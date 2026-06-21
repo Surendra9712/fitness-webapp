@@ -13,10 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { ProductFormDialog } from "@/pages/admin/product/ProductFormDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { toast } from "sonner";
 import type { Product, Category, PaginatedResponse } from "@/types";
 
 const PAGE_SIZE = 10;
@@ -33,7 +34,8 @@ export default function ProductManagement() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [error, setError] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const { page, goToPage, resetPage } = usePagination();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,7 +49,7 @@ export default function ProductManagement() {
     api
       .get<PaginatedResponse<Product>>(`/admin/products?${params}`)
       .then(setData)
-      .catch((e) => setError((e as Error).message));
+      .catch((e) => toast.error((e as Error).message));
   }
 
   useEffect(() => {
@@ -80,13 +82,22 @@ export default function ProductManagement() {
     setDialogOpen(true);
   }
 
-  async function del(id: number) {
-    if (!confirm("Delete this product?")) return;
+  function handleDeleteClick(id: number) {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteId) return;
     try {
-      await api.delete(`/admin/products/${id}`);
+      await api.delete(`/admin/products/${pendingDeleteId}`);
+      toast.success("Product deleted");
       load(page, search);
     } catch (e) {
-      setError((e as Error).message);
+      toast.error((e as Error).message);
+    } finally {
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
     }
   }
 
@@ -99,12 +110,6 @@ export default function ProductManagement() {
           Add Product
         </Button>
       </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
@@ -137,15 +142,7 @@ export default function ProductManagement() {
             <TableBody>
               {data.items.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">
-                    {p.name}
-                    {/* {p.description && (
-                      <div
-                        className="max-w-xs truncate text-xs text-muted-foreground"
-                        dangerouslySetInnerHTML={{ __html: p.description }}
-                      />
-                    )} */}
-                  </TableCell>
+                  <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">
                       {p.category}
@@ -183,7 +180,7 @@ export default function ProductManagement() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8 text-destructive"
-                        onClick={() => del(p.id)}
+                        onClick={() => handleDeleteClick(p.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -221,6 +218,15 @@ export default function ProductManagement() {
         editing={editing}
         categories={categories}
         onSaved={() => load(page, search)}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete product?"
+        description="This will permanently remove the product. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
       />
     </div>
   );

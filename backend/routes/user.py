@@ -2,10 +2,23 @@ from flask import Blueprint, request, jsonify
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic import ConfigDict
 from typing import Optional
+import base64
 import datetime
+import hashlib
+import hmac
+import os
+import time
+import requests as http_req
 from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
+
+ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
+ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
+ESEWA_URL          = os.getenv('ESEWA_URL', 'https://rc-epay.esewa.com.np/api/epay/main/v2/form')
+KHALTI_SECRET      = os.getenv('KHALTI_SECRET_KEY', 'test_secret_key_dc74e0fd57cb46cd93832aee0a390234')
+KHALTI_INITIATE_URL = os.getenv('KHALTI_INITIATE_URL', 'https://a.khalti.com/api/v2/epayment/initiate/')
+FRONTEND_URL       = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 user_bp = Blueprint('user', __name__)
 
@@ -27,6 +40,14 @@ class OrderItemSchema(BaseModel):
 class PlaceOrderSchema(BaseModel):
     items: list[OrderItemSchema] = Field(min_length=1)
     shipping_address: Optional[str] = None
+    payment_method: str = 'cod'
+
+    @field_validator('payment_method')
+    @classmethod
+    def validate_payment_method(cls, v: str) -> str:
+        if v not in ('cod', 'esewa', 'khalti'):
+            raise ValueError('payment_method must be cod, esewa, or khalti')
+        return v
 
 
 class RequestProductSchema(BaseModel):
@@ -330,6 +351,7 @@ def place_order():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        # Resolve products and compute total
         total = 0.0
         resolved = []
         for item in body.items:
@@ -346,24 +368,102 @@ def place_order():
             total += float(product['price']) * item.quantity
             resolved.append({'product': product, 'quantity': item.quantity})
 
+        total = round(total, 2)
+
+        # For COD confirm immediately; for digital payments mark payment_status pending
+        payment_status = 'pending' if body.payment_method in ('esewa', 'khalti') else 'pending'
+
         cursor.execute(
-            "INSERT INTO orders (user_id, total_amount, shipping_address) VALUES (%s,%s,%s)",
-            (request.user_id, round(total, 2), body.shipping_address),
+            "INSERT INTO orders (user_id, total_amount, shipping_address, payment_method, payment_status) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (request.user_id, total, body.shipping_address, body.payment_method, payment_status),
         )
         order_id = cursor.lastrowid
 
         for r in resolved:
             cursor.execute(
-                "INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (%s,%s,%s,%s)",
+                "INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) "
+                "VALUES (%s, %s, %s, %s)",
                 (order_id, r['product']['id'], r['quantity'], r['product']['price']),
             )
-            cursor.execute(
-                "UPDATE products SET stock_quantity = stock_quantity - %s WHERE id = %s",
-                (r['quantity'], r['product']['id']),
-            )
+            # Decrement stock only for COD; for digital payments deduct after verification
+            if body.payment_method == 'cod':
+                cursor.execute(
+                    "UPDATE products SET stock_quantity = stock_quantity - %s WHERE id = %s",
+                    (r['quantity'], r['product']['id']),
+                )
 
         conn.commit()
-        return jsonify({'id': order_id, 'total_amount': round(total, 2), 'message': 'Order placed'}), 201
+
+        # ── COD: done ────────────────────────────────────────────────────────
+        if body.payment_method == 'cod':
+            return jsonify({'id': order_id, 'total_amount': total, 'payment_method': 'cod'}), 201
+
+        transaction_uuid = f"order-{order_id}-{int(time.time() * 1000)}"
+
+        # ── eSewa ────────────────────────────────────────────────────────────
+        if body.payment_method == 'esewa':
+            total_str = f"{total:.2f}"   # must be "500.00" not "500.0"
+            message = f"total_amount={total_str},transaction_uuid={transaction_uuid},product_code={ESEWA_PRODUCT_CODE}"
+            sig = base64.b64encode(
+                hmac.new(ESEWA_SECRET.encode(), message.encode(), hashlib.sha256).digest()
+            ).decode()
+
+            esewa_params = {
+                'amount': total_str,
+                'tax_amount': '0',
+                'total_amount': total_str,
+                'transaction_uuid': transaction_uuid,
+                'product_code': ESEWA_PRODUCT_CODE,
+                'product_service_charge': '0',
+                'product_delivery_charge': '0',
+                'success_url': f"{FRONTEND_URL}/payment/esewa/success",
+                'failure_url': f"{FRONTEND_URL}/payment/esewa/failure",
+                'signed_field_names': 'total_amount,transaction_uuid,product_code',
+                'signature': sig,
+            }
+            return jsonify({
+                'id': order_id,
+                'payment_method': 'esewa',
+                'esewa_url': ESEWA_URL,
+                'esewa_params': esewa_params,
+            }), 201
+
+        # ── Khalti ───────────────────────────────────────────────────────────
+        if body.payment_method == 'khalti':
+            cursor.execute("SELECT name, email FROM users WHERE id = %s", (request.user_id,))
+            user = cursor.fetchone() or {}
+
+            headers = {'Authorization': f'Key {KHALTI_SECRET}'}
+            payload = {
+                'return_url': f"{FRONTEND_URL}/payment/khalti/return",
+                'website_url': FRONTEND_URL,
+                'amount': int(total * 100),   # paisa
+                'purchase_order_id': transaction_uuid,
+                'purchase_order_name': f"SmartDiet Order #{order_id}",
+                'customer_info': {
+                    'name': user.get('name', ''),
+                    'email': user.get('email', ''),
+                },
+            }
+            try:
+                resp = http_req.post(KHALTI_INITIATE_URL, json=payload, headers=headers, timeout=10)
+                resp.raise_for_status()
+            except http_req.RequestException as e:
+                # Roll back the order if Khalti initiation fails
+                cursor.execute("DELETE FROM order_items WHERE order_id = %s", (order_id,))
+                cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+                conn.commit()
+                return jsonify({'error': f'Khalti initiation failed: {str(e)}'}), 502
+
+            khalti_data = resp.json()
+            return jsonify({
+                'id': order_id,
+                'payment_method': 'khalti',
+                'payment_url': khalti_data.get('payment_url'),
+                'pidx': khalti_data.get('pidx'),
+            }), 201
+
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -391,6 +491,48 @@ def get_orders():
             )
             order['items'] = cursor.fetchall()
         return jsonify(orders)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/orders/<int:order_id>', methods=['DELETE'])
+@role_required('user')
+def cancel_order(order_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT * FROM orders WHERE id = %s AND user_id = %s AND deleted_at IS NULL",
+            (order_id, request.user_id),
+        )
+        order = cursor.fetchone()
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        if order['status'] not in ('pending',):
+            return jsonify({'error': f"Cannot cancel an order that is '{order['status']}'"}), 400
+
+        # Restore stock only for COD orders (digital payments never decremented stock)
+        if order['payment_method'] == 'cod':
+            cursor.execute(
+                "SELECT product_id, quantity FROM order_items WHERE order_id = %s",
+                (order_id,),
+            )
+            for item in cursor.fetchall():
+                cursor.execute(
+                    "UPDATE products SET stock_quantity = stock_quantity + %s WHERE id = %s",
+                    (item['quantity'], item['product_id']),
+                )
+
+        cursor.execute(
+            "UPDATE orders SET status = 'cancelled', deleted_at = NOW() WHERE id = %s",
+            (order_id,),
+        )
+        conn.commit()
+        return jsonify({'message': 'Order cancelled'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

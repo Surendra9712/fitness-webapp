@@ -664,6 +664,43 @@ def update_order_status(oid):
         conn.close()
 
 
+@admin_bp.route('/orders/<int:oid>', methods=['DELETE'])
+@role_required('admin')
+def delete_order(oid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT * FROM orders WHERE id = %s AND deleted_at IS NULL", (oid,)
+        )
+        order = cursor.fetchone()
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
+        # Restore stock for COD orders that were not yet delivered
+        if order['payment_method'] == 'cod' and order['status'] not in ('delivered', 'cancelled'):
+            cursor.execute(
+                "SELECT product_id, quantity FROM order_items WHERE order_id = %s", (oid,)
+            )
+            for item in cursor.fetchall():
+                cursor.execute(
+                    "UPDATE products SET stock_quantity = stock_quantity + %s WHERE id = %s",
+                    (item['quantity'], item['product_id']),
+                )
+
+        cursor.execute(
+            "UPDATE orders SET deleted_at = NOW() WHERE id = %s", (oid,)
+        )
+        conn.commit()
+        return jsonify({'message': 'Order deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # ── Trainer Assignments ───────────────────────────────────────────────────────
 
 @admin_bp.route('/trainer-assignments', methods=['GET'])

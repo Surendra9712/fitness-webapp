@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
 import type { TrainerAssignment } from '@/types'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -32,37 +32,44 @@ export default function TrainerAssignments() {
   const [approveTarget, setApproveTarget] = useState<TrainerAssignment | null>(null)
   const [rejectTarget, setRejectTarget]   = useState<TrainerAssignment | null>(null)
   const [adminNote, setAdminNote] = useState('')
-  const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
   function load() {
     api.get<TrainerAssignment[]>(`/admin/trainer-assignments?status=${filter}`)
       .then(setAssignments)
-      .catch(e => setError((e as Error).message))
+      .catch(e => toast.error((e as Error).message))
   }
 
   useEffect(() => { load() }, [filter])
 
   async function approve() {
     if (!approveTarget) return
-    setSaving(true); setError('')
+    setSaving(true)
     try {
       await api.put(`/admin/trainer-assignments/${approveTarget.id}/approve`, { admin_note: adminNote || undefined })
+      toast.success('Assignment approved')
       setApproveTarget(null)
       load()
-    } catch (e) { setError((e as Error).message) }
-    finally { setSaving(false) }
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function reject() {
     if (!rejectTarget) return
-    setSaving(true); setError('')
+    setSaving(true)
     try {
       await api.put(`/admin/trainer-assignments/${rejectTarget.id}/reject`, { admin_note: adminNote || undefined })
+      toast.success('Assignment rejected')
       setRejectTarget(null)
       load()
-    } catch (e) { setError((e as Error).message) }
-    finally { setSaving(false) }
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -82,8 +89,6 @@ export default function TrainerAssignments() {
           </SelectContent>
         </Select>
       </div>
-
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       <Card>
         <CardContent className="p-0">
@@ -124,14 +129,14 @@ export default function TrainerAssignments() {
                         <Button
                           size="sm" variant="outline"
                           className="h-7 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => { setAdminNote(''); setError(''); setApproveTarget(a) }}
+                          onClick={() => { setAdminNote(''); setApproveTarget(a) }}
                         >
                           <CheckCircle className="mr-1 h-3.5 w-3.5" />Approve
                         </Button>
                         <Button
                           size="sm" variant="outline"
                           className="h-7 border-destructive text-destructive hover:bg-red-50"
-                          onClick={() => { setAdminNote(''); setError(''); setRejectTarget(a) }}
+                          onClick={() => { setAdminNote(''); setRejectTarget(a) }}
                         >
                           <XCircle className="mr-1 h-3.5 w-3.5" />Reject
                         </Button>
@@ -164,7 +169,6 @@ export default function TrainerAssignments() {
             <Label>Admin note (optional)</Label>
             <Input placeholder="e.g. Approved — good match" value={adminNote} onChange={e => setAdminNote(e.target.value)} />
           </div>
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveTarget(null)}>Cancel</Button>
             <Button onClick={approve} disabled={saving}>{saving ? 'Approving…' : 'Approve'}</Button>
@@ -183,7 +187,6 @@ export default function TrainerAssignments() {
             <Label>Reason (optional)</Label>
             <Input placeholder="e.g. Trainer at capacity" value={adminNote} onChange={e => setAdminNote(e.target.value)} />
           </div>
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>
             <Button variant="destructive" onClick={reject} disabled={saving}>{saving ? 'Rejecting…' : 'Reject'}</Button>
