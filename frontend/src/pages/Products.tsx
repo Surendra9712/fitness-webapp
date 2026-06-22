@@ -54,7 +54,6 @@ export default function Products() {
   });
   const products = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = data?.total_pages ?? 1;
   const { data: categoriesData } = GetCategories({ queryParams: { page_size: 100 } });
   const categories = categoriesData?.items ?? [];
 
@@ -122,14 +121,14 @@ export default function Products() {
               ref={searchRef}
               placeholder="Search equipment…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               className="border-white/10 bg-white/7 pl-11 text-white placeholder:text-primary-400 focus-visible:border-primary/50 focus-visible:ring-0"
             />
           </div>
 
           <div className="mt-12 flex justify-center gap-10">
             {[
-              { value: products.length, label: "Products" },
+              { value: total, label: "Products" },
               { value: products.filter((p) => p.stock_quantity > 0).length, label: "In stock" },
               { value: categories.length, label: "Categories" },
             ].map((s) => (
@@ -172,7 +171,7 @@ export default function Products() {
               <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
               <span className="text-sm">Loading equipment…</span>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : products.length === 0 ? (
             <div className="py-20 text-center">
               <Package className="mx-auto mb-4 h-12 w-12 text-border" />
               <p className="mb-2 text-base text-muted-foreground">No equipment found.</p>
@@ -188,12 +187,12 @@ export default function Products() {
           ) : (
             <>
               <p className="mb-6 text-sm font-medium text-muted-foreground">
-                {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+                {products.length} item{products.length !== 1 ? "s" : ""}
                 {category !== "all" && ` · ${tabs.find((t) => t.key === category)?.label}`}
                 {search && ` · "${search}"`}
               </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))] gap-5">
-                {filtered.map((p) => (
+                {products.map((p) => (
                   <ProductCard
                     key={p.id}
                     product={p}
@@ -207,6 +206,9 @@ export default function Products() {
                     onDec={() => setQty(p.id, (items[p.id]?.quantity ?? 0) - 1)}
                   />
                 ))}
+              </div>
+              <div className="mt-10">
+                <AppPagination page={page} total={total} pageSize={12} onPageChange={goToPage} />
               </div>
             </>
           )}

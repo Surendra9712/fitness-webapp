@@ -34,6 +34,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { User, Role } from "@/types";
 import { ROLE_LABELS } from "@/lib/roles";
+import { set } from "zod";
 
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
@@ -52,13 +53,14 @@ export default function UserManagement() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  const { page, goToPage } = usePagination();
+  const { page, goToPage, setPageSize, pageSize } = usePagination();
 
   const { GetUsers, CreateUser, UpdateUser, DeleteUser } = useAdmin();
-  const { data, isPlaceholderData } = GetUsers({ queryParams: { page, page_size: 20 } });
+  const { data, isPlaceholderData } = GetUsers({
+    queryParams: { page, page_size: 20 },
+  });
   const users = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = data?.total_pages ?? 1;
   const createUser = CreateUser();
   const toggleActive = UpdateUser();
   const deleteUser = DeleteUser();
@@ -256,7 +258,13 @@ export default function UserManagement() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination
+        page={page}
+        total={total}
+        onPageSizeChange={setPageSize}
+        pageSize={pageSize}
+        onPageChange={goToPage}
+      />
 
       <ConfirmDialog
         open={confirmOpen}

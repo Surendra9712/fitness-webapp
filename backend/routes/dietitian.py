@@ -5,6 +5,7 @@ from typing import Optional
 from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
+from utils.pagination import parse_page_params, paginated_response
 
 dietitian_bp = Blueprint('dietitian', __name__)
 
@@ -22,9 +23,7 @@ class AssignmentNoteSchema(BaseModel):
 @role_required('admin', 'dietitian')
 def list_users():
     """Approved customers for this trainer."""
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -45,13 +44,7 @@ def list_users():
             "ORDER BY u.name LIMIT %s OFFSET %s",
             (request.user_id, page_size, offset),
         )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -85,9 +78,7 @@ def stats():
 @role_required('dietitian')
 def list_assignment_requests():
     status_filter = request.args.get('status', 'pending_trainer')
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -118,13 +109,7 @@ def list_assignment_requests():
                 + base_where + "AND ta.status = %s ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
                 (request.user_id, status_filter, page_size, offset)
             )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()

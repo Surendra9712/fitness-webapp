@@ -34,12 +34,12 @@ export default function AssignmentRequests() {
   const [rejectTarget, setRejectTarget]   = useState<TrainerAssignment | null>(null)
   const [trainerNote, setTrainerNote] = useState('')
 
-  const { page, goToPage, resetPage } = usePagination()
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({ initialPageSize: 20 })
 
   const { GetAssignmentRequests, ApproveDietitianAssignment, RejectDietitianAssignment } = useDietitian()
-  const { data, isPlaceholderData } = GetAssignmentRequests({ queryParams: { status: filter, page, page_size: 20 } })
+  const { data, isPlaceholderData } = GetAssignmentRequests({ queryParams: { status: filter, page, page_size: pageSize } })
   const assignments = data?.items ?? []
-  const totalPages = data?.total_pages ?? 1
+  const total = data?.total ?? 0
   const approveAssignment = ApproveDietitianAssignment()
   const rejectAssignment = RejectDietitianAssignment()
 
@@ -149,7 +149,7 @@ export default function AssignmentRequests() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
 
       <Dialog open={!!approveTarget} onOpenChange={() => setApproveTarget(null)}>
         <DialogContent className="max-w-sm">

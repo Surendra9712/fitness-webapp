@@ -55,13 +55,12 @@ export default function OrderManagement() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  const { page, goToPage } = usePagination();
+  const { page, pageSize, goToPage, setPageSize } = usePagination({ initialPageSize: 20 });
 
   const { GetOrders, UpdateOrderStatus, DeleteOrder } = useAdmin();
-  const { data, isPlaceholderData } = GetOrders({ queryParams: { page, page_size: 20 } });
+  const { data, isPlaceholderData } = GetOrders({ queryParams: { page, page_size: pageSize } });
   const orders = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = data?.total_pages ?? 1;
   const updateStatus = UpdateOrderStatus();
   const deleteOrder = DeleteOrder();
 
@@ -275,7 +274,7 @@ export default function OrderManagement() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={confirmOpen}

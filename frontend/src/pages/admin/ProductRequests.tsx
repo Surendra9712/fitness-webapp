@@ -25,12 +25,12 @@ export default function ProductRequests() {
   const [approveForm, setApproveForm] = useState({ price: '', stock_quantity: '', category: '', admin_note: '' })
   const [rejectNote, setRejectNote] = useState('')
 
-  const { page, goToPage, resetPage } = usePagination()
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({ initialPageSize: 20 })
 
   const { GetProductRequests, ApproveProductRequest, RejectProductRequest, GetCategories } = useAdmin()
-  const { data, isPlaceholderData } = GetProductRequests({ queryParams: { status: filter, page, page_size: 20 } })
+  const { data, isPlaceholderData } = GetProductRequests({ queryParams: { status: filter, page, page_size: pageSize } })
   const requests = data?.items ?? []
-  const totalPages = data?.total_pages ?? 1
+  const total = data?.total ?? 0
   const { data: categoriesData } = GetCategories({ queryParams: { page_size: 200 } })
   const categories = categoriesData?.items ?? []
   const approveRequest = ApproveProductRequest()
@@ -151,7 +151,7 @@ export default function ProductRequests() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
 
       <Dialog open={!!approveDialog} onOpenChange={() => setApproveDialog(null)}>
         <DialogContent className="max-w-sm">

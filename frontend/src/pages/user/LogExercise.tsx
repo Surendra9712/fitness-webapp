@@ -25,14 +25,14 @@ export default function LogExercise() {
   const [date, setDate] = useState(todayStr())
   const [success, setSuccess] = useState('')
 
-  const { page, goToPage, resetPage } = usePagination()
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({ initialPageSize: 10 })
 
   const { GetExercises, GetExerciseLogs, LogExercise, DeleteExerciseLog } = useUser()
   const { data: exercisesData } = GetExercises({ queryParams: { page_size: 200 } })
   const exercises = exercisesData?.items ?? []
-  const { data: logsData, isError, error } = GetExerciseLogs({ queryParams: { date, page, page_size: 10 } })
+  const { data: logsData, isError, error } = GetExerciseLogs({ queryParams: { date, page, page_size: pageSize } })
   const logs = logsData?.items ?? []
-  const totalPages = logsData?.total_pages ?? 1
+  const total = logsData?.total ?? 0
   const logExercise = LogExercise()
   const deleteLog = DeleteExerciseLog()
 
@@ -158,7 +158,7 @@ export default function LogExercise() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
     </div>
   )
 }

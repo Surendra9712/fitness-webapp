@@ -29,12 +29,12 @@ export default function MyOrders() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingCancelId, setPendingCancelId] = useState<number | null>(null)
 
-  const { page, goToPage } = usePagination()
+  const { page, pageSize, goToPage, setPageSize } = usePagination({ initialPageSize: 10 })
 
   const { GetOrders, CancelOrder } = useUser()
-  const { data, isLoading } = GetOrders({ queryParams: { page, page_size: 10 } })
+  const { data, isLoading } = GetOrders({ queryParams: { page, page_size: pageSize } })
   const orders = data?.items ?? []
-  const totalPages = data?.total_pages ?? 1
+  const total = data?.total ?? 0
   const cancelOrder = CancelOrder()
 
   function handleCancelClick(orderId: number) {
@@ -153,7 +153,7 @@ export default function MyOrders() {
         </div>
       )}
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={confirmOpen}

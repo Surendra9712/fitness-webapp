@@ -26,13 +26,12 @@ export default function ExerciseLibrary() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
 
-  const { page, goToPage } = usePagination()
+  const { page, pageSize, goToPage, setPageSize } = usePagination({ initialPageSize: 20 })
 
   const { GetExercises, CreateExercise, DeleteExercise } = useAdmin()
-  const { data, isPlaceholderData } = GetExercises({ queryParams: { page, page_size: 20 } })
+  const { data, isPlaceholderData } = GetExercises({ queryParams: { page, page_size: pageSize } })
   const exercises = data?.items ?? []
   const total = data?.total ?? 0
-  const totalPages = data?.total_pages ?? 1
   const createExercise = CreateExercise()
   const deleteExercise = DeleteExercise()
 
@@ -137,7 +136,7 @@ export default function ExerciseLibrary() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={confirmOpen}

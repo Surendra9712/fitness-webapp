@@ -6,6 +6,7 @@ from typing import Literal, Optional
 from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
+from utils.pagination import parse_page_params, paginated_response
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -113,9 +114,7 @@ class TrainerAssignmentNoteSchema(BaseModel):
 @admin_bp.route('/categories', methods=['GET'])
 @role_required('admin', 'dietitian', 'user')
 def list_categories():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(200, int(request.args.get('page_size', 20))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=200)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -126,13 +125,7 @@ def list_categories():
             "WHERE deleted_at IS NULL ORDER BY id LIMIT %s OFFSET %s",
             (page_size, offset)
         )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -219,10 +212,8 @@ def delete_category(cid):
 @admin_bp.route('/users', methods=['GET'])
 @role_required('admin')
 def list_users():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    search    = request.args.get('search', '').strip()
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+    search = request.args.get('search', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -243,13 +234,7 @@ def list_users():
             f"{base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
             params_count + [page_size, offset]
         )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -336,11 +321,9 @@ def delete_user(uid):
 @admin_bp.route('/exercises', methods=['GET'])
 @role_required('admin', 'dietitian', 'user')
 def list_exercises():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(200, int(request.args.get('page_size', 20))))
-    search    = request.args.get('search', '').strip()
-    category  = request.args.get('category', '').strip()
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=200)
+    search   = request.args.get('search', '').strip()
+    category = request.args.get('category', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -359,13 +342,7 @@ def list_exercises():
             f"SELECT * FROM exercises {where} ORDER BY category, name LIMIT %s OFFSET %s",
             params + [page_size, offset]
         )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -439,10 +416,8 @@ PRODUCT_SELECT = (
 @admin_bp.route('/products', methods=['GET'])
 @role_required('admin')
 def list_products():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 10))))
-    search    = request.args.get('search', '').strip()
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=10, max_size=100)
+    search = request.args.get('search', '').strip()
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -472,14 +447,7 @@ def list_products():
                 (page_size, offset),
             )
 
-        items = cursor.fetchall()
-        return jsonify({
-            'items': items,
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),  # ceiling division
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -571,9 +539,7 @@ def delete_product(pid):
 @role_required('admin')
 def list_product_requests():
     status_filter = request.args.get('status', 'pending')
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -596,13 +562,7 @@ def list_product_requests():
             total = cursor.fetchone()['total']
             cursor.execute(data_select + "AND pr.status = %s ORDER BY pr.created_at DESC LIMIT %s OFFSET %s",
                            (status_filter, page_size, offset))
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -691,10 +651,8 @@ def reject_product_request(rid):
 @admin_bp.route('/orders', methods=['GET'])
 @role_required('admin')
 def list_all_orders():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    status    = request.args.get('status', '').strip()
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+    status = request.args.get('status', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -721,13 +679,7 @@ def list_all_orders():
                 (order['id'],),
             )
             order['items'] = cursor.fetchall()
-        return jsonify({
-            'items': orders,
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(orders, total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -798,9 +750,7 @@ def delete_order(oid):
 @role_required('admin')
 def list_trainer_assignments():
     status_filter = request.args.get('status', 'pending_admin')
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -827,13 +777,7 @@ def list_trainer_assignments():
             total = cursor.fetchone()['total']
             cursor.execute(data_select + "AND ta.status = %s ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
                            (status_filter, page_size, offset))
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()

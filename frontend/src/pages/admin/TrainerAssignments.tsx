@@ -34,12 +34,12 @@ export default function TrainerAssignments() {
   const [rejectTarget, setRejectTarget]   = useState<TrainerAssignment | null>(null)
   const [adminNote, setAdminNote] = useState('')
 
-  const { page, goToPage, resetPage } = usePagination()
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({ initialPageSize: 20 })
 
   const { GetTrainerAssignments, ApproveTrainerAssignment, RejectTrainerAssignment } = useAdmin()
-  const { data, isPlaceholderData } = GetTrainerAssignments({ queryParams: { status: filter, page, page_size: 20 } })
+  const { data, isPlaceholderData } = GetTrainerAssignments({ queryParams: { status: filter, page, page_size: pageSize } })
   const assignments = data?.items ?? []
-  const totalPages = data?.total_pages ?? 1
+  const total = data?.total ?? 0
 
   function handleFilterChange(value: string) {
     setFilter(value)
@@ -156,7 +156,7 @@ export default function TrainerAssignments() {
         </CardContent>
       </Card>
 
-      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
 
       <Dialog open={!!approveTarget} onOpenChange={() => setApproveTarget(null)}>
         <DialogContent className="max-w-sm">

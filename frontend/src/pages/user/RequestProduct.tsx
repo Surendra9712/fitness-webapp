@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Plus, Clock, CheckCircle, XCircle } from 'lucide-react'
 import useUser from '@/hooks/useUser'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,9 +27,12 @@ export default function RequestProduct() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  const { page, pageSize, goToPage, setPageSize } = usePagination({ initialPageSize: 10 })
+
   const { GetProductRequests, CreateProductRequest } = useUser()
-  const { data: requestsData } = GetProductRequests({ queryParams: { page_size: 50 } })
+  const { data: requestsData } = GetProductRequests({ queryParams: { page, page_size: pageSize } })
   const requests = requestsData?.items ?? []
+  const total = requestsData?.total ?? 0
   const createRequest = CreateProductRequest()
 
   async function submit(e: React.FormEvent) {
@@ -93,9 +98,9 @@ export default function RequestProduct() {
         </CardContent>
       </Card>
 
-      {requests.length > 0 && (
+      {(requests.length > 0 || total > 0) && (
         <Card>
-          <CardHeader><CardTitle className="text-base">My Requests</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">My Requests {total > 0 && `(${total})`}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {requests.map((r, i) => (
               <div key={r.id}>
@@ -116,6 +121,13 @@ export default function RequestProduct() {
                 </div>
               </div>
             ))}
+            <AppPagination
+              page={page}
+              total={total}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              onPageChange={goToPage}
+            />
           </CardContent>
         </Card>
       )}

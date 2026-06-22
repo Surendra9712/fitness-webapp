@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { UserCheck } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import useUser from '@/hooks/useUser'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Card, CardContent } from '@/components/ui/card'
 import { AssignmentStatusCard } from '@/components/trainer/AssignmentStatusCard'
 import { TrainerList } from '@/components/trainer/TrainerList'
@@ -16,10 +18,13 @@ export default function MyTrainer() {
   const [requestTarget, setRequestTarget] = useState<TrainerInfo | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
 
+  const { page, pageSize, goToPage, setPageSize } = usePagination({ initialPageSize: 10 })
+
   const { GetTrainerAssignment, GetTrainers, CancelTrainerAssignment } = useUser()
   const { data: assignment, isLoading } = GetTrainerAssignment()
-  const { data: trainersData } = GetTrainers({ queryParams: { page_size: 50 } })
+  const { data: trainersData } = GetTrainers({ queryParams: { page, page_size: pageSize } })
   const trainers = trainersData?.items ?? []
+  const total = trainersData?.total ?? 0
   const cancelMutation = CancelTrainerAssignment()
 
   async function cancelRequest() {
@@ -70,7 +75,16 @@ export default function MyTrainer() {
       )}
 
       {showTrainerList && (
-        <TrainerList trainers={trainers} onRequest={(t) => setRequestTarget(t)} />
+        <>
+          <TrainerList trainers={trainers} onRequest={(t) => setRequestTarget(t)} />
+          <AppPagination
+            page={page}
+            total={total}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            onPageChange={goToPage}
+          />
+        </>
       )}
 
       <TrainerRequestDialog

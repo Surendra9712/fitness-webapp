@@ -12,6 +12,7 @@ import requests as http_req
 from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
+from utils.pagination import parse_page_params, paginated_response
 
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
 ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
@@ -86,10 +87,8 @@ class UpdateProfileSchema(BaseModel):
 @user_bp.route('/exercise-logs', methods=['GET'])
 @role_required('user')
 def get_exercise_logs():
-    date      = request.args.get('date')
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(50, int(request.args.get('page_size', 10))))
-    offset    = (page - 1) * page_size
+    date = request.args.get('date')
+    page, page_size, offset = parse_page_params(default_size=10, max_size=50)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -121,13 +120,7 @@ def get_exercise_logs():
                 "ORDER BY el.logged_date DESC LIMIT %s OFFSET %s",
                 (request.user_id, page_size, offset),
             )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -501,9 +494,7 @@ def place_order():
 @user_bp.route('/orders', methods=['GET'])
 @role_required('user')
 def get_orders():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(50, int(request.args.get('page_size', 10))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=10, max_size=50)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -525,13 +516,7 @@ def get_orders():
                 (order['id'],),
             )
             order['items'] = cursor.fetchall()
-        return jsonify({
-            'items': orders,
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(orders, total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -609,9 +594,7 @@ def request_product():
 @user_bp.route('/product-requests', methods=['GET'])
 @role_required('user')
 def get_product_requests():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(50, int(request.args.get('page_size', 10))))
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=10, max_size=50)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -625,13 +608,7 @@ def get_product_requests():
             "ORDER BY created_at DESC LIMIT %s OFFSET %s",
             (request.user_id, page_size, offset)
         )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -642,10 +619,8 @@ def get_product_requests():
 @user_bp.route('/trainers', methods=['GET'])
 @role_required('user')
 def list_trainers():
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
-    search    = request.args.get('search', '').strip()
-    offset    = (page - 1) * page_size
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+    search = request.args.get('search', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -663,13 +638,7 @@ def list_trainers():
             f"FROM users u {base_where} ORDER BY u.name LIMIT %s OFFSET %s",
             params + [page_size, offset]
         )
-        return jsonify({
-            'items': cursor.fetchall(),
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'total_pages': max(1, -(-total // page_size)),
-        })
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
