@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import { api } from '@/api/client'
+import useAdmin from '@/hooks/useAdmin'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { toast } from 'sonner'
-import type { Exercise, ExerciseCategory } from '@/types'
+import type { ExerciseCategory } from '@/types'
 
 const catVariant: Record<ExerciseCategory, 'warning' | 'destructive' | 'success' | 'info' | 'secondary'> = {
   cardio: 'warning', strength: 'destructive', flexibility: 'success', sports: 'info', other: 'secondary',
@@ -19,25 +21,28 @@ const catVariant: Record<ExerciseCategory, 'warning' | 'destructive' | 'success'
 const CATEGORIES: ExerciseCategory[] = ['cardio', 'strength', 'flexibility', 'sports', 'other']
 
 export default function ExerciseLibrary() {
-  const [exercises, setExercises] = useState<Exercise[]>([])
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'cardio' as ExerciseCategory, calories_burned_per_hour: '', description: '' })
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null)
 
-  const load = () =>
-    api.get<Exercise[]>('/admin/exercises').then(setExercises).catch(e => toast.error((e as Error).message))
+  const { page, goToPage } = usePagination()
 
-  useEffect(() => { load() }, [])
+  const { GetExercises, CreateExercise, DeleteExercise } = useAdmin()
+  const { data, isPlaceholderData } = GetExercises({ queryParams: { page, page_size: 20 } })
+  const exercises = data?.items ?? []
+  const total = data?.total ?? 0
+  const totalPages = data?.total_pages ?? 1
+  const createExercise = CreateExercise()
+  const deleteExercise = DeleteExercise()
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await api.post('/admin/exercises', form)
+      await createExercise.mutateAsync(form)
       toast.success('Exercise added')
       setForm({ name: '', category: 'cardio', calories_burned_per_hour: '', description: '' })
       setOpen(false)
-      load()
     } catch (err) {
       toast.error((err as Error).message)
     }
@@ -51,9 +56,8 @@ export default function ExerciseLibrary() {
   async function confirmDelete() {
     if (!pendingDeleteId) return
     try {
-      await api.delete(`/admin/exercises/${pendingDeleteId}`)
+      await deleteExercise.mutateAsync(pendingDeleteId)
       toast.success('Exercise deleted')
-      load()
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -93,15 +97,17 @@ export default function ExerciseLibrary() {
                 <Input value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} />
               </div>
               <div className="col-span-2">
-                <Button type="submit" className="w-full">Add Exercise</Button>
+                <Button type="submit" className="w-full" disabled={createExercise.isPending}>
+                  {createExercise.isPending ? 'Adding…' : 'Add Exercise'}
+                </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Exercises ({exercises.length})</CardTitle></CardHeader>
+      <Card className={isPlaceholderData ? 'opacity-70' : ''}>
+        <CardHeader><CardTitle>Exercises ({total})</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -130,6 +136,8 @@ export default function ExerciseLibrary() {
           </Table>
         </CardContent>
       </Card>
+
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={confirmOpen}

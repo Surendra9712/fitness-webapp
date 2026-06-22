@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Search,
@@ -7,9 +7,11 @@ import {
   Package,
   Zap,
 } from "lucide-react";
-import { api } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
+import usePublic from "@/hooks/usePublic";
+import { usePagination } from "@/hooks/usePagination";
+import { AppPagination } from "@/components/ui/app-pagination";
 import PublicLayout from "@/components/PublicLayout";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { Input } from "@/components/ui/input";
@@ -17,9 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
-import type { Product, Category } from "@/types";
+import type { Product } from "@/types";
 
-// ── Category display metadata ─────────────────────────────────────────────────
 type CatMeta = { gradient: string; badgeClass: string; glyph: string };
 
 const CAT_META: Record<string, CatMeta> = {
@@ -35,32 +36,41 @@ export default function Products() {
   const { user } = useAuth();
   const { items, add, setQty } = useCartStore();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { page, goToPage, resetPage } = usePagination();
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      api.get<Product[]>("/public/products"),
-      api.get<Category[]>("/public/categories").catch(() => [] as Category[]),
-    ])
-      .then(([prods, cats]) => {
-        setProducts(prods);
-        setCategories(cats);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const filtered = products.filter((p) => {
-    if (category !== "all" && p.category !== category) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+  const { GetProducts, GetCategories } = usePublic();
+  const { data, isLoading } = GetProducts({
+    queryParams: {
+      page,
+      page_size: 12,
+      category: category !== "all" ? category : undefined,
+      q: debouncedSearch || undefined,
+    },
   });
+  const products = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.total_pages ?? 1;
+  const { data: categoriesData } = GetCategories({ queryParams: { page_size: 100 } });
+  const categories = categoriesData?.items ?? [];
+
+  function handleSearch(value: string) {
+    setSearch(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      resetPage();
+    }, 300);
+  }
+
+  function handleCategory(key: string) {
+    setCategory(key);
+    resetPage();
+  }
 
   const tabs = [
     { key: "all", label: "All Equipment" },
@@ -157,7 +167,7 @@ export default function Products() {
       {/* ── Product grid ── */}
       <main className="min-h-[50vh] bg-muted">
         <div className="mx-auto max-w-7xl px-6 pb-20 pt-10">
-          {loading ? (
+          {isLoading ? (
             <div className="flex flex-col items-center gap-4 py-20 text-muted-foreground">
               <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
               <span className="text-sm">Loading equipment…</span>
@@ -203,7 +213,6 @@ export default function Products() {
         </div>
       </main>
 
-      {/* ── Bottom CTA (guests only) ── */}
       {!user && (
         <section className="bg-primary-950 px-6 py-18 text-center">
           <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-400">
@@ -265,7 +274,6 @@ function ProductCard({ product, isLoggedIn, cartQty, onAdd, onInc, onDec }: Prod
           ) : (
             <span className="text-6xl opacity-35">{meta.glyph}</span>
           )}
-
           {outOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/65">
               <span className="rounded-full bg-black/40 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-white">
@@ -273,7 +281,6 @@ function ProductCard({ product, isLoggedIn, cartQty, onAdd, onInc, onDec }: Prod
               </span>
             </div>
           )}
-
           {!outOfStock && product.stock_quantity <= 5 && (
             <div className="absolute right-2.5 top-2.5 rounded-full bg-black/55 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
               Only {product.stock_quantity} left

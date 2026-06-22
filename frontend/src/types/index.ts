@@ -17,6 +17,8 @@ export interface TrainerInfo {
   name: string
   email: string
   customer_count?: number
+  avg_rating?: number
+  review_count?: number
 }
 
 export interface TrainerAssignment {
@@ -149,6 +151,21 @@ export interface DashboardStats {
   orders_count: number
   pending_requests: number
   metrics: BodyMetrics | null
+}
+
+export interface Review {
+  id: number
+  user_id: number
+  user_name: string
+  rating: number
+  comment?: string
+  created_at: string
+}
+
+export interface ReviewStats {
+  avg_rating: number
+  count: number
+  reviews: Review[]
 }
 
 export interface AdminStats {

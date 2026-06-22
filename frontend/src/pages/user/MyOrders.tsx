@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ShoppingBag, ChevronDown, ChevronUp, X } from 'lucide-react'
-import { api } from '@/api/client'
+import useUser from '@/hooks/useUser'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,17 +25,17 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 }
 
 export default function MyOrders() {
-  const [orders, setOrders] = useState<Order[]>([])
   const [expanded, setExpanded] = useState<number | null>(null)
-  const [cancelling, setCancelling] = useState<number | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingCancelId, setPendingCancelId] = useState<number | null>(null)
 
-  function load() {
-    api.get<Order[]>('/user/orders').then(setOrders).catch(e => toast.error((e as Error).message))
-  }
+  const { page, goToPage } = usePagination()
 
-  useEffect(() => { load() }, [])
+  const { GetOrders, CancelOrder } = useUser()
+  const { data, isLoading } = GetOrders({ queryParams: { page, page_size: 10 } })
+  const orders = data?.items ?? []
+  const totalPages = data?.total_pages ?? 1
+  const cancelOrder = CancelOrder()
 
   function handleCancelClick(orderId: number) {
     setPendingCancelId(orderId)
@@ -42,18 +44,23 @@ export default function MyOrders() {
 
   async function confirmCancel() {
     if (!pendingCancelId) return
-    setCancelling(pendingCancelId)
     try {
-      await api.delete(`/user/orders/${pendingCancelId}`)
+      await cancelOrder.mutateAsync(pendingCancelId)
       toast.success('Order cancelled')
-      load()
     } catch (e) {
       toast.error((e as Error).message)
     } finally {
-      setCancelling(null)
       setConfirmOpen(false)
       setPendingCancelId(null)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
   }
 
   return (
@@ -94,11 +101,11 @@ export default function MyOrders() {
                         size="sm"
                         variant="ghost"
                         className="h-7 gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        disabled={cancelling === order.id}
+                        disabled={cancelOrder.isPending && pendingCancelId === order.id}
                         onClick={() => handleCancelClick(order.id)}
                       >
                         <X className="h-3.5 w-3.5" />
-                        {cancelling === order.id ? 'Cancelling…' : 'Cancel'}
+                        {cancelOrder.isPending && pendingCancelId === order.id ? 'Cancelling…' : 'Cancel'}
                       </Button>
                     )}
 
@@ -145,6 +152,8 @@ export default function MyOrders() {
           ))}
         </div>
       )}
+
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={confirmOpen}

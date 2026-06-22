@@ -1,23 +1,18 @@
-import { useEffect, useState } from 'react'
 import { Users, UserCheck, Package, ShoppingBag, Bell, TrendingUp } from 'lucide-react'
-import { api } from '@/api/client'
+import useAdmin from '@/hooks/useAdmin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { toast } from 'sonner'
 import { ROLE_LABELS } from '@/lib/roles'
-import type { AdminStats, Role } from '@/types'
+import type { Role } from '@/types'
 
 const roleBadge: Record<Role, 'destructive' | 'info' | 'success'> = {
   admin: 'destructive', dietitian: 'info', user: 'success',
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<AdminStats | null>(null)
-
-  useEffect(() => {
-    api.get<AdminStats>('/admin/stats').then(setStats).catch(e => toast.error((e as Error).message))
-  }, [])
+  const { GetStats } = useAdmin()
+  const { data: stats } = GetStats()
 
   return (
     <div className="space-y-6">

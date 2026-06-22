@@ -3,7 +3,8 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { api, ApiError } from "@/api/client";
+import { ApiError } from "@/api/client";
+import useAdmin from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
@@ -36,19 +37,8 @@ import type { Product, Category } from "@/types";
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().min(1, "Description is required"),
-  price: z
-    .string()
-    .min(1, "Price is required")
-    .refine(
-      (v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0,
-      "Price must be greater than 0",
-    ),
-  stock_quantity: z
-    .string()
-    .refine(
-      (v) => !isNaN(parseInt(v)) && parseInt(v) >= 0,
-      "Stock cannot be negative",
-    ),
+  price: z.coerce.number().positive("Price must be greater than 0"),
+  stock_quantity: z.coerce.number().min(0, "Stock cannot be negative"),
   category: z.string().min(1, "Category is required"),
   image_url: z.string().optional(),
   status: z.enum(["active", "inactive"]),
@@ -61,23 +51,20 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   editing: Product | null;
   categories: Category[];
-  onSaved: () => void;
 }
 
-export function ProductFormDialog({
-  open,
-  onOpenChange,
-  editing,
-  categories,
-  onSaved,
-}: Props) {
+export function ProductFormDialog({ open, onOpenChange, editing, categories }: Props) {
+  const { CreateProduct, UpdateProduct } = useAdmin();
+  const createProduct = CreateProduct();
+  const updateProduct = UpdateProduct();
+
   const form = useForm<ProductValues>({
     resolver: zodResolver(productSchema) as Resolver<ProductValues>,
     defaultValues: {
       name: "",
       description: "",
-      price: "",
-      stock_quantity: "0",
+      price: 0,
+      stock_quantity: 0,
       category: "",
       image_url: "",
       status: "active",
@@ -92,8 +79,8 @@ export function ProductFormDialog({
       form.reset({
         name: editing.name,
         description: editing.description ?? "",
-        price: String(editing.price),
-        stock_quantity: String(editing.stock_quantity),
+        price: editing.price,
+        stock_quantity: editing.stock_quantity,
         category: editing.category,
         image_url: editing.image_url ?? "",
         status: editing.status as "active" | "inactive",
@@ -102,8 +89,8 @@ export function ProductFormDialog({
       form.reset({
         name: "",
         description: "",
-        price: "",
-        stock_quantity: "0",
+        price: 0,
+        stock_quantity: 0,
         category: categories[0]?.slug ?? "",
         image_url: "",
         status: "active",
@@ -112,19 +99,14 @@ export function ProductFormDialog({
   }, [open, editing, categories]);
 
   async function onSubmit(values: ProductValues) {
-    const payload = {
-      ...values,
-      stock_quantity: parseInt(values.stock_quantity || "0"),
-    };
     try {
       if (editing) {
-        await api.put(`/admin/products/${editing.id}`, payload);
+        await updateProduct.mutateAsync({ id: editing.id, ...values });
       } else {
-        await api.post("/admin/products", payload);
+        await createProduct.mutateAsync(values);
       }
       toast.success(editing ? "Product updated" : "Product created");
       onOpenChange(false);
-      onSaved();
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors) {
         Object.entries(err.fieldErrors).forEach(([field, message]) => {
@@ -151,12 +133,8 @@ export function ProductFormDialog({
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Name <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -167,15 +145,9 @@ export function ProductFormDialog({
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      Description <span className="text-destructive">*</span>
-                    </FormLabel>
+                    <FormLabel>Description <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <RichTextEditor
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder="Describe the product…"
-                      />
+                      <RichTextEditor value={field.value ?? ""} onChange={field.onChange} placeholder="Describe the product…" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -188,17 +160,8 @@ export function ProductFormDialog({
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        Price (Rs.) <span className="text-destructive">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          {...field}
-                        />
-                      </FormControl>
+                      <FormLabel>Price (Rs.) <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input type="number" min="0" placeholder="0" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -210,9 +173,7 @@ export function ProductFormDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Stock</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" {...field} />
-                      </FormControl>
+                      <FormControl><Input type="number" min="0" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -226,20 +187,13 @@ export function ProductFormDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
+                      <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {categories.map((c) => (
-                            <SelectItem key={c.slug} value={c.slug}>
-                              {c.icon} {c.name}
-                            </SelectItem>
+                            <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -254,14 +208,9 @@ export function ProductFormDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
+                      <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="active">Active</SelectItem>
@@ -280,9 +229,7 @@ export function ProductFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Image URL</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://…" {...field} />
-                    </FormControl>
+                    <FormControl><Input placeholder="https://…" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -290,17 +237,9 @@ export function ProductFormDialog({
             </DialogBody>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>

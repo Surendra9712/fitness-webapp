@@ -22,19 +22,36 @@ class AssignmentNoteSchema(BaseModel):
 @role_required('admin', 'dietitian')
 def list_users():
     """Approved customers for this trainer."""
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM trainer_assignments ta "
+            "JOIN users u ON ta.customer_id = u.id "
+            "WHERE ta.trainer_id = %s AND ta.status = 'approved' "
+            "AND ta.deleted_at IS NULL AND u.deleted_at IS NULL",
+            (request.user_id,)
+        )
+        total = cursor.fetchone()['total']
         cursor.execute(
             "SELECT u.id, u.name, u.email, ta.created_at AS assigned_at "
             "FROM trainer_assignments ta "
             "JOIN users u ON ta.customer_id = u.id "
             "WHERE ta.trainer_id = %s AND ta.status = 'approved' "
             "AND ta.deleted_at IS NULL AND u.deleted_at IS NULL "
-            "ORDER BY u.name",
-            (request.user_id,),
+            "ORDER BY u.name LIMIT %s OFFSET %s",
+            (request.user_id, page_size, offset),
         )
-        return jsonify(cursor.fetchall())
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -68,21 +85,46 @@ def stats():
 @role_required('dietitian')
 def list_assignment_requests():
     status_filter = request.args.get('status', 'pending_trainer')
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        base = (
-            "SELECT ta.*, u.name AS customer_name, u.email AS customer_email "
-            "FROM trainer_assignments ta "
-            "JOIN users u ON ta.customer_id = u.id "
-            "WHERE ta.trainer_id = %s AND ta.deleted_at IS NULL "
-        )
+        base_where = "WHERE ta.trainer_id = %s AND ta.deleted_at IS NULL "
         if status_filter == 'all':
-            cursor.execute(base + "ORDER BY ta.created_at DESC", (request.user_id,))
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM trainer_assignments ta " + base_where,
+                (request.user_id,)
+            )
+            total = cursor.fetchone()['total']
+            cursor.execute(
+                "SELECT ta.*, u.name AS customer_name, u.email AS customer_email "
+                "FROM trainer_assignments ta "
+                "JOIN users u ON ta.customer_id = u.id "
+                + base_where + "ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
+                (request.user_id, page_size, offset)
+            )
         else:
-            cursor.execute(base + "AND ta.status = %s ORDER BY ta.created_at DESC",
-                           (request.user_id, status_filter))
-        return jsonify(cursor.fetchall())
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM trainer_assignments ta " + base_where + "AND ta.status = %s",
+                (request.user_id, status_filter)
+            )
+            total = cursor.fetchone()['total']
+            cursor.execute(
+                "SELECT ta.*, u.name AS customer_name, u.email AS customer_email "
+                "FROM trainer_assignments ta "
+                "JOIN users u ON ta.customer_id = u.id "
+                + base_where + "AND ta.status = %s ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
+                (request.user_id, status_filter, page_size, offset)
+            )
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()

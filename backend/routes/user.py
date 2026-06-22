@@ -66,6 +66,11 @@ class RequestTrainerSchema(BaseModel):
     customer_note: Optional[str] = None
 
 
+class ReviewSchema(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+
 class UpdateProfileSchema(BaseModel):
     model_config = ConfigDict(extra='ignore')
     age: Optional[int] = Field(default=None, ge=1, le=120)
@@ -81,27 +86,48 @@ class UpdateProfileSchema(BaseModel):
 @user_bp.route('/exercise-logs', methods=['GET'])
 @role_required('user')
 def get_exercise_logs():
-    date = request.args.get('date')
+    date      = request.args.get('date')
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(50, int(request.args.get('page_size', 10))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         if date:
             cursor.execute(
+                "SELECT COUNT(*) AS total FROM exercise_logs el "
+                "WHERE el.user_id = %s AND el.logged_date = %s AND el.deleted_at IS NULL",
+                (request.user_id, date)
+            )
+            total = cursor.fetchone()['total']
+            cursor.execute(
                 "SELECT el.*, e.name AS exercise_name, e.category, e.calories_burned_per_hour "
                 "FROM exercise_logs el JOIN exercises e ON el.exercise_id = e.id "
                 "WHERE el.user_id = %s AND el.logged_date = %s AND el.deleted_at IS NULL "
-                "ORDER BY el.logged_at",
-                (request.user_id, date),
+                "ORDER BY el.logged_at LIMIT %s OFFSET %s",
+                (request.user_id, date, page_size, offset),
             )
         else:
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM exercise_logs el "
+                "WHERE el.user_id = %s AND el.deleted_at IS NULL",
+                (request.user_id,)
+            )
+            total = cursor.fetchone()['total']
             cursor.execute(
                 "SELECT el.*, e.name AS exercise_name, e.category, e.calories_burned_per_hour "
                 "FROM exercise_logs el JOIN exercises e ON el.exercise_id = e.id "
                 "WHERE el.user_id = %s AND el.deleted_at IS NULL "
-                "ORDER BY el.logged_date DESC LIMIT 50",
-                (request.user_id,),
+                "ORDER BY el.logged_date DESC LIMIT %s OFFSET %s",
+                (request.user_id, page_size, offset),
             )
-        return jsonify(cursor.fetchall())
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -475,12 +501,21 @@ def place_order():
 @user_bp.route('/orders', methods=['GET'])
 @role_required('user')
 def get_orders():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(50, int(request.args.get('page_size', 10))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT * FROM orders WHERE user_id = %s AND deleted_at IS NULL ORDER BY created_at DESC",
-            (request.user_id,),
+            "SELECT COUNT(*) AS total FROM orders WHERE user_id = %s AND deleted_at IS NULL",
+            (request.user_id,)
+        )
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            "SELECT * FROM orders WHERE user_id = %s AND deleted_at IS NULL "
+            "ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            (request.user_id, page_size, offset)
         )
         orders = cursor.fetchall()
         for order in orders:
@@ -490,7 +525,13 @@ def get_orders():
                 (order['id'],),
             )
             order['items'] = cursor.fetchall()
-        return jsonify(orders)
+        return jsonify({
+            'items': orders,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -568,14 +609,29 @@ def request_product():
 @user_bp.route('/product-requests', methods=['GET'])
 @role_required('user')
 def get_product_requests():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(50, int(request.args.get('page_size', 10))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT * FROM product_requests WHERE user_id = %s AND deleted_at IS NULL ORDER BY created_at DESC",
-            (request.user_id,),
+            "SELECT COUNT(*) AS total FROM product_requests WHERE user_id = %s AND deleted_at IS NULL",
+            (request.user_id,)
         )
-        return jsonify(cursor.fetchall())
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            "SELECT * FROM product_requests WHERE user_id = %s AND deleted_at IS NULL "
+            "ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            (request.user_id, page_size, offset)
+        )
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -586,16 +642,58 @@ def get_product_requests():
 @user_bp.route('/trainers', methods=['GET'])
 @role_required('user')
 def list_trainers():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    search    = request.args.get('search', '').strip()
+    offset    = (page - 1) * page_size
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        base_where = "WHERE u.role = 'dietitian' AND u.is_active = TRUE AND u.deleted_at IS NULL"
+        params = []
+        if search:
+            base_where += " AND u.name LIKE %s"
+            params.append(f"%{search}%")
+        cursor.execute(f"SELECT COUNT(*) AS total FROM users u {base_where}", params)
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            f"SELECT u.id, u.name, u.email, "
+            f"(SELECT COUNT(*) FROM trainer_assignments ta "
+            f" WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count "
+            f"FROM users u {base_where} ORDER BY u.name LIMIT %s OFFSET %s",
+            params + [page_size, offset]
+        )
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/trainers/<int:trainer_id>', methods=['GET'])
+@role_required('user')
+def get_trainer(trainer_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT u.id, u.name, u.email, "
             "(SELECT COUNT(*) FROM trainer_assignments ta "
-            " WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count "
-            "FROM users u WHERE u.role = 'dietitian' AND u.is_active = TRUE AND u.deleted_at IS NULL ORDER BY u.name"
+            " WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count, "
+            "COALESCE((SELECT ROUND(AVG(r.rating), 1) FROM trainer_reviews r WHERE r.trainer_id = u.id), 0) AS avg_rating, "
+            "(SELECT COUNT(*) FROM trainer_reviews r WHERE r.trainer_id = u.id) AS review_count "
+            "FROM users u WHERE u.id = %s AND u.role = 'dietitian' AND u.is_active = TRUE AND u.deleted_at IS NULL",
+            (trainer_id,),
         )
-        return jsonify(cursor.fetchall())
+        trainer = cursor.fetchone()
+        if not trainer:
+            return jsonify({'error': 'Trainer not found'}), 404
+        return jsonify(trainer)
     finally:
         cursor.close()
         conn.close()
@@ -682,6 +780,154 @@ def cancel_trainer_assignment():
         )
         conn.commit()
         return jsonify({'message': 'Request cancelled'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Reviews ───────────────────────────────────────────────────────────────────
+
+@user_bp.route('/products/<int:product_id>/reviews', methods=['POST'])
+@role_required('user')
+def submit_product_review(product_id):
+    try:
+        body = ReviewSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT 1 FROM order_items oi JOIN orders o ON oi.order_id = o.id "
+            "WHERE o.user_id = %s AND oi.product_id = %s AND o.status != 'cancelled' AND o.deleted_at IS NULL LIMIT 1",
+            (request.user_id, product_id),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'You can only review products you have ordered'}), 403
+
+        cursor.execute(
+            "INSERT INTO product_reviews (user_id, product_id, rating, comment) VALUES (%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), updated_at = NOW()",
+            (request.user_id, product_id, body.rating, body.comment),
+        )
+        conn.commit()
+
+        cursor.execute(
+            "SELECT r.id, r.user_id, u.name AS user_name, r.rating, r.comment, r.created_at "
+            "FROM product_reviews r JOIN users u ON r.user_id = u.id "
+            "WHERE r.user_id = %s AND r.product_id = %s",
+            (request.user_id, product_id),
+        )
+        return jsonify(cursor.fetchone()), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/products/<int:product_id>/reviews', methods=['DELETE'])
+@role_required('user')
+def delete_product_review(product_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "DELETE FROM product_reviews WHERE user_id = %s AND product_id = %s",
+            (request.user_id, product_id),
+        )
+        conn.commit()
+        if cursor.rowcount == 0:
+            return jsonify({'error': 'Review not found'}), 404
+        return jsonify({'message': 'Review deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/trainers/<int:trainer_id>/reviews', methods=['GET'])
+@role_required('user')
+def list_trainer_reviews(trainer_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT r.id, r.user_id, u.name AS user_name, r.rating, r.comment, r.created_at "
+            "FROM trainer_reviews r JOIN users u ON r.user_id = u.id "
+            "WHERE r.trainer_id = %s ORDER BY r.created_at DESC",
+            (trainer_id,),
+        )
+        reviews = cursor.fetchall()
+        avg = sum(r['rating'] for r in reviews) / len(reviews) if reviews else 0
+        return jsonify({'reviews': reviews, 'avg_rating': round(avg, 1), 'count': len(reviews)})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/trainers/<int:trainer_id>/reviews', methods=['POST'])
+@role_required('user')
+def submit_trainer_review(trainer_id):
+    try:
+        body = ReviewSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT 1 FROM trainer_assignments "
+            "WHERE customer_id = %s AND trainer_id = %s AND status = 'approved' AND deleted_at IS NULL LIMIT 1",
+            (request.user_id, trainer_id),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'You can only review trainers you are assigned to'}), 403
+
+        cursor.execute(
+            "INSERT INTO trainer_reviews (user_id, trainer_id, rating, comment) VALUES (%s,%s,%s,%s) "
+            "ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), updated_at = NOW()",
+            (request.user_id, trainer_id, body.rating, body.comment),
+        )
+        conn.commit()
+
+        cursor.execute(
+            "SELECT r.id, r.user_id, u.name AS user_name, r.rating, r.comment, r.created_at "
+            "FROM trainer_reviews r JOIN users u ON r.user_id = u.id "
+            "WHERE r.user_id = %s AND r.trainer_id = %s",
+            (request.user_id, trainer_id),
+        )
+        return jsonify(cursor.fetchone()), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/trainers/<int:trainer_id>/reviews', methods=['DELETE'])
+@role_required('user')
+def delete_trainer_review(trainer_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "DELETE FROM trainer_reviews WHERE user_id = %s AND trainer_id = %s",
+            (request.user_id, trainer_id),
+        )
+        conn.commit()
+        if cursor.rowcount == 0:
+            return jsonify({'error': 'Review not found'}), 404
+        return jsonify({'message': 'Review deleted'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

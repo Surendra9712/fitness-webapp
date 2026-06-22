@@ -1,27 +1,17 @@
-import { useEffect, useState } from 'react'
 import { Users, Bell } from 'lucide-react'
-import { api } from '@/api/client'
+import useDietitian from '@/hooks/useDietitian'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import type { User } from '@/types'
-
-interface TrainerStats { customers: number; pending_requests: number }
 
 export default function DietitianDashboard() {
-  const [clients, setClients] = useState<User[]>([])
-  const [stats, setStats] = useState<TrainerStats>({ customers: 0, pending_requests: 0 })
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    api.get<User[]>('/dietitian/users').then(setClients).catch(e => setError((e as Error).message))
-    api.get<TrainerStats>('/dietitian/stats').then(setStats).catch(console.error)
-  }, [])
+  const { GetClients, GetStats } = useDietitian()
+  const { data: clientsData } = GetClients({ queryParams: { page_size: 50 } })
+  const clients = clientsData?.items ?? []
+  const { data: stats = { customers: 0, pending_requests: 0 } } = GetStats()
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Trainer Dashboard</h1>
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

@@ -17,7 +17,7 @@ import ExerciseLibrary from "@/pages/admin/ExerciseLibrary";
 import ProductManagement from "@/pages/admin/product/ProductManagement";
 import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
-import CategoryManagement from "@/pages/admin/CategoryManagement";
+import CategoryManagement from "@/pages/admin/category/CategoryManagement";
 import TrainerAssignments from "@/pages/admin/TrainerAssignments";
 
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
@@ -29,6 +29,7 @@ import RequestProduct from "@/pages/user/RequestProduct";
 import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
 import MyTrainer from "@/pages/user/MyTrainer";
+import TrainerDetail from "@/pages/user/TrainerDetail";
 import AuthLayout from "./pages/auth/AuthLayout";
 
 function RoleRedirect() {
@@ -201,6 +202,16 @@ export default function App() {
               <ProtectedRoute roles={["user"]}>
                 <Layout>
                   <MyTrainer />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/trainers/:id"
+            element={
+              <ProtectedRoute roles={["user"]}>
+                <Layout>
+                  <TrainerDetail />
                 </Layout>
               </ProtectedRoute>
             }

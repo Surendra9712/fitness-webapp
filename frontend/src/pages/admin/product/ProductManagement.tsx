@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Package, Search } from "lucide-react";
-import { api } from "@/api/client";
+import useAdmin from "@/hooks/useAdmin";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,57 +18,44 @@ import { usePagination } from "@/hooks/usePagination";
 import { ProductFormDialog } from "@/pages/admin/product/ProductFormDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
-import type { Product, Category, PaginatedResponse } from "@/types";
-
-const PAGE_SIZE = 10;
+import type { Product } from "@/types";
 
 export default function ProductManagement() {
-  const [data, setData] = useState<PaginatedResponse<Product>>({
-    items: [],
-    total: 0,
-    page: 1,
-    page_size: PAGE_SIZE,
-    total_pages: 1,
-  });
-  const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  const { page, goToPage, resetPage } = usePagination();
+  const { page, goToPage, resetPage, setPageSize, pageSize } = usePagination();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function load(p: number, q: string) {
-    const params = new URLSearchParams({
-      page: String(p),
-      page_size: String(PAGE_SIZE),
-      ...(q ? { search: q } : {}),
-    });
-    api
-      .get<PaginatedResponse<Product>>(`/admin/products?${params}`)
-      .then(setData)
-      .catch((e) => toast.error((e as Error).message));
-  }
+  const { GetProducts, GetCategories, DeleteProduct } = useAdmin();
+  const { data, isPlaceholderData } = GetProducts({
+    queryParams: {
+      page,
+      page_size: pageSize,
+      search: debouncedSearch || undefined,
+    },
+  });
 
-  useEffect(() => {
-    load(page, search);
-  }, [page]);
+  const { data: categoriesData } = GetCategories({
+    queryParams: { page_size: 200 },
+  });
 
-  useEffect(() => {
-    api
-      .get<Category[]>("/admin/categories")
-      .then(setCategories)
-      .catch(console.error);
-  }, []);
+  const categories = categoriesData?.items ?? [];
+  const deleteProduct = DeleteProduct();
+
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
 
   function handleSearch(value: string) {
     setSearch(value);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
+      setDebouncedSearch(value);
       resetPage();
-      load(1, value);
     }, 300);
   }
 
@@ -90,9 +77,8 @@ export default function ProductManagement() {
   async function confirmDelete() {
     if (!pendingDeleteId) return;
     try {
-      await api.delete(`/admin/products/${pendingDeleteId}`);
+      await deleteProduct.mutateAsync(pendingDeleteId);
       toast.success("Product deleted");
-      load(page, search);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -122,11 +108,11 @@ export default function ProductManagement() {
           />
         </div>
         <p className="shrink-0 text-sm text-muted-foreground">
-          {data.total} {data.total === 1 ? "product" : "products"}
+          {total} {total === 1 ? "product" : "products"}
         </p>
       </div>
 
-      <Card>
+      <Card className={isPlaceholderData ? "opacity-70" : ""}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -140,7 +126,7 @@ export default function ProductManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.items.map((p) => (
+              {items.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>
@@ -188,7 +174,7 @@ export default function ProductManagement() {
                   </TableCell>
                 </TableRow>
               ))}
-              {!data.items.length && (
+              {!items.length && (
                 <TableRow>
                   <TableCell
                     colSpan={6}
@@ -208,8 +194,10 @@ export default function ProductManagement() {
 
       <AppPagination
         page={page}
-        totalPages={data.total_pages}
+        total={total}
         onPageChange={goToPage}
+        onPageSizeChange={setPageSize}
+        pageSize={pageSize}
       />
 
       <ProductFormDialog
@@ -217,7 +205,6 @@ export default function ProductManagement() {
         onOpenChange={setDialogOpen}
         editing={editing}
         categories={categories}
-        onSaved={() => load(page, search)}
       />
 
       <ConfirmDialog

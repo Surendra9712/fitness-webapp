@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { api } from "@/api/client";
+import useUser from "@/hooks/useUser";
+import { useCartStore } from "@/store/cartStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,10 +94,12 @@ export default function CheckoutDialog({
   items: initialItems,
   onSuccess,
 }: Props) {
+  const { setQty, remove } = useCartStore();
   const [cartItems, setCartItems] = useState<CheckoutItem[]>([]);
   const [shippingAddress, setShippingAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
-  const [submitting, setSubmitting] = useState(false);
+  const { CreateOrder } = useUser();
+  const createOrder = CreateOrder();
 
   // Sync local cart when drawer opens with new items
   useEffect(() => {
@@ -106,19 +109,20 @@ export default function CheckoutDialog({
   const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
 
   function updateQty(productId: number, delta: number) {
-    setCartItems((prev) =>
-      prev
-        .map((i) =>
-          i.product_id === productId
-            ? { ...i, quantity: i.quantity + delta }
-            : i,
-        )
-        .filter((i) => i.quantity > 0),
-    );
+    setCartItems((prev) => {
+      const next = prev
+        .map((i) => i.product_id === productId ? { ...i, quantity: i.quantity + delta } : i)
+        .filter((i) => i.quantity > 0);
+      const item = next.find((i) => i.product_id === productId);
+      if (item) setQty(productId, item.quantity);
+      else remove(productId);
+      return next;
+    });
   }
 
   function removeItem(productId: number) {
     setCartItems((prev) => prev.filter((i) => i.product_id !== productId));
+    remove(productId);
   }
 
   async function handleSubmit() {
@@ -130,16 +134,9 @@ export default function CheckoutDialog({
       toast.error("Shipping address is required");
       return;
     }
-    setSubmitting(true);
 
     try {
-      const res = await api.post<{
-        id: number;
-        payment_method: string;
-        esewa_url?: string;
-        esewa_params?: EsewaParams;
-        payment_url?: string;
-      }>("/user/orders", {
+      const res = await createOrder.mutateAsync({
         items: cartItems.map((i) => ({
           product_id: i.product_id,
           quantity: i.quantity,
@@ -166,8 +163,6 @@ export default function CheckoutDialog({
       }
     } catch (e) {
       toast.error((e as Error).message);
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -297,7 +292,7 @@ export default function CheckoutDialog({
               variant="outline"
               className="flex-1"
               onClick={onClose}
-              disabled={submitting}
+              disabled={createOrder.isPending}
             >
               Cancel
             </Button>
@@ -310,9 +305,9 @@ export default function CheckoutDialog({
                     : ""
               }`}
               onClick={handleSubmit}
-              disabled={submitting || cartItems.length === 0}
+              disabled={createOrder.isPending || cartItems.length === 0}
             >
-              {submitting
+              {createOrder.isPending
                 ? "Processing…"
                 : paymentMethod === "cod"
                   ? "Place Order"

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CheckCircle, XCircle, UserCheck } from 'lucide-react'
-import { api } from '@/api/client'
+import useAdmin from '@/hooks/useAdmin'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,48 +29,44 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function TrainerAssignments() {
-  const [assignments, setAssignments] = useState<TrainerAssignment[]>([])
   const [filter, setFilter] = useState('pending_admin')
   const [approveTarget, setApproveTarget] = useState<TrainerAssignment | null>(null)
   const [rejectTarget, setRejectTarget]   = useState<TrainerAssignment | null>(null)
   const [adminNote, setAdminNote] = useState('')
-  const [saving, setSaving] = useState(false)
 
-  function load() {
-    api.get<TrainerAssignment[]>(`/admin/trainer-assignments?status=${filter}`)
-      .then(setAssignments)
-      .catch(e => toast.error((e as Error).message))
+  const { page, goToPage, resetPage } = usePagination()
+
+  const { GetTrainerAssignments, ApproveTrainerAssignment, RejectTrainerAssignment } = useAdmin()
+  const { data, isPlaceholderData } = GetTrainerAssignments({ queryParams: { status: filter, page, page_size: 20 } })
+  const assignments = data?.items ?? []
+  const totalPages = data?.total_pages ?? 1
+
+  function handleFilterChange(value: string) {
+    setFilter(value)
+    resetPage()
   }
-
-  useEffect(() => { load() }, [filter])
+  const approveAssignment = ApproveTrainerAssignment()
+  const rejectAssignment = RejectTrainerAssignment()
 
   async function approve() {
     if (!approveTarget) return
-    setSaving(true)
     try {
-      await api.put(`/admin/trainer-assignments/${approveTarget.id}/approve`, { admin_note: adminNote || undefined })
+      await approveAssignment.mutateAsync({ id: approveTarget.id, admin_note: adminNote || undefined })
       toast.success('Assignment approved')
       setApproveTarget(null)
-      load()
     } catch (e) {
       toast.error((e as Error).message)
-    } finally {
-      setSaving(false)
     }
   }
 
   async function reject() {
     if (!rejectTarget) return
-    setSaving(true)
     try {
-      await api.put(`/admin/trainer-assignments/${rejectTarget.id}/reject`, { admin_note: adminNote || undefined })
+      await rejectAssignment.mutateAsync({ id: rejectTarget.id, admin_note: adminNote || undefined })
       toast.success('Assignment rejected')
       setRejectTarget(null)
-      load()
     } catch (e) {
       toast.error((e as Error).message)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -79,7 +77,7 @@ export default function TrainerAssignments() {
           <h1 className="text-2xl font-bold tracking-tight">Trainer Assignments</h1>
           <p className="text-sm text-muted-foreground">Review and approve customer–trainer assignments.</p>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={handleFilterChange}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="pending_admin">Pending Approval</SelectItem>
@@ -90,7 +88,7 @@ export default function TrainerAssignments() {
         </Select>
       </div>
 
-      <Card>
+      <Card className={isPlaceholderData ? 'opacity-70' : ''}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -158,7 +156,8 @@ export default function TrainerAssignments() {
         </CardContent>
       </Card>
 
-      {/* Approve dialog */}
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+
       <Dialog open={!!approveTarget} onOpenChange={() => setApproveTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Approve Assignment</DialogTitle></DialogHeader>
@@ -171,12 +170,13 @@ export default function TrainerAssignments() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveTarget(null)}>Cancel</Button>
-            <Button onClick={approve} disabled={saving}>{saving ? 'Approving…' : 'Approve'}</Button>
+            <Button onClick={approve} disabled={approveAssignment.isPending}>
+              {approveAssignment.isPending ? 'Approving…' : 'Approve'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reject dialog */}
       <Dialog open={!!rejectTarget} onOpenChange={() => setRejectTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Reject Assignment</DialogTitle></DialogHeader>
@@ -189,7 +189,9 @@ export default function TrainerAssignments() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={reject} disabled={saving}>{saving ? 'Rejecting…' : 'Reject'}</Button>
+            <Button variant="destructive" onClick={reject} disabled={rejectAssignment.isPending}>
+              {rejectAssignment.isPending ? 'Rejecting…' : 'Reject'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

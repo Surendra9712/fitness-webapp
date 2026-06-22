@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CheckCircle, XCircle, UserCheck } from 'lucide-react'
-import { api } from '@/api/client'
+import useDietitian from '@/hooks/useDietitian'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
 import type { TrainerAssignment } from '@/types'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -27,49 +29,50 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function AssignmentRequests() {
-  const [assignments, setAssignments] = useState<TrainerAssignment[]>([])
   const [filter, setFilter] = useState('pending_trainer')
   const [approveTarget, setApproveTarget] = useState<TrainerAssignment | null>(null)
   const [rejectTarget, setRejectTarget]   = useState<TrainerAssignment | null>(null)
   const [trainerNote, setTrainerNote] = useState('')
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
 
-  function load() {
-    api.get<TrainerAssignment[]>(`/dietitian/assignment-requests?status=${filter}`)
-      .then(setAssignments)
-      .catch(e => setError((e as Error).message))
+  const { page, goToPage, resetPage } = usePagination()
+
+  const { GetAssignmentRequests, ApproveDietitianAssignment, RejectDietitianAssignment } = useDietitian()
+  const { data, isPlaceholderData } = GetAssignmentRequests({ queryParams: { status: filter, page, page_size: 20 } })
+  const assignments = data?.items ?? []
+  const totalPages = data?.total_pages ?? 1
+  const approveAssignment = ApproveDietitianAssignment()
+  const rejectAssignment = RejectDietitianAssignment()
+
+  function handleFilterChange(value: string) {
+    setFilter(value)
+    resetPage()
   }
-
-  useEffect(() => { load() }, [filter])
 
   async function approve() {
     if (!approveTarget) return
-    setSaving(true); setError('')
     try {
-      await api.put(`/dietitian/assignment-requests/${approveTarget.id}/approve`, { trainer_note: trainerNote || undefined })
+      await approveAssignment.mutateAsync({ id: approveTarget.id, trainer_note: trainerNote || undefined })
       setApproveTarget(null)
-      load()
-    } catch (e) { setError((e as Error).message) }
-    finally { setSaving(false) }
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
   }
 
   async function reject() {
     if (!rejectTarget) return
-    setSaving(true); setError('')
     try {
-      await api.put(`/dietitian/assignment-requests/${rejectTarget.id}/reject`, { trainer_note: trainerNote || undefined })
+      await rejectAssignment.mutateAsync({ id: rejectTarget.id, trainer_note: trainerNote || undefined })
       setRejectTarget(null)
-      load()
-    } catch (e) { setError((e as Error).message) }
-    finally { setSaving(false) }
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Assignment Requests</h1>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={handleFilterChange}>
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="pending_trainer">Pending (You)</SelectItem>
@@ -81,9 +84,7 @@ export default function AssignmentRequests() {
         </Select>
       </div>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-
-      <Card>
+      <Card className={isPlaceholderData ? 'opacity-70' : ''}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -119,14 +120,14 @@ export default function AssignmentRequests() {
                         <Button
                           size="sm" variant="outline"
                           className="h-7 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => { setTrainerNote(''); setError(''); setApproveTarget(a) }}
+                          onClick={() => { setTrainerNote(''); setApproveTarget(a) }}
                         >
                           <CheckCircle className="mr-1 h-3.5 w-3.5" />Approve
                         </Button>
                         <Button
                           size="sm" variant="outline"
                           className="h-7 border-destructive text-destructive hover:bg-red-50"
-                          onClick={() => { setTrainerNote(''); setError(''); setRejectTarget(a) }}
+                          onClick={() => { setTrainerNote(''); setRejectTarget(a) }}
                         >
                           <XCircle className="mr-1 h-3.5 w-3.5" />Reject
                         </Button>
@@ -148,7 +149,8 @@ export default function AssignmentRequests() {
         </CardContent>
       </Card>
 
-      {/* Approve dialog */}
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+
       <Dialog open={!!approveTarget} onOpenChange={() => setApproveTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Approve Request</DialogTitle></DialogHeader>
@@ -159,15 +161,15 @@ export default function AssignmentRequests() {
             <Label>Note to customer (optional)</Label>
             <Input placeholder="e.g. Looking forward to working with you!" value={trainerNote} onChange={e => setTrainerNote(e.target.value)} />
           </div>
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveTarget(null)}>Cancel</Button>
-            <Button onClick={approve} disabled={saving}>{saving ? 'Approving…' : 'Approve'}</Button>
+            <Button onClick={approve} disabled={approveAssignment.isPending}>
+              {approveAssignment.isPending ? 'Approving…' : 'Approve'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reject dialog */}
       <Dialog open={!!rejectTarget} onOpenChange={() => setRejectTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Reject Request</DialogTitle></DialogHeader>
@@ -178,10 +180,11 @@ export default function AssignmentRequests() {
             <Label>Reason (optional)</Label>
             <Input placeholder="e.g. Fully booked at the moment" value={trainerNote} onChange={e => setTrainerNote(e.target.value)} />
           </div>
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={reject} disabled={saving}>{saving ? 'Rejecting…' : 'Reject'}</Button>
+            <Button variant="destructive" onClick={reject} disabled={rejectAssignment.isPending}>
+              {rejectAssignment.isPending ? 'Rejecting…' : 'Reject'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -113,14 +113,26 @@ class TrainerAssignmentNoteSchema(BaseModel):
 @admin_bp.route('/categories', methods=['GET'])
 @role_required('admin', 'dietitian', 'user')
 def list_categories():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(200, int(request.args.get('page_size', 20))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        cursor.execute("SELECT COUNT(*) AS total FROM categories WHERE deleted_at IS NULL")
+        total = cursor.fetchone()['total']
         cursor.execute(
             "SELECT id, name, slug, description FROM categories "
-            "WHERE deleted_at IS NULL ORDER BY id"
+            "WHERE deleted_at IS NULL ORDER BY id LIMIT %s OFFSET %s",
+            (page_size, offset)
         )
-        return jsonify(cursor.fetchall())
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -207,17 +219,37 @@ def delete_category(cid):
 @admin_bp.route('/users', methods=['GET'])
 @role_required('admin')
 def list_users():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    search    = request.args.get('search', '').strip()
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        base_where = "WHERE u.deleted_at IS NULL"
+        params_count = []
+        if search:
+            like = f"%{search}%"
+            base_where += " AND (u.name LIKE %s OR u.email LIKE %s)"
+            params_count = [like, like]
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at, "
-            "p.goal, p.weight_kg, p.height_cm "
-            "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
-            "WHERE u.deleted_at IS NULL "
-            "ORDER BY u.created_at DESC"
+            f"SELECT COUNT(*) AS total FROM users u {base_where}", params_count
         )
-        return jsonify(cursor.fetchall())
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            f"SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at, "
+            f"p.goal, p.weight_kg, p.height_cm "
+            f"FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
+            f"{base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
+            params_count + [page_size, offset]
+        )
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -304,13 +336,36 @@ def delete_user(uid):
 @admin_bp.route('/exercises', methods=['GET'])
 @role_required('admin', 'dietitian', 'user')
 def list_exercises():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(200, int(request.args.get('page_size', 20))))
+    search    = request.args.get('search', '').strip()
+    category  = request.args.get('category', '').strip()
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        conditions = ["deleted_at IS NULL"]
+        params = []
+        if search:
+            conditions.append("name LIKE %s")
+            params.append(f"%{search}%")
+        if category:
+            conditions.append("category = %s")
+            params.append(category)
+        where = "WHERE " + " AND ".join(conditions)
+        cursor.execute(f"SELECT COUNT(*) AS total FROM exercises {where}", params)
+        total = cursor.fetchone()['total']
         cursor.execute(
-            "SELECT * FROM exercises WHERE deleted_at IS NULL ORDER BY category, name"
+            f"SELECT * FROM exercises {where} ORDER BY category, name LIMIT %s OFFSET %s",
+            params + [page_size, offset]
         )
-        return jsonify(cursor.fetchall())
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -516,21 +571,38 @@ def delete_product(pid):
 @role_required('admin')
 def list_product_requests():
     status_filter = request.args.get('status', 'pending')
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        base = (
-            "SELECT pr.*, u.name AS user_name, u.email AS user_email, "
-            "r.name AS reviewed_by_name "
+        base_join = (
             "FROM product_requests pr JOIN users u ON pr.user_id = u.id "
             "LEFT JOIN users r ON pr.reviewed_by = r.id "
             "WHERE pr.deleted_at IS NULL "
         )
+        count_select = "SELECT COUNT(*) AS total " + base_join
+        data_select  = (
+            "SELECT pr.*, u.name AS user_name, u.email AS user_email, "
+            "r.name AS reviewed_by_name " + base_join
+        )
         if status_filter == 'all':
-            cursor.execute(base + "ORDER BY pr.created_at DESC")
+            cursor.execute(count_select)
+            total = cursor.fetchone()['total']
+            cursor.execute(data_select + "ORDER BY pr.created_at DESC LIMIT %s OFFSET %s", (page_size, offset))
         else:
-            cursor.execute(base + "AND pr.status = %s ORDER BY pr.created_at DESC", (status_filter,))
-        return jsonify(cursor.fetchall())
+            cursor.execute(count_select + "AND pr.status = %s", (status_filter,))
+            total = cursor.fetchone()['total']
+            cursor.execute(data_select + "AND pr.status = %s ORDER BY pr.created_at DESC LIMIT %s OFFSET %s",
+                           (status_filter, page_size, offset))
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -619,14 +691,27 @@ def reject_product_request(rid):
 @admin_bp.route('/orders', methods=['GET'])
 @role_required('admin')
 def list_all_orders():
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    status    = request.args.get('status', '').strip()
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        base_where = "WHERE o.deleted_at IS NULL"
+        params = []
+        if status:
+            base_where += " AND o.status = %s"
+            params.append(status)
         cursor.execute(
-            "SELECT o.*, u.name AS user_name, u.email AS user_email "
-            "FROM orders o JOIN users u ON o.user_id = u.id "
-            "WHERE o.deleted_at IS NULL "
-            "ORDER BY o.created_at DESC"
+            f"SELECT COUNT(*) AS total FROM orders o {base_where}", params
+        )
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            f"SELECT o.*, u.name AS user_name, u.email AS user_email "
+            f"FROM orders o JOIN users u ON o.user_id = u.id "
+            f"{base_where} ORDER BY o.created_at DESC LIMIT %s OFFSET %s",
+            params + [page_size, offset]
         )
         orders = cursor.fetchall()
         for order in orders:
@@ -636,7 +721,13 @@ def list_all_orders():
                 (order['id'],),
             )
             order['items'] = cursor.fetchall()
-        return jsonify(orders)
+        return jsonify({
+            'items': orders,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()
@@ -707,26 +798,42 @@ def delete_order(oid):
 @role_required('admin')
 def list_trainer_assignments():
     status_filter = request.args.get('status', 'pending_admin')
+    page      = max(1, int(request.args.get('page', 1)))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20))))
+    offset    = (page - 1) * page_size
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        base = (
-            "SELECT ta.*, "
-            "c.name AS customer_name, c.email AS customer_email, "
-            "t.name AS trainer_name,  t.email AS trainer_email, "
-            "a.name AS reviewed_by_name "
+        base_join = (
             "FROM trainer_assignments ta "
             "JOIN users c ON ta.customer_id = c.id "
             "JOIN users t ON ta.trainer_id  = t.id "
             "LEFT JOIN users a ON ta.reviewed_by_admin = a.id "
             "WHERE ta.deleted_at IS NULL "
         )
+        count_select = "SELECT COUNT(*) AS total " + base_join
+        data_select  = (
+            "SELECT ta.*, "
+            "c.name AS customer_name, c.email AS customer_email, "
+            "t.name AS trainer_name,  t.email AS trainer_email, "
+            "a.name AS reviewed_by_name " + base_join
+        )
         if status_filter == 'all':
-            cursor.execute(base + "ORDER BY ta.created_at DESC")
+            cursor.execute(count_select)
+            total = cursor.fetchone()['total']
+            cursor.execute(data_select + "ORDER BY ta.created_at DESC LIMIT %s OFFSET %s", (page_size, offset))
         else:
-            cursor.execute(base + "AND ta.status = %s ORDER BY ta.created_at DESC",
-                           (status_filter,))
-        return jsonify(cursor.fetchall())
+            cursor.execute(count_select + "AND ta.status = %s", (status_filter,))
+            total = cursor.fetchone()['total']
+            cursor.execute(data_select + "AND ta.status = %s ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
+                           (status_filter, page_size, offset))
+        return jsonify({
+            'items': cursor.fetchall(),
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+        })
     finally:
         cursor.close()
         conn.close()

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Clock, Bell } from 'lucide-react'
-import { api } from '@/api/client'
+import { useState } from 'react'
+import { CheckCircle, XCircle, Bell } from 'lucide-react'
+import useAdmin from '@/hooks/useAdmin'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,46 +12,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
-import type { ProductRequest, Category } from '@/types'
+import type { ProductRequest } from '@/types'
 
 const statusVariant: Record<string, 'info' | 'success' | 'destructive'> = {
   pending: 'info', approved: 'success', rejected: 'destructive',
 }
 
 export default function ProductRequests() {
-  const [requests, setRequests] = useState<ProductRequest[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   const [filter, setFilter] = useState('pending')
   const [approveDialog, setApproveDialog] = useState<ProductRequest | null>(null)
   const [rejectDialog, setRejectDialog] = useState<ProductRequest | null>(null)
   const [approveForm, setApproveForm] = useState({ price: '', stock_quantity: '', category: '', admin_note: '' })
   const [rejectNote, setRejectNote] = useState('')
-  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    api.get<Category[]>('/admin/categories').then(cats => {
-      setCategories(cats)
-      setApproveForm(f => ({ ...f, category: f.category || cats[0]?.slug || '' }))
-    }).catch(console.error)
-  }, [])
+  const { page, goToPage, resetPage } = usePagination()
 
-  function load() {
-    api.get<ProductRequest[]>(`/admin/product-requests?status=${filter}`)
-      .then(setRequests)
-      .catch(e => toast.error((e as Error).message))
+  const { GetProductRequests, ApproveProductRequest, RejectProductRequest, GetCategories } = useAdmin()
+  const { data, isPlaceholderData } = GetProductRequests({ queryParams: { status: filter, page, page_size: 20 } })
+  const requests = data?.items ?? []
+  const totalPages = data?.total_pages ?? 1
+  const { data: categoriesData } = GetCategories({ queryParams: { page_size: 200 } })
+  const categories = categoriesData?.items ?? []
+  const approveRequest = ApproveProductRequest()
+  const rejectRequest = RejectProductRequest()
+
+  function handleFilterChange(value: string) {
+    setFilter(value)
+    resetPage()
   }
-
-  useEffect(() => { load() }, [filter])
 
   async function approve() {
     if (!approveDialog) return
-    if (!approveForm.price) {
-      toast.error('Price is required')
-      return
-    }
-    setSaving(true)
+    if (!approveForm.price) { toast.error('Price is required'); return }
     try {
-      await api.put(`/admin/product-requests/${approveDialog.id}/approve`, {
+      await approveRequest.mutateAsync({
+        id: approveDialog.id,
         price: parseFloat(approveForm.price),
         stock_quantity: parseInt(approveForm.stock_quantity || '0'),
         category: approveForm.category,
@@ -57,27 +54,20 @@ export default function ProductRequests() {
       })
       toast.success(`"${approveDialog.product_name}" approved and added to catalog`)
       setApproveDialog(null)
-      load()
     } catch (e) {
       toast.error((e as Error).message)
-    } finally {
-      setSaving(false)
     }
   }
 
   async function reject() {
     if (!rejectDialog) return
-    setSaving(true)
     try {
-      await api.put(`/admin/product-requests/${rejectDialog.id}/reject`, { admin_note: rejectNote })
+      await rejectRequest.mutateAsync({ id: rejectDialog.id, admin_note: rejectNote })
       toast.success('Request rejected')
       setRejectDialog(null)
       setRejectNote('')
-      load()
     } catch (e) {
       toast.error((e as Error).message)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -85,7 +75,7 @@ export default function ProductRequests() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Product Requests</h1>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={handleFilterChange}>
           <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="pending">Pending</SelectItem>
@@ -96,7 +86,7 @@ export default function ProductRequests() {
         </Select>
       </div>
 
-      <Card>
+      <Card className={isPlaceholderData ? 'opacity-70' : ''}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -161,7 +151,8 @@ export default function ProductRequests() {
         </CardContent>
       </Card>
 
-      {/* Approve Dialog */}
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
+
       <Dialog open={!!approveDialog} onOpenChange={() => setApproveDialog(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -195,12 +186,13 @@ export default function ProductRequests() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveDialog(null)}>Cancel</Button>
-            <Button onClick={approve} disabled={saving}>{saving ? 'Adding…' : 'Approve & Add'}</Button>
+            <Button onClick={approve} disabled={approveRequest.isPending}>
+              {approveRequest.isPending ? 'Adding…' : 'Approve & Add'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reject Dialog */}
       <Dialog open={!!rejectDialog} onOpenChange={() => setRejectDialog(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -213,7 +205,9 @@ export default function ProductRequests() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={reject} disabled={saving}>{saving ? 'Rejecting…' : 'Reject'}</Button>
+            <Button variant="destructive" onClick={reject} disabled={rejectRequest.isPending}>
+              {rejectRequest.isPending ? 'Rejecting…' : 'Reject'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

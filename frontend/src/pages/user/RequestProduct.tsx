@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Plus, Clock, CheckCircle, XCircle } from 'lucide-react'
-import { api } from '@/api/client'
+import useUser from '@/hooks/useUser'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,10 +8,10 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
-import type { ProductRequest, RequestStatus } from '@/types'
+import type { RequestStatus } from '@/types'
 
 const statusIcon: Record<RequestStatus, React.ReactNode> = {
-  pending: <Clock className="h-4 w-4 text-yellow-500" />,
+  pending:  <Clock className="h-4 w-4 text-yellow-500" />,
   approved: <CheckCircle className="h-4 w-4 text-emerald-500" />,
   rejected: <XCircle className="h-4 w-4 text-destructive" />,
 }
@@ -21,32 +21,25 @@ const statusVariant: Record<RequestStatus, 'info' | 'success' | 'destructive'> =
 }
 
 export default function RequestProduct() {
-  const [requests, setRequests] = useState<ProductRequest[]>([])
   const [form, setForm] = useState({ product_name: '', description: '', reason: '' })
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  function load() {
-    api.get<ProductRequest[]>('/user/product-requests').then(setRequests).catch(() => {})
-  }
-
-  useEffect(() => { load() }, [])
+  const { GetProductRequests, CreateProductRequest } = useUser()
+  const { data: requestsData } = GetProductRequests({ queryParams: { page_size: 50 } })
+  const requests = requestsData?.items ?? []
+  const createRequest = CreateProductRequest()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.product_name.trim()) { setError('Product name is required'); return }
-    setLoading(true)
     setError('')
     try {
-      await api.post('/user/product-requests', form)
+      await createRequest.mutateAsync(form)
       setSuccess('Request submitted! Admin will review it shortly.')
       setForm({ product_name: '', description: '', reason: '' })
-      load()
     } catch (e) {
       setError((e as Error).message)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -92,9 +85,9 @@ export default function RequestProduct() {
             </div>
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
             {success && <Alert variant="info"><AlertDescription>{success}</AlertDescription></Alert>}
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={createRequest.isPending}>
               <Plus className="mr-2 h-4 w-4" />
-              {loading ? 'Submitting…' : 'Submit Request'}
+              {createRequest.isPending ? 'Submitting…' : 'Submit Request'}
             </Button>
           </form>
         </CardContent>

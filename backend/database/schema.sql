@@ -165,6 +165,32 @@ CREATE TABLE IF NOT EXISTS trainer_assignments (
     FOREIGN KEY (reviewed_by_admin) REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    product_id  INT NOT NULL,
+    rating      TINYINT NOT NULL,
+    comment     TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY  uq_product_review (user_id, product_id),
+    FOREIGN KEY (user_id)    REFERENCES users(id)    ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS trainer_reviews (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    trainer_id  INT NOT NULL,
+    rating      TINYINT NOT NULL,
+    comment     TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY  uq_trainer_review (user_id, trainer_id),
+    FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (trainer_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS product_requests (
     id           INT AUTO_INCREMENT PRIMARY KEY,
     user_id      INT NOT NULL,

@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ShoppingBag, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
-import { api } from "@/api/client";
+import useAdmin from "@/hooks/useAdmin";
+import { usePagination } from "@/hooks/usePagination";
+import { AppPagination } from "@/components/ui/app-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,27 +51,23 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 };
 
 export default function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  function load() {
-    api
-      .get<Order[]>("/admin/orders")
-      .then(setOrders)
-      .catch((e) => toast.error((e as Error).message));
-  }
+  const { page, goToPage } = usePagination();
 
-  useEffect(() => {
-    load();
-  }, []);
+  const { GetOrders, UpdateOrderStatus, DeleteOrder } = useAdmin();
+  const { data, isPlaceholderData } = GetOrders({ queryParams: { page, page_size: 20 } });
+  const orders = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.total_pages ?? 1;
+  const updateStatus = UpdateOrderStatus();
+  const deleteOrder = DeleteOrder();
 
-  async function updateStatus(orderId: number, status: OrderStatus) {
+  async function handleUpdateStatus(orderId: number, status: OrderStatus) {
     try {
-      await api.put(`/admin/orders/${orderId}/status`, { status });
-      load();
+      await updateStatus.mutateAsync({ orderId, status });
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -82,15 +80,12 @@ export default function OrderManagement() {
 
   async function confirmDelete() {
     if (!pendingDeleteId) return;
-    setDeleting(pendingDeleteId);
     try {
-      await api.delete(`/admin/orders/${pendingDeleteId}`);
+      await deleteOrder.mutateAsync(pendingDeleteId);
       toast.success(`Order #${pendingDeleteId} deleted`);
-      load();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setDeleting(null);
       setConfirmOpen(false);
       setPendingDeleteId(null);
     }
@@ -98,9 +93,12 @@ export default function OrderManagement() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+        <p className="text-sm text-muted-foreground">{total} {total === 1 ? 'order' : 'orders'}</p>
+      </div>
 
-      <Card>
+      <Card className={isPlaceholderData ? "opacity-70" : ""}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -189,7 +187,7 @@ export default function OrderManagement() {
                       {NEXT_STATUSES[order.status].length > 0 && (
                         <Select
                           onValueChange={(v) =>
-                            updateStatus(order.id, v as OrderStatus)
+                            handleUpdateStatus(order.id, v as OrderStatus)
                           }
                         >
                           <SelectTrigger className="h-7 w-32 text-xs">
@@ -218,7 +216,7 @@ export default function OrderManagement() {
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                        disabled={deleting === order.id}
+                        disabled={deleteOrder.isPending && pendingDeleteId === order.id}
                         onClick={() => handleDeleteClick(order.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -276,6 +274,8 @@ export default function OrderManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={confirmOpen}

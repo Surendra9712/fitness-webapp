@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Trash2, Flame } from 'lucide-react'
-import { api } from '@/api/client'
+import useUser from '@/hooks/useUser'
+import { usePagination } from '@/hooks/usePagination'
+import { AppPagination } from '@/components/ui/app-pagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import type { Exercise, ExerciseLog, ExerciseCategory } from '@/types'
+import { toast } from 'sonner'
+import type { ExerciseCategory } from '@/types'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 
@@ -18,36 +21,45 @@ const catVariant: Record<ExerciseCategory, 'warning' | 'destructive' | 'success'
 }
 
 export default function LogExercise() {
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [logs, setLogs] = useState<ExerciseLog[]>([])
   const [form, setForm] = useState({ exercise_id: '', logged_date: todayStr(), duration_minutes: '', notes: '' })
   const [date, setDate] = useState(todayStr())
-  const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const loadLogs = (d: string) => api.get<ExerciseLog[]>(`/user/exercise-logs?date=${d}`).then(setLogs).catch(e => setError((e as Error).message))
+  const { page, goToPage, resetPage } = usePagination()
 
-  useEffect(() => {
-    api.get<Exercise[]>('/user/exercises').then(setExercises).catch(e => setError((e as Error).message))
-    loadLogs(todayStr())
-  }, [])
+  const { GetExercises, GetExerciseLogs, LogExercise, DeleteExerciseLog } = useUser()
+  const { data: exercisesData } = GetExercises({ queryParams: { page_size: 200 } })
+  const exercises = exercisesData?.items ?? []
+  const { data: logsData, isError, error } = GetExerciseLogs({ queryParams: { date, page, page_size: 10 } })
+  const logs = logsData?.items ?? []
+  const totalPages = logsData?.total_pages ?? 1
+  const logExercise = LogExercise()
+  const deleteLog = DeleteExerciseLog()
+
+  function handleDateChange(newDate: string) {
+    setDate(newDate)
+    resetPage()
+  }
 
   const handleLog = async (e: React.FormEvent) => {
-    e.preventDefault(); setError(''); setSuccess('')
+    e.preventDefault()
+    setSuccess('')
     try {
-      const res = await api.post<{ calories_burned: number }>('/user/exercise-logs', form)
+      const res = await logExercise.mutateAsync(form)
       setSuccess(`Exercise logged! Burned ~${res.calories_burned} kcal`)
       setForm(f => ({ ...f, exercise_id: '', duration_minutes: '', notes: '' }))
-      loadLogs(date)
-    } catch (err) { setError((err as Error).message) }
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
   }
 
-  const deleteLog = async (id: number) => {
-    try { await api.delete(`/user/exercise-logs/${id}`); loadLogs(date) }
-    catch (err) { setError((err as Error).message) }
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteLog.mutateAsync(id)
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
   }
-
-  const handleDateChange = (d: string) => { setDate(d); loadLogs(d) }
 
   const selectedEx = exercises.find(e => String(e.id) === form.exercise_id)
   const estCal = selectedEx && form.duration_minutes
@@ -58,7 +70,7 @@ export default function LogExercise() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Log Exercise</h1>
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {isError && <Alert variant="destructive"><AlertDescription>{(error as Error).message}</AlertDescription></Alert>}
       {success && <Alert variant="success"><AlertDescription>{success}</AlertDescription></Alert>}
 
       <Card>
@@ -98,7 +110,9 @@ export default function LogExercise() {
               <Input placeholder="e.g. felt strong today" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
             </div>
             <div className="col-span-2">
-              <Button type="submit" className="w-full sm:w-auto">Log Exercise</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={logExercise.isPending}>
+                {logExercise.isPending ? 'Logging…' : 'Log Exercise'}
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -126,15 +140,25 @@ export default function LogExercise() {
                   <TableCell>{l.calories_burned} kcal</TableCell>
                   <TableCell className="text-muted-foreground">{l.notes ?? '—'}</TableCell>
                   <TableCell>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteLog(l.id)}><Trash2 className="h-3 w-3" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(l.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {!logs.length && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No exercises logged for {date}</TableCell></TableRow>}
+              {!logs.length && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    No exercises logged for {date}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      <AppPagination page={page} totalPages={totalPages} onPageChange={goToPage} />
     </div>
   )
 }
