@@ -78,6 +78,11 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Assignments",
       icon: <UserCheck className="h-4 w-4" />,
     },
+    {
+      to: "/trainer/profile",
+      label: "My Profile",
+      icon: <User className="h-4 w-4" />,
+    },
   ],
   user: [
     {

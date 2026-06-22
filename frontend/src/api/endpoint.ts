@@ -19,7 +19,10 @@ export const endpoint = {
   publicProducts: "public/products",
   publicCategories: "public/categories",
 
+  dietitianProfile: "dietitian/profile",
   dietitianUsers: "dietitian/users",
   dietitianStats: "dietitian/stats",
   dietitianAssignmentRequests: "dietitian/assignment-requests",
+
+  uploadImage: "upload/image",
 };

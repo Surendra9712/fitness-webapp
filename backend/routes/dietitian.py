@@ -17,7 +17,78 @@ class AssignmentNoteSchema(BaseModel):
     trainer_note: Optional[str] = None
 
 
+class UpdateTrainerProfileSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    name:              Optional[str] = None
+    bio:               Optional[str] = None
+    specialization:    Optional[str] = None
+    profile_image_url: Optional[str] = None
+    phone_number:      Optional[str] = None
+    city:              Optional[str] = None
+    country:           Optional[str] = None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
+
+@dietitian_bp.route('/profile', methods=['GET'])
+@role_required('dietitian', 'admin')
+def get_profile():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT u.id, u.name, u.email, u.role, u.is_active, "
+            "COALESCE(u.profile_image_url, p.profile_image_url) AS profile_image_url, "
+            "p.bio, p.specialization, p.phone_number, p.city, p.country "
+            "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
+            "WHERE u.id = %s",
+            (request.user_id,),
+        )
+        return jsonify(cursor.fetchone())
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@dietitian_bp.route('/profile', methods=['PUT'])
+@role_required('dietitian', 'trainer')
+def update_profile():
+    try:
+        body = UpdateTrainerProfileSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        return jsonify({'error': 'No valid fields'}), 400
+
+    user_fields    = {k: v for k, v in updates.items() if k in ('name', 'profile_image_url')}
+    profile_fields = {k: v for k, v in updates.items() if k != 'name'}
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        if user_fields:
+            set_clause = ', '.join(f"{k} = %s" for k in user_fields)
+            cursor.execute(
+                f"UPDATE users SET {set_clause} WHERE id = %s",
+                list(user_fields.values()) + [request.user_id],
+            )
+        if profile_fields:
+            set_clause = ', '.join(f"{k} = %s" for k in profile_fields)
+            cursor.execute(
+                f"UPDATE user_profiles SET {set_clause} WHERE user_id = %s",
+                list(profile_fields.values()) + [request.user_id],
+            )
+        conn.commit()
+        return jsonify({'message': 'Profile updated'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
 
 @dietitian_bp.route('/users', methods=['GET'])
 @role_required('admin', 'dietitian')

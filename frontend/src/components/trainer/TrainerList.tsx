@@ -1,60 +1,64 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Send, Users, Mail, Dumbbell } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { AppPagination } from '@/components/ui/app-pagination'
-import { StarDisplay } from '@/components/ui/star-rating'
-import type { TrainerInfo } from '@/types'
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Search, Send, Users, Mail, Dumbbell } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AppPagination } from "@/components/ui/app-pagination";
+import { StarDisplay } from "@/components/ui/star-rating";
+import type { TrainerInfo } from "@/types";
+import { AvatarImage } from "@radix-ui/react-avatar";
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 5;
 
 const AVATAR_GRADIENTS = [
-  'from-emerald-400 to-teal-600',
-  'from-green-400 to-emerald-600',
-  'from-secondary-400 to-secondary-700',
-  'from-violet-400 to-purple-600',
-  'from-rose-400 to-pink-600',
-  'from-amber-400 to-orange-500',
-  'from-cyan-400 to-sky-600',
-]
+  "from-emerald-400 to-teal-600",
+  "from-green-400 to-emerald-600",
+  "from-secondary-400 to-secondary-700",
+  "from-violet-400 to-purple-600",
+  "from-rose-400 to-pink-600",
+  "from-amber-400 to-orange-500",
+  "from-cyan-400 to-sky-600",
+];
 
 function avatarGradient(name: string) {
-  return AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length]
+  return AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
 }
 
 interface Props {
-  trainers: TrainerInfo[]
-  onRequest: (trainer: TrainerInfo) => void
+  trainers: TrainerInfo[];
+  onRequest: (trainer: TrainerInfo) => void;
 }
 
 export function TrainerList({ trainers, onRequest }: Props) {
-  const [searchInput, setSearchInput] = useState('')
-  const [appliedSearch, setAppliedSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
-    if (!appliedSearch) return trainers
-    const q = appliedSearch.toLowerCase()
+    if (!appliedSearch) return trainers;
+    const q = appliedSearch.toLowerCase();
     return trainers.filter(
-      (t) => t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q),
-    )
-  }, [trainers, appliedSearch])
+      (t) =>
+        t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q),
+    );
+  }, [trainers, appliedSearch]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-  const slice = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
-  const to = Math.min(safePage * PAGE_SIZE, filtered.length)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const slice = filtered.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
+  const from = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const to = Math.min(safePage * PAGE_SIZE, filtered.length);
 
   function applySearch() {
-    setAppliedSearch(searchInput)
-    setPage(1)
+    setAppliedSearch(searchInput);
+    setPage(1);
   }
 
   return (
     <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
-
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-6 py-5 border-b">
         <div className="flex items-center gap-3">
@@ -67,7 +71,7 @@ export function TrainerList({ trainers, onRequest }: Props) {
         </div>
         <div className="flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-sm font-semibold text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
-          {trainers.length} trainer{trainers.length !== 1 ? 's' : ''}
+          {trainers.length} trainer{trainers.length !== 1 ? "s" : ""}
         </div>
       </div>
 
@@ -80,7 +84,7 @@ export function TrainerList({ trainers, onRequest }: Props) {
             placeholder="Search by name or email…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+            onKeyDown={(e) => e.key === "Enter" && applySearch()}
             className="w-full rounded-xl border border-border bg-background pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-muted-foreground"
           />
         </div>
@@ -94,11 +98,11 @@ export function TrainerList({ trainers, onRequest }: Props) {
       <div className="divide-y">
         {slice.length === 0 ? (
           <div className="py-14 text-center text-sm text-muted-foreground">
-            No trainers found{appliedSearch ? ` for "${appliedSearch}"` : ''}.
+            No trainers found{appliedSearch ? ` for "${appliedSearch}"` : ""}.
           </div>
         ) : (
           slice.map((t) => {
-            const available = !t.customer_count || t.customer_count === 0
+            const available = !t.customer_count || t.customer_count === 0;
             return (
               <div
                 key={t.id}
@@ -111,6 +115,7 @@ export function TrainerList({ trainers, onRequest }: Props) {
                   >
                     {t.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
+                  <AvatarImage src={t.profile_image_url} />
                 </Avatar>
 
                 {/* Name + status */}
@@ -122,9 +127,13 @@ export function TrainerList({ trainers, onRequest }: Props) {
                     {t.name}
                   </Link>
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    <span className={`h-2 w-2 rounded-full ${available ? 'bg-emerald-500' : 'bg-secondary-500'}`} />
-                    <span className={`text-xs font-semibold ${available ? 'text-emerald-600' : 'text-secondary-600'}`}>
-                      {available ? 'Available' : 'Active'}
+                    <span
+                      className={`h-2 w-2 rounded-full ${available ? "bg-emerald-500" : "bg-secondary-500"}`}
+                    />
+                    <span
+                      className={`text-xs font-semibold ${available ? "text-emerald-600" : "text-secondary-600"}`}
+                    >
+                      {available ? "Available" : "Active"}
                     </span>
                   </div>
                 </div>
@@ -138,9 +147,15 @@ export function TrainerList({ trainers, onRequest }: Props) {
                 {/* Rating */}
                 <div className="shrink-0 w-28">
                   {t.avg_rating && t.avg_rating > 0 ? (
-                    <StarDisplay value={t.avg_rating} count={t.review_count} size="sm" />
+                    <StarDisplay
+                      value={t.avg_rating}
+                      count={t.review_count}
+                      size="sm"
+                    />
                   ) : (
-                    <span className="text-xs text-muted-foreground">No reviews</span>
+                    <span className="text-xs text-muted-foreground">
+                      No reviews
+                    </span>
                   )}
                 </div>
 
@@ -153,7 +168,12 @@ export function TrainerList({ trainers, onRequest }: Props) {
 
                 {/* Actions */}
                 <div className="flex shrink-0 items-center gap-2">
-                  <Button asChild variant="outline" size="sm" className="rounded-full px-4 text-xs">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full px-4 text-xs"
+                  >
                     <Link to={`/customer/trainers/${t.id}`}>View</Link>
                   </Button>
                   <Button
@@ -166,24 +186,17 @@ export function TrainerList({ trainers, onRequest }: Props) {
                   </Button>
                 </div>
               </div>
-            )
+            );
           })
         )}
       </div>
 
       {/* ── Footer: count + pagination ── */}
-      {filtered.length > 0 && (
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-t bg-muted/20">
-          <p className="text-sm text-muted-foreground shrink-0">
-            Showing <strong>{from}–{to}</strong> of <strong>{filtered.length}</strong> trainer{filtered.length !== 1 ? 's' : ''}
-          </p>
-          <AppPagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
-        </div>
-      )}
+      <AppPagination
+        page={safePage}
+        totalPages={totalPages}
+        onPageChange={setPage}
+      />
     </div>
-  )
+  );
 }

@@ -632,7 +632,7 @@ def list_trainers():
         cursor.execute(f"SELECT COUNT(*) AS total FROM users u {base_where}", params)
         total = cursor.fetchone()['total']
         cursor.execute(
-            f"SELECT u.id, u.name, u.email, "
+            f"SELECT u.id, u.name, u.email, u.profile_image_url, "
             f"(SELECT COUNT(*) FROM trainer_assignments ta "
             f" WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count "
             f"FROM users u {base_where} ORDER BY u.name LIMIT %s OFFSET %s",
@@ -651,7 +651,7 @@ def get_trainer(trainer_id):
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT u.id, u.name, u.email, "
+            "SELECT u.id, u.name, u.email, u.profile_image_url, "
             "(SELECT COUNT(*) FROM trainer_assignments ta "
             " WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count, "
             "COALESCE((SELECT ROUND(AVG(r.rating), 1) FROM trainer_reviews r WHERE r.trainer_id = u.id), 0) AS avg_rating, "

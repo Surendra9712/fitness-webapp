@@ -5,16 +5,20 @@ CREATE DATABASE IF NOT EXISTS smartdiet_fitness
 USE smartdiet_fitness;
 
 CREATE TABLE IF NOT EXISTS users (
-    id            INT AUTO_INCREMENT PRIMARY KEY,
-    name          VARCHAR(100)  NOT NULL,
-    email         VARCHAR(150)  NOT NULL UNIQUE,
-    password_hash VARCHAR(255)  NOT NULL,
-    role          ENUM('admin','dietitian','user') NOT NULL DEFAULT 'user',
-    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at    TIMESTAMP NULL DEFAULT NULL
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    name              VARCHAR(100)  NOT NULL,
+    email             VARCHAR(150)  NOT NULL UNIQUE,
+    password_hash     VARCHAR(255)  NOT NULL,
+    role              ENUM('admin','dietitian','user') NOT NULL DEFAULT 'user',
+    is_active         BOOLEAN NOT NULL DEFAULT TRUE,
+    profile_image_url VARCHAR(500),
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at        TIMESTAMP NULL DEFAULT NULL
 );
+
+-- Run once on existing databases:
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image_url VARCHAR(500);
 
 CREATE TABLE IF NOT EXISTS user_profiles (
     id                   INT AUTO_INCREMENT PRIMARY KEY,
@@ -61,9 +65,20 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     weight_kg            DECIMAL(5,2),
     goal                 ENUM('lose_weight','maintain','gain_muscle') DEFAULT 'maintain',
 
+    -- Trainer / public profile fields
+    profile_image_url    VARCHAR(500),
+    bio                  TEXT,
+    specialization       VARCHAR(200),
+
     updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Run once on existing databases:
+-- ALTER TABLE user_profiles
+--   ADD COLUMN IF NOT EXISTS profile_image_url VARCHAR(500),
+--   ADD COLUMN IF NOT EXISTS bio               TEXT,
+--   ADD COLUMN IF NOT EXISTS specialization    VARCHAR(200);
 
 CREATE TABLE IF NOT EXISTS exercises (
     id                       INT AUTO_INCREMENT PRIMARY KEY,

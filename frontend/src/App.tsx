@@ -22,6 +22,7 @@ import TrainerAssignments from "@/pages/admin/TrainerAssignments";
 
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
 import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
+import TrainerProfile from "@/pages/dietitian/TrainerProfile";
 
 import UserDashboard from "@/pages/user/UserDashboard";
 import MyOrders from "@/pages/user/MyOrders";
@@ -166,6 +167,16 @@ export default function App() {
               <ProtectedRoute roles={["dietitian"]}>
                 <Layout>
                   <AssignmentRequests />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trainer/profile"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <TrainerProfile />
                 </Layout>
               </ProtectedRoute>
             }

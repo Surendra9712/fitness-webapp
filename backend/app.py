@@ -10,6 +10,7 @@ from routes.user import user_bp
 from routes.public import public_bp
 from routes.onboarding import onboarding_bp
 from routes.payment import payment_bp
+from routes.upload import upload_bp
 
 load_dotenv()
 
@@ -20,9 +21,10 @@ app.register_blueprint(auth_bp,       url_prefix='/api/auth')
 app.register_blueprint(admin_bp,      url_prefix='/api/admin')
 app.register_blueprint(dietitian_bp,  url_prefix='/api/dietitian')
 app.register_blueprint(user_bp,       url_prefix='/api/user')
-app.register_blueprint(public_bp,       url_prefix='/api/public')
-app.register_blueprint(onboarding_bp,  url_prefix='/api/onboarding')
-app.register_blueprint(payment_bp,     url_prefix='/api/payments')
+app.register_blueprint(public_bp,     url_prefix='/api/public')
+app.register_blueprint(onboarding_bp, url_prefix='/api/onboarding')
+app.register_blueprint(payment_bp,    url_prefix='/api/payments')
+app.register_blueprint(upload_bp,     url_prefix='/api/upload')
 
 
 @app.route('/api/health')

@@ -59,7 +59,7 @@ export function useApi({
     return useMutation({
       mutationKey: [endpoint, "update"] as MutationKey,
       mutationFn: async (postData: any) => {
-        const url = `${endpoint}/${postData.id}`;
+        const url = postData?.id ? `${endpoint}/${postData.id}` : endpoint;
         const { data } = await api.put(url, postData);
         return data;
       },
