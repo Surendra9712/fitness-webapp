@@ -17,8 +17,8 @@ export function Pill({
       className={cn(
         "px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors select-none cursor-pointer",
         active
-          ? "bg-emerald-600 border-emerald-600 text-white"
-          : "border-gray-200 text-gray-600 hover:border-emerald-400 hover:text-emerald-700",
+          ? "bg-primary-600 border-primary-600 text-white"
+          : "border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-700",
       )}
     >
       {children}
@@ -42,7 +42,7 @@ export function Tag({
       className={cn(
         "px-3 py-1 rounded-lg border text-sm transition-colors select-none cursor-pointer",
         active
-          ? "bg-emerald-50 border-emerald-500 text-emerald-700 font-medium"
+          ? "bg-primary-50 border-primary-500 text-primary-700 font-medium"
           : "border-gray-200 text-gray-600 hover:border-gray-300",
       )}
     >
@@ -71,7 +71,7 @@ export function Stepper({
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - step))}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-emerald-400 hover:text-emerald-600 transition-colors"
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600 transition-colors"
       >
         <Minus className="h-3.5 w-3.5" />
       </button>
@@ -81,7 +81,7 @@ export function Stepper({
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + step))}
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-emerald-400 hover:text-emerald-600 transition-colors"
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-primary-400 hover:text-primary-600 transition-colors"
       >
         <Plus className="h-3.5 w-3.5" />
       </button>

@@ -37,7 +37,7 @@ def get_profile():
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.role, u.is_active, "
+            "SELECT u.id, u.name, u.email, u.role, u.status, "
             "COALESCE(u.profile_image_url, p.profile_image_url) AS profile_image_url, "
             "p.bio, p.specialization, p.phone_number, p.city, p.country "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "

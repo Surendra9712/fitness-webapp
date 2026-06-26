@@ -14,7 +14,7 @@ def _allowed(filename: str) -> bool:
 
 
 @upload_bp.route('/image', methods=['POST'])
-@role_required('admin', 'dietitian', 'user')
+@role_required('admin', 'dietitian', 'trainee')
 def upload_image():
     if 'image' not in request.files:
         return jsonify({'error': 'No image field in request'}), 400

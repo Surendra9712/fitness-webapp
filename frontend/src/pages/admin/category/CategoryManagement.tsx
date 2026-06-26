@@ -15,16 +15,24 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Category } from "@/types";
 import CategoryFormDialog from "./CategoryFormDialog";
 import useAdmin from "@/hooks/useAdmin";
+import { usePagination } from "@/hooks/usePagination";
+import { AppPagination } from "@/components/ui/app-pagination";
 
 export default function CategoryManagement() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+  const { page, pageSize, goToPage, setPageSize } = usePagination({
+    initialPageSize: 10,
+  });
 
   const { GetCategories, DeleteCategory } = useAdmin();
-  const { data: categoriesData } = GetCategories({ queryParams: { page_size: 200 } });
+  const { data: categoriesData } = GetCategories({
+    queryParams: { page, page_size: pageSize },
+  });
   const categories = categoriesData?.items ?? [];
+  const total = categoriesData?.total ?? 0;
   const deleteCategory = DeleteCategory();
 
   function openAdd() {
@@ -130,7 +138,13 @@ export default function CategoryManagement() {
           </Table>
         </CardContent>
       </Card>
-
+      <AppPagination
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onPageChange={goToPage}
+      />
       <CategoryFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

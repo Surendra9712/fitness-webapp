@@ -1,9 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-
-
-
   --color-primary-50: #f0fdf4;
   --color-primary-100: #dcfce7;
   --color-primary-200: #bbf7d0;
@@ -18,7 +15,7 @@
   --color-primary: #22c55e;
 
 
- --color-secondary-50: #f0f7fe;
+  --color-secondary-50: #f0f7fe;
   --color-secondary-100: #deecfb;
   --color-secondary-200: #c4dff9;
   --color-secondary-300: #9ccbf4;
@@ -32,7 +29,7 @@
   --color-secondary: #4b90e6;
 
 
- --color-accent-50: #fffbeb;
+  --color-accent-50: #fffbeb;
   --color-accent-100: #fef3c7;
   --color-accent-200: #fde68a;
   --color-accent-300: #fcd34d;
@@ -47,6 +44,11 @@
 
 
 
+
+
+  --color-primary-foreground: #ffffff;
+  --color-secondary-foreground: #ffffff;
+  --color-accent-foreground: #111827;
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -57,12 +59,8 @@
   --color-card-foreground: hsl(var(--card-foreground));
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
 }
@@ -75,9 +73,7 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
@@ -164,3 +160,47 @@
   height: 0;
   pointer-events: none;
 }
+
+/* ── Home page animations & scroll reveal ────────────────────────────────── */
+@keyframes fadeInUp    { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:none} }
+@keyframes float       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }
+@keyframes shimmer     { 0%{background-position:-200% center} 100%{background-position:200% center} }
+@keyframes pulse-ring  { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(1.7);opacity:0} }
+@keyframes slideUp     { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+@keyframes marquee     { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+.hero-tag   { animation: fadeInUp .6s ease-out .1s  both }
+.hero-h1    { animation: fadeInUp .7s ease-out .25s both }
+.hero-sub   { animation: fadeInUp .7s ease-out .45s both }
+.hero-btns  { animation: fadeInUp .7s ease-out .6s  both }
+.hero-stats { animation: fadeInUp .7s ease-out .75s both }
+
+.float-a { animation: float 6s ease-in-out infinite }
+.float-b { animation: float 5s ease-in-out 1.2s infinite }
+.float-c { animation: float 4s ease-in-out .6s infinite }
+
+.gradient-text {
+  background: linear-gradient(90deg,#6ee7b7,#34d399,#10b981,#6ee7b7);
+  background-size:300%;
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation: shimmer 4s linear infinite;
+}
+
+.hover-lift { transition:transform .3s ease,box-shadow .3s ease }
+.hover-lift:hover { transform:translateY(-8px); box-shadow:0 24px 48px rgba(0,0,0,.12) }
+
+.pulse-ring::before {
+  content:''; position:absolute; inset:-8px; border-radius:9999px;
+  border:2px solid rgba(52,211,153,.4);
+  animation:pulse-ring 2s ease-out infinite;
+}
+
+.img-zoom { overflow:hidden }
+.img-zoom img { transition:transform .5s ease }
+.img-zoom:hover img { transform:scale(1.06) }
+
+.faq-answer { overflow:hidden; transition:max-height .35s ease,opacity .35s ease }
+.faq-answer.open  { max-height:200px; opacity:1 }
+.faq-answer.closed{ max-height:0;     opacity:0 }

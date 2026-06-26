@@ -5,8 +5,6 @@ import {
   Clock,
   ShoppingBag,
   Bell,
-  ShoppingCart,
-  Dumbbell,
   Activity,
   Flame,
   Droplets,

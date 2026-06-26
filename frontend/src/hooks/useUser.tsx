@@ -3,17 +3,44 @@ import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
 
 const useUser = (): any => {
-  const { api, get: GetTrainers } = useApi({ endpoint: endpoint.userTrainers, queryKey: "trainers" });
+  const { api, get: GetTrainers } = useApi({
+    endpoint: endpoint.userTrainers,
+    queryKey: "trainers",
+  });
+  const { get: GetAuthProfile } = useApi({
+    endpoint: endpoint.authProfile,
+    queryKey: "authProfile",
+  });
 
-  const { get: GetTrainerAssignment, post: RequestTrainer } = useApi({ endpoint: endpoint.userTrainerAssignment, queryKey: "trainerAssignment" });
+  const { get: GetTrainerAssignment, post: RequestTrainer } = useApi({
+    endpoint: endpoint.userTrainerAssignment,
+    queryKey: "trainerAssignment",
+  });
 
-  const { get: GetOrders, post: CreateOrder, delete: CancelOrder } = useApi({ endpoint: endpoint.userOrders, queryKey: "userOrders" });
+  const {
+    get: GetOrders,
+    post: CreateOrder,
+    delete: CancelOrder,
+  } = useApi({ endpoint: endpoint.userOrders, queryKey: "userOrders" });
 
-  const { get: GetProductRequests, post: CreateProductRequest } = useApi({ endpoint: endpoint.userProductRequests, queryKey: "userProductRequests" });
+  const { get: GetProductRequests, post: CreateProductRequest } = useApi({
+    endpoint: endpoint.userProductRequests,
+    queryKey: "userProductRequests",
+  });
 
-  const { get: GetExercises } = useApi({ endpoint: endpoint.userExercises, queryKey: "userExercises" });
+  const { get: GetExercises } = useApi({
+    endpoint: endpoint.userExercises,
+    queryKey: "userExercises",
+  });
 
-  const { get: GetExerciseLogs, post: LogExercise, delete: DeleteExerciseLog } = useApi({ endpoint: endpoint.userExerciseLogs, queryKey: "userExerciseLogs" });
+  const {
+    get: GetExerciseLogs,
+    post: LogExercise,
+    delete: DeleteExerciseLog,
+  } = useApi({
+    endpoint: endpoint.userExerciseLogs,
+    queryKey: "userExerciseLogs",
+  });
 
   const GetTrainer = (id?: string | number) =>
     useQuery({
@@ -33,7 +60,9 @@ const useUser = (): any => {
     useQuery({
       queryKey: ["trainerReviews", trainerId],
       queryFn: async () => {
-        const { data } = await api.get(`${endpoint.userTrainers}/${trainerId}/reviews`);
+        const { data } = await api.get(
+          `${endpoint.userTrainers}/${trainerId}/reviews`,
+        );
         return data;
       },
       enabled: !!trainerId,
@@ -41,8 +70,14 @@ const useUser = (): any => {
 
   const SubmitTrainerReview = (trainerId?: number) =>
     useMutation({
-      mutationFn: async (reviewData: { rating: number; comment?: string | null }) => {
-        const { data } = await api.post(`${endpoint.userTrainers}/${trainerId}/reviews`, reviewData);
+      mutationFn: async (reviewData: {
+        rating: number;
+        comment?: string | null;
+      }) => {
+        const { data } = await api.post(
+          `${endpoint.userTrainers}/${trainerId}/reviews`,
+          reviewData,
+        );
         return data;
       },
     });
@@ -50,7 +85,9 @@ const useUser = (): any => {
   const DeleteTrainerReview = (trainerId?: number) =>
     useMutation({
       mutationFn: async () => {
-        const { data } = await api.delete(`${endpoint.userTrainers}/${trainerId}/reviews`);
+        const { data } = await api.delete(
+          `${endpoint.userTrainers}/${trainerId}/reviews`,
+        );
         return data;
       },
     });
@@ -63,14 +100,36 @@ const useUser = (): any => {
       },
     });
 
+  const UpdateAvatar = () =>
+    useMutation({
+      mutationFn: async (profileImageUrl: string) => {
+        const { data } = await api.put("auth/avatar", {
+          profile_image_url: profileImageUrl,
+        });
+        return data;
+      },
+    });
+
   return {
-    GetTrainers, GetTrainer,
-    GetTrainerAssignment, RequestTrainer, CancelTrainerAssignment,
-    GetTrainerReviews, SubmitTrainerReview, DeleteTrainerReview,
-    GetOrders, CreateOrder, CancelOrder,
-    GetProductRequests, CreateProductRequest,
+    GetTrainers,
+    GetTrainer,
+    GetTrainerAssignment,
+    RequestTrainer,
+    CancelTrainerAssignment,
+    GetTrainerReviews,
+    SubmitTrainerReview,
+    DeleteTrainerReview,
+    GetOrders,
+    CreateOrder,
+    CancelOrder,
+    GetProductRequests,
+    CreateProductRequest,
     GetExercises,
-    GetExerciseLogs, LogExercise, DeleteExerciseLog,
+    GetExerciseLogs,
+    LogExercise,
+    DeleteExerciseLog,
+    GetAuthProfile,
+    UpdateAvatar,
   };
 };
 

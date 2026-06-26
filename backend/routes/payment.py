@@ -29,7 +29,7 @@ def _order_id_from_ref(ref: str) -> Optional[int]:
 # ── eSewa verify ──────────────────────────────────────────────────────────────
 
 @payment_bp.route('/esewa/verify', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def esewa_verify():
     data_b64 = (request.get_json() or {}).get('data', '')
     if not data_b64:
@@ -69,7 +69,7 @@ def esewa_verify():
 # ── Khalti verify ─────────────────────────────────────────────────────────────
 
 @payment_bp.route('/khalti/verify', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def khalti_verify():
     pidx = (request.get_json() or {}).get('pidx', '')
     if not pidx:

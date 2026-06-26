@@ -45,13 +45,14 @@ export function AppPagination({
   const resolvedTotalPages =
     "totalPages" in rest && rest.totalPages !== undefined
       ? rest.totalPages
-      : Math.max(1, Math.ceil((rest.total ?? 0) / (pageSize ?? 10)));
+      : Math.ceil((rest.total ?? 0) / (pageSize ?? 10));
 
   const totalPages = resolvedTotalPages;
   const showSizeSelector =
     pageSize !== undefined && onPageSizeChange !== undefined;
+  console.log({ totalPages });
 
-  if (totalPages <= 1 && !showSizeSelector) return null;
+  if (totalPages <= 0) return null;
 
   const isFirst = page === 1;
   const isLast = page === totalPages;

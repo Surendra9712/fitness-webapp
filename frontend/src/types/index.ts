@@ -6,7 +6,7 @@ export interface PaginatedResponse<T> {
   total_pages: number;
 }
 
-export type Role = "admin" | "dietitian" | "user";
+export type Role = "admin" | "dietitian" | "trainee";
 export type Goal = "lose_weight" | "maintain" | "gain_muscle";
 export type ExerciseCategory =
   | "cardio"
@@ -34,6 +34,8 @@ export interface TrainerInfo {
   avg_rating?: number;
   review_count?: number;
   profile_image_url: string;
+  bio?: string;
+  specialization?: string;
 }
 
 export interface TrainerAssignment {
@@ -68,7 +70,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
-  is_active?: boolean;
+  status?: 'inactive' | 'active' | 'pending';
   created_at?: string;
   age?: number;
   weight_kg?: number;

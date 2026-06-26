@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   UserCheck,
+  UserRound,
 } from "lucide-react";
 import type { Role } from "@/types";
 
@@ -36,6 +37,8 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
+    { to: "/admin/trainees", label: "Trainees", icon: <UserRound className="h-4 w-4" /> },
+    { to: "/admin/trainers", label: "Trainers", icon: <UserCheck className="h-4 w-4" /> },
     {
       to: "/admin/products",
       label: "Products",
@@ -84,7 +87,7 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <User className="h-4 w-4" />,
     },
   ],
-  user: [
+  trainee: [
     {
       to: "/customer",
       label: "Dashboard",
@@ -126,7 +129,7 @@ const navLinks: Record<Role, NavItem[]> = {
 const roleLabel: Record<Role, string> = {
   admin: "Administrator",
   dietitian: "Trainer",
-  user: "Customer",
+  trainee: "Trainee",
 };
 
 export default function Sidebar() {

@@ -13,6 +13,7 @@ import PaymentReturn from "@/pages/PaymentReturn";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UserManagement from "@/pages/admin/UserManagement";
+import UserDetail from "@/pages/admin/UserDetail";
 import ExerciseLibrary from "@/pages/admin/ExerciseLibrary";
 import ProductManagement from "@/pages/admin/product/ProductManagement";
 import ProductRequests from "@/pages/admin/ProductRequests";
@@ -66,7 +67,7 @@ export default function App() {
           <Route path="/payment/khalti/return" element={<PaymentReturn />} />
           <Route path="/dashboard" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/register" element={<Navigate to="/login?tab=register" replace />} />
 
           {/* Admin */}
           <Route
@@ -85,6 +86,36 @@ export default function App() {
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
                   <UserManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/trainees"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <UserManagement role="trainee" />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/trainers"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <UserManagement role="dietitian" />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users/:id"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <UserDetail />
                 </Layout>
               </ProtectedRoute>
             }
@@ -186,7 +217,7 @@ export default function App() {
           <Route
             path="/customer"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <UserDashboard />
                 </Layout>
@@ -200,7 +231,7 @@ export default function App() {
           <Route
             path="/customer/orders"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <MyOrders />
                 </Layout>
@@ -210,7 +241,7 @@ export default function App() {
           <Route
             path="/customer/trainer"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <MyTrainer />
                 </Layout>
@@ -220,7 +251,7 @@ export default function App() {
           <Route
             path="/customer/trainers/:id"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <TrainerDetail />
                 </Layout>
@@ -230,7 +261,7 @@ export default function App() {
           <Route
             path="/customer/request-product"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <RequestProduct />
                 </Layout>
@@ -240,7 +271,7 @@ export default function App() {
           <Route
             path="/customer/log-exercise"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <LogExercise />
                 </Layout>
@@ -250,7 +281,7 @@ export default function App() {
           <Route
             path="/customer/profile"
             element={
-              <ProtectedRoute roles={["user"]}>
+              <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <Profile />
                 </Layout>

@@ -209,10 +209,10 @@ export default function TrainerProfile() {
               </span>{" "}
               <span
                 className={
-                  profile?.is_active ? "text-emerald-600" : "text-destructive"
+                  profile?.status === 'active' ? "text-emerald-600" : "text-destructive"
                 }
               >
-                {profile?.is_active ? "Active" : "Disabled"}
+                {profile?.status === 'active' ? "Active" : "Disabled"}
               </span>
             </p>
           </CardContent>

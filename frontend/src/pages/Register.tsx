@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
-import { Leaf, Loader2 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { CheckCircle2, Leaf, Loader2 } from "lucide-react";
+import { useAuth, PendingApprovalError } from "@/context/AuthContext";
 import { getDashboardPath } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ export default function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pendingMessage, setPendingMessage] = useState("");
 
   if (authLoading) {
     return (
@@ -45,7 +46,7 @@ export default function Register() {
     name: z.string().min(1, "Full name is required"),
     email: z.string().email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
-    role: z.enum(["user", "dietitian"]),
+    role: z.enum(["trainee", "dietitian"]),
   });
 
   type FormValues = z.infer<typeof schema>;
@@ -57,22 +58,21 @@ export default function Register() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", password: "", role: "user" },
+    defaultValues: { name: "", email: "", password: "", role: "trainee" },
   });
 
   const onSubmit = async (data: FormValues) => {
     setError("");
     setLoading(true);
     try {
-      const user = await registerUser(
-        data.name,
-        data.email,
-        data.password,
-        data.role,
-      );
-      navigate(getDashboardPath(user.role));
+      await registerUser(data.name, data.email, data.password, data.role);
+      navigate(getDashboardPath(user!.role));
     } catch (err) {
-      setError((err as Error).message);
+      if (err instanceof PendingApprovalError) {
+        setPendingMessage(err.message);
+      } else {
+        setError((err as Error).message);
+      }
     } finally {
       setLoading(false);
     }
@@ -91,6 +91,17 @@ export default function Register() {
           <CardDescription>Join SmartDiet today</CardDescription>
         </CardHeader>
         <CardContent>
+          {pendingMessage ? (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+              <p className="font-semibold text-gray-800">Account Created!</p>
+              <p className="text-sm text-muted-foreground">{pendingMessage}</p>
+              <Link to="/login" className="text-sm font-medium text-primary hover:underline">
+                Back to Login
+              </Link>
+            </div>
+          ) : (
+          <>
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>{error}</AlertDescription>
@@ -141,7 +152,7 @@ export default function Register() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="user">Customer</SelectItem>
+                      <SelectItem value="trainee">Trainee</SelectItem>
                       <SelectItem value="dietitian">Trainer</SelectItem>
                     </SelectContent>
                   </Select>
@@ -165,6 +176,8 @@ export default function Register() {
               Sign in
             </Link>
           </p>
+          </>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -55,10 +55,14 @@ export default function OrderManagement() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  const { page, pageSize, goToPage, setPageSize } = usePagination({ initialPageSize: 20 });
+  const { page, pageSize, goToPage, setPageSize } = usePagination({
+    initialPageSize: 20,
+  });
 
   const { GetOrders, UpdateOrderStatus, DeleteOrder } = useAdmin();
-  const { data, isPlaceholderData } = GetOrders({ queryParams: { page, page_size: pageSize } });
+  const { data, isPlaceholderData } = GetOrders({
+    queryParams: { page, page_size: pageSize },
+  });
   const orders = data?.items ?? [];
   const total = data?.total ?? 0;
   const updateStatus = UpdateOrderStatus();
@@ -94,7 +98,9 @@ export default function OrderManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-        <p className="text-sm text-muted-foreground">{total} {total === 1 ? 'order' : 'orders'}</p>
+        <p className="text-sm text-muted-foreground">
+          {total} {total === 1 ? "order" : "orders"}
+        </p>
       </div>
 
       <Card className={isPlaceholderData ? "opacity-70" : ""}>
@@ -215,7 +221,9 @@ export default function OrderManagement() {
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                        disabled={deleteOrder.isPending && pendingDeleteId === order.id}
+                        disabled={
+                          deleteOrder.isPending && pendingDeleteId === order.id
+                        }
                         onClick={() => handleDeleteClick(order.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -273,9 +281,13 @@ export default function OrderManagement() {
           </Table>
         </CardContent>
       </Card>
-
-      <AppPagination page={page} total={total} pageSize={pageSize} onPageSizeChange={setPageSize} onPageChange={goToPage} />
-
+      <AppPagination
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onPageChange={goToPage}
+      />
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}

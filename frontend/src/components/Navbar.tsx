@@ -36,7 +36,7 @@ export default function Navbar() {
             {user ? (
               <>
                 {/* Cart button — only for customer role */}
-                {user.role === "user" && (
+                {user.role === "trainee" && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -74,7 +74,7 @@ export default function Navbar() {
                   <Link to="/login">Sign In</Link>
                 </Button>
                 <Button asChild>
-                  <Link to="/register">Get Started</Link>
+                  <Link to="/login?tab=register">Get Started</Link>
                 </Button>
               </>
             )}

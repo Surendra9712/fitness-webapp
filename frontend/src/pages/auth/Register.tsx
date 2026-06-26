@@ -16,21 +16,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, PendingApprovalError } from "@/context/AuthContext";
 import { getDashboardPath } from "@/lib/roles";
 import { ApiError } from "@/api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail, User, Lock, EyeOff, Eye, Loader2 } from "lucide-react";
+import { CheckCircle2, Mail, User, Lock, EyeOff, Eye, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 const registerSchema = z.object({
   name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["user", "dietitian"]),
+  role: z.enum(["trainee", "dietitian"]),
 });
 type RegisterValues = z.infer<typeof registerSchema>;
 
@@ -38,26 +38,26 @@ export const RegisterForm = () => {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState("");
+  const [pendingMessage, setPendingMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<RegisterValues>({
     // resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "", role: "user" },
+    defaultValues: { name: "", email: "", password: "", role: "trainee" },
   });
   const { isSubmitting } = form.formState;
 
   async function onSubmit(data: RegisterValues) {
     setServerError("");
     try {
-      const user = await registerUser(
-        data.name,
-        data.email,
-        data.password,
-        data.role,
-      );
-      navigate(getDashboardPath(user.role));
+      await registerUser(data.name, data.email, data.password, data.role);
+      // If we get here, register returned a user — navigate to dashboard
+      // (AuthContext sets the user, so we read it from useAuth if needed)
+      navigate("/login");
     } catch (err) {
-      if (err instanceof ApiError && err.fieldErrors) {
+      if (err instanceof PendingApprovalError) {
+        setPendingMessage(err.message);
+      } else if (err instanceof ApiError && err.fieldErrors) {
         Object.entries(err.fieldErrors).forEach(([field, message]) => {
           form.setError(field as keyof RegisterValues, { message });
         });
@@ -65,6 +65,19 @@ export const RegisterForm = () => {
         setServerError((err as Error).message);
       }
     }
+  }
+
+  if (pendingMessage) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-4 text-center">
+        <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+        <p className="font-semibold text-gray-800">Account Created!</p>
+        <p className="text-sm text-muted-foreground">{pendingMessage}</p>
+        <Link to="/login" className="text-sm font-medium text-primary hover:underline">
+          Back to Login
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -180,7 +193,7 @@ export const RegisterForm = () => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="user">Customer</SelectItem>
+                    <SelectItem value="trainee">Trainee</SelectItem>
                     <SelectItem value="dietitian">Trainer</SelectItem>
                   </SelectContent>
                 </Select>

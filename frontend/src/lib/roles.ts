@@ -1,7 +1,7 @@
 import type { Role } from '@/types'
 
 export const ROLE_LABELS: Record<Role, string> = {
-  user: 'Customer',
+  trainee: 'Trainee',
   dietitian: 'Trainer',
   admin: 'Admin',
 }
@@ -9,6 +9,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 export function getDashboardPath(role: Role): string {
   if (role === 'admin') return '/admin'
   if (role === 'dietitian') return '/trainer'
+  if (role === 'trainee') return '/customer'
   return '/customer'
 }
 

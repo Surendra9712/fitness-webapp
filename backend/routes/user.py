@@ -85,7 +85,7 @@ class UpdateProfileSchema(BaseModel):
 # ── Exercise Logs ─────────────────────────────────────────────────────────────
 
 @user_bp.route('/exercise-logs', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def get_exercise_logs():
     date = request.args.get('date')
     page, page_size, offset = parse_page_params(default_size=10, max_size=50)
@@ -127,7 +127,7 @@ def get_exercise_logs():
 
 
 @user_bp.route('/exercise-logs', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def log_exercise():
     try:
         body = LogExerciseSchema.model_validate(request.get_json() or {})
@@ -164,7 +164,7 @@ def log_exercise():
 
 
 @user_bp.route('/exercise-logs/<int:log_id>', methods=['DELETE'])
-@role_required('user')
+@role_required('trainee')
 def delete_exercise_log(log_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -186,16 +186,33 @@ def delete_exercise_log(log_id):
 # ── Available Exercises ────────────────────────────────────────────────────────
 
 @user_bp.route('/exercises', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def available_exercises():
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+    search = request.args.get('search', '').strip()
+    category = request.args.get('category', '').strip()
+
+    conditions = ["deleted_at IS NULL"]
+    params: list = []
+    if search:
+        conditions.append("name LIKE %s")
+        params.append(f"%{search}%")
+    if category:
+        conditions.append("category = %s")
+        params.append(category)
+
+    where = " AND ".join(conditions)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        cursor.execute(f"SELECT COUNT(*) AS cnt FROM exercises WHERE {where}", params)
+        total = cursor.fetchone()['cnt']
         cursor.execute(
-            "SELECT id, name, category, calories_burned_per_hour FROM exercises "
-            "WHERE deleted_at IS NULL ORDER BY category, name"
+            f"SELECT id, name, category, calories_burned_per_hour FROM exercises "
+            f"WHERE {where} ORDER BY category, name LIMIT %s OFFSET %s",
+            params + [page_size, offset],
         )
-        return jsonify(cursor.fetchall())
+        return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()
         conn.close()
@@ -276,7 +293,7 @@ def _compute_metrics(profile: dict) -> Optional[dict]:
 
 
 @user_bp.route('/dashboard', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def dashboard():
     today = request.args.get('date')
     conn = get_connection()
@@ -335,7 +352,7 @@ def dashboard():
 # ── Products (shop) ───────────────────────────────────────────────────────────
 
 @user_bp.route('/products', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def list_products():
     category_slug = request.args.get('category', '').strip()
     conn = get_connection()
@@ -360,7 +377,7 @@ def list_products():
 # ── Orders ────────────────────────────────────────────────────────────────────
 
 @user_bp.route('/orders', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def place_order():
     try:
         body = PlaceOrderSchema.model_validate(request.get_json() or {})
@@ -492,7 +509,7 @@ def place_order():
 
 
 @user_bp.route('/orders', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def get_orders():
     page, page_size, offset = parse_page_params(default_size=10, max_size=50)
     conn = get_connection()
@@ -523,7 +540,7 @@ def get_orders():
 
 
 @user_bp.route('/orders/<int:order_id>', methods=['DELETE'])
-@role_required('user')
+@role_required('trainee')
 def cancel_order(order_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -567,7 +584,7 @@ def cancel_order(order_id):
 # ── Product Requests ──────────────────────────────────────────────────────────
 
 @user_bp.route('/product-requests', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def request_product():
     try:
         body = RequestProductSchema.model_validate(request.get_json() or {})
@@ -592,7 +609,7 @@ def request_product():
 
 
 @user_bp.route('/product-requests', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def get_product_requests():
     page, page_size, offset = parse_page_params(default_size=10, max_size=50)
     conn = get_connection()
@@ -617,14 +634,14 @@ def get_product_requests():
 # ── Trainer selection ────────────────────────────────────────────────────────
 
 @user_bp.route('/trainers', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def list_trainers():
     page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     search = request.args.get('search', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        base_where = "WHERE u.role = 'dietitian' AND u.is_active = TRUE AND u.deleted_at IS NULL"
+        base_where = "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.deleted_at IS NULL"
         params = []
         if search:
             base_where += " AND u.name LIKE %s"
@@ -645,20 +662,58 @@ def list_trainers():
 
 
 @user_bp.route('/trainers/<int:trainer_id>', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def get_trainer(trainer_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.profile_image_url, "
-            "(SELECT COUNT(*) FROM trainer_assignments ta "
-            " WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count, "
-            "COALESCE((SELECT ROUND(AVG(r.rating), 1) FROM trainer_reviews r WHERE r.trainer_id = u.id), 0) AS avg_rating, "
-            "(SELECT COUNT(*) FROM trainer_reviews r WHERE r.trainer_id = u.id) AS review_count "
-            "FROM users u WHERE u.id = %s AND u.role = 'dietitian' AND u.is_active = TRUE AND u.deleted_at IS NULL",
+            """
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.profile_image_url,
+                up.bio,
+                up.specialization,
+                (
+                    SELECT COUNT(*)
+                    FROM trainer_assignments ta
+                    WHERE ta.trainer_id = u.id
+                    AND ta.status = 'approved'
+                    AND ta.deleted_at IS NULL
+                ) AS customer_count,
+                COALESCE(
+                    (
+                        SELECT ROUND(AVG(r.rating), 1)
+                        FROM trainer_reviews r
+                        WHERE r.trainer_id = u.id
+                    ),
+                    0
+                ) AS avg_rating,
+                (
+                    SELECT COUNT(*)
+                    FROM trainer_reviews r
+                    WHERE r.trainer_id = u.id
+                ) AS review_count
+            FROM users u
+            LEFT JOIN user_profiles up ON up.user_id = u.id
+            WHERE u.id = %s
+            AND u.role = 'dietitian'
+            AND u.status = 'active'
+            AND u.deleted_at IS NULL
+            """,
             (trainer_id,),
         )
+        # cursor.execute(
+        #     "SELECT u.id, u.name, u.email, u.profile_image_url, "
+        #     "(SELECT COUNT(*) FROM trainer_assignments ta "
+        #     " WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count, "
+        #     "COALESCE((SELECT ROUND(AVG(r.rating), 1) FROM trainer_reviews r WHERE r.trainer_id = u.id), 0) AS avg_rating, "
+        #     "(SELECT COUNT(*) FROM trainer_reviews r WHERE r.trainer_id = u.id) AS review_count "
+        #     "FROM users u WHERE u.id = %s AND u.role = 'dietitian' AND u.status = 'active' AND u.deleted_at IS NULL",
+        #     (trainer_id,),
+        # )
         trainer = cursor.fetchone()
         if not trainer:
             return jsonify({'error': 'Trainer not found'}), 404
@@ -669,7 +724,7 @@ def get_trainer(trainer_id):
 
 
 @user_bp.route('/trainer-assignment', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def get_trainer_assignment():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -689,7 +744,7 @@ def get_trainer_assignment():
 
 
 @user_bp.route('/trainer-assignment', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def request_trainer():
     try:
         body = RequestTrainerSchema.model_validate(request.get_json() or {})
@@ -709,7 +764,7 @@ def request_trainer():
             return jsonify({'error': f"You already have an active assignment (status: {existing['status']})"}), 409
 
         cursor.execute(
-            "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND is_active = TRUE AND deleted_at IS NULL",
+            "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND status = 'active' AND deleted_at IS NULL",
             (body.trainer_id,),
         )
         if not cursor.fetchone():
@@ -730,7 +785,7 @@ def request_trainer():
 
 
 @user_bp.route('/trainer-assignment', methods=['DELETE'])
-@role_required('user')
+@role_required('trainee')
 def cancel_trainer_assignment():
     """Cancel a pending_trainer request (before trainer reviews it)."""
     conn = get_connection()
@@ -760,7 +815,7 @@ def cancel_trainer_assignment():
 # ── Reviews ───────────────────────────────────────────────────────────────────
 
 @user_bp.route('/products/<int:product_id>/reviews', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def submit_product_review(product_id):
     try:
         body = ReviewSchema.model_validate(request.get_json() or {})
@@ -801,7 +856,7 @@ def submit_product_review(product_id):
 
 
 @user_bp.route('/products/<int:product_id>/reviews', methods=['DELETE'])
-@role_required('user')
+@role_required('trainee')
 def delete_product_review(product_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -823,7 +878,7 @@ def delete_product_review(product_id):
 
 
 @user_bp.route('/trainers/<int:trainer_id>/reviews', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def list_trainer_reviews(trainer_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -843,7 +898,7 @@ def list_trainer_reviews(trainer_id):
 
 
 @user_bp.route('/trainers/<int:trainer_id>/reviews', methods=['POST'])
-@role_required('user')
+@role_required('trainee')
 def submit_trainer_review(trainer_id):
     try:
         body = ReviewSchema.model_validate(request.get_json() or {})
@@ -884,7 +939,7 @@ def submit_trainer_review(trainer_id):
 
 
 @user_bp.route('/trainers/<int:trainer_id>/reviews', methods=['DELETE'])
-@role_required('user')
+@role_required('trainee')
 def delete_trainer_review(trainer_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -908,7 +963,7 @@ def delete_trainer_review(trainer_id):
 # ── Profile ───────────────────────────────────────────────────────────────────
 
 @user_bp.route('/profile', methods=['GET'])
-@role_required('user')
+@role_required('trainee')
 def get_profile():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -926,7 +981,7 @@ def get_profile():
 
 
 @user_bp.route('/profile', methods=['PUT'])
-@role_required('user')
+@role_required('trainee')
 def update_profile():
     try:
         body = UpdateProfileSchema.model_validate(request.get_json() or {})

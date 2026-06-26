@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dumbbell } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { LoginForm } from "./Login";
 import { RegisterForm } from "./Register";
 
@@ -16,7 +16,14 @@ const headings = {
 };
 
 export default function AuthLayout() {
-  const [tab, setTab] = useState<"login" | "register">("login");
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
+  const [tab, setTab] = useState<"login" | "register">(initialTab);
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "register" || t === "login") setTab(t);
+  }, [searchParams]);
 
   return (
     <div className="flex min-h-screen">

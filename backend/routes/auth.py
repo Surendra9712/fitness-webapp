@@ -33,7 +33,7 @@ class RegisterSchema(BaseModel):
     name: str = Field(min_length=1)
     email: EmailStr
     password: str = Field(min_length=6)
-    role: Literal['user', 'dietitian'] = 'user'
+    role: Literal['trainee', 'dietitian'] = 'trainee'
 
     @field_validator('name', mode='before')
     @classmethod
@@ -76,17 +76,16 @@ def register():
             return jsonify({'errors': {'email': 'Email already registered'}}), 422
 
         cursor.execute(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s, %s, %s, %s, 'pending')",
             (name, email, password_hash, role),
         )
         user_id = cursor.lastrowid
         cursor.execute("INSERT INTO user_profiles (user_id) VALUES (%s)", (user_id,))
         conn.commit()
 
-        token = generate_token(user_id, role)
         return jsonify({
-            'token': token,
-            'user': {'id': user_id, 'name': name, 'email': email, 'role': role},
+            'pending': True,
+            'message': 'Registration successful. Your account is awaiting admin approval.',
         }), 201
     except Exception as e:
         conn.rollback()
@@ -109,14 +108,16 @@ def login():
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT id, name, email, password_hash, role, is_active "
+            "SELECT id, name, email, password_hash, role, status "
             "FROM users WHERE email = %s AND deleted_at IS NULL",
             (email,),
         )
         user = cursor.fetchone()
         if not user or not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
             return jsonify({'error': 'Invalid email or password'}), 401
-        if not user['is_active']:
+        if user['status'] != 'active':
+            if user['status'] == 'pending':
+                return jsonify({'error': 'Your account is pending admin approval'}), 403
             return jsonify({'error': 'Account is disabled'}), 403
 
         token = generate_token(user['id'], user['role'])
@@ -180,7 +181,7 @@ def me():
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.role, "
+            "SELECT u.id, u.name, u.email, u.role, u.profile_image_url, "
             "p.full_name, p.date_of_birth, p.gender, p.phone_number, p.city, p.country, "
             "p.occupation, p.height_cm, p.current_weight_kg, p.activity_level, "
             "p.primary_goal, p.fitness_level, p.target_water_ml, "
@@ -199,6 +200,28 @@ def me():
         if not user:
             return jsonify({'error': 'User not found'}), 404
         return jsonify(_serialize_row(user))
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@auth_bp.route('/avatar', methods=['PUT'])
+@token_required
+def update_avatar():
+    body = request.get_json() or {}
+    url = body.get('profile_image_url', '').strip()
+    if not url:
+        return jsonify({'error': 'profile_image_url is required'}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET profile_image_url = %s WHERE id = %s",
+            (url, request.user_id),
+        )
+        conn.commit()
+        return jsonify({'message': 'Avatar updated', 'profile_image_url': url})
     finally:
         cursor.close()
         conn.close()

@@ -1,12 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Search,
-  ShoppingCart,
-  ArrowRight,
-  Package,
-  Zap,
-} from "lucide-react";
+import { Search, ShoppingCart, ArrowRight, Package, Zap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import usePublic from "@/hooks/usePublic";
@@ -24,11 +18,31 @@ import type { Product } from "@/types";
 type CatMeta = { gradient: string; badgeClass: string; glyph: string };
 
 const CAT_META: Record<string, CatMeta> = {
-  cardio:      { gradient: "linear-gradient(140deg,#f97316,#dc2626)", badgeClass: "bg-orange-100 text-orange-700 border-0",  glyph: "🏃" },
-  strength:    { gradient: "linear-gradient(140deg,#3B82F6,#4338CA)", badgeClass: "bg-blue-100 text-blue-700 border-0",     glyph: "🏋️" },
-  machines:    { gradient: "linear-gradient(140deg,#64748B,#1E293B)", badgeClass: "bg-slate-100 text-slate-600 border-0",   glyph: "⚙️" },
-  recovery:    { gradient: "linear-gradient(140deg,#8B5CF6,#BE185D)", badgeClass: "bg-purple-100 text-purple-700 border-0", glyph: "🧘" },
-  accessories: { gradient: "linear-gradient(140deg,#10B981,#0F766E)", badgeClass: "bg-primary-100 text-primary-700 border-0", glyph: "🎽" },
+  cardio: {
+    gradient: "linear-gradient(140deg,#f97316,#dc2626)",
+    badgeClass: "bg-orange-100 text-orange-700 border-0",
+    glyph: "🏃",
+  },
+  strength: {
+    gradient: "linear-gradient(140deg,#3B82F6,#4338CA)",
+    badgeClass: "bg-blue-100 text-blue-700 border-0",
+    glyph: "🏋️",
+  },
+  machines: {
+    gradient: "linear-gradient(140deg,#64748B,#1E293B)",
+    badgeClass: "bg-slate-100 text-slate-600 border-0",
+    glyph: "⚙️",
+  },
+  recovery: {
+    gradient: "linear-gradient(140deg,#8B5CF6,#BE185D)",
+    badgeClass: "bg-purple-100 text-purple-700 border-0",
+    glyph: "🧘",
+  },
+  accessories: {
+    gradient: "linear-gradient(140deg,#10B981,#0F766E)",
+    badgeClass: "bg-primary-100 text-primary-700 border-0",
+    glyph: "🎽",
+  },
 };
 const fallbackMeta: CatMeta = CAT_META.machines;
 
@@ -47,15 +61,16 @@ export default function Products() {
   const { data, isLoading } = GetProducts({
     queryParams: {
       page,
-      page_size: 12,
+      page_size: 50,
       category: category !== "all" ? category : undefined,
       q: debouncedSearch || undefined,
     },
   });
   const products = data?.items ?? [];
   const total = data?.total ?? 0;
-  const { data: categoriesData } = GetCategories({ queryParams: { page_size: 100 } });
-  const categories = categoriesData?.items ?? [];
+  const { data: categoriesData } = GetCategories({
+    queryParams: { page_size: 100 },
+  });
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -73,7 +88,7 @@ export default function Products() {
 
   const tabs = [
     { key: "all", label: "All Equipment" },
-    ...categories.map((c) => ({ key: c.slug, label: c.name })),
+    ...categoriesData.map((c) => ({ key: c.slug, label: c.name })),
   ];
 
   return (
@@ -95,7 +110,10 @@ export default function Products() {
         <div
           aria-hidden
           className="pointer-events-none absolute -top-1/5 left-1/2 h-3/5 w-3/5 -translate-x-1/2"
-          style={{ background: "radial-gradient(ellipse,rgba(34,197,94,0.08) 0%,transparent 70%)" }}
+          style={{
+            background:
+              "radial-gradient(ellipse,rgba(34,197,94,0.08) 0%,transparent 70%)",
+          }}
         />
 
         <div className="relative mx-auto max-w-3xl text-center">
@@ -104,7 +122,7 @@ export default function Products() {
             Professional-grade fitness equipment
           </div>
 
-          <h1 className="mb-5 text-[clamp(40px,8vw,80px)] font-black leading-none tracking-tighter text-white">
+          <h1 className="mb-5 text-[clamp(24px,4vw,40px)] font-black leading-none tracking-tighter text-white">
             BUILT TO
             <br />
             <span className="text-primary-400">PERFORM.</span>
@@ -124,19 +142,6 @@ export default function Products() {
               onChange={(e) => handleSearch(e.target.value)}
               className="border-white/10 bg-white/7 pl-11 text-white placeholder:text-primary-400 focus-visible:border-primary/50 focus-visible:ring-0"
             />
-          </div>
-
-          <div className="mt-12 flex justify-center gap-10">
-            {[
-              { value: total, label: "Products" },
-              { value: products.filter((p) => p.stock_quantity > 0).length, label: "In stock" },
-              { value: categories.length, label: "Categories" },
-            ].map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-3xl font-extrabold tracking-tight text-white">{s.value}</div>
-                <div className="text-[11px] font-semibold uppercase tracking-widest text-primary-300">{s.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -174,7 +179,9 @@ export default function Products() {
           ) : products.length === 0 ? (
             <div className="py-20 text-center">
               <Package className="mx-auto mb-4 h-12 w-12 text-border" />
-              <p className="mb-2 text-base text-muted-foreground">No equipment found.</p>
+              <p className="mb-2 text-base text-muted-foreground">
+                No equipment found.
+              </p>
               {search && (
                 <button
                   onClick={() => setSearch("")}
@@ -186,11 +193,6 @@ export default function Products() {
             </div>
           ) : (
             <>
-              <p className="mb-6 text-sm font-medium text-muted-foreground">
-                {products.length} item{products.length !== 1 ? "s" : ""}
-                {category !== "all" && ` · ${tabs.find((t) => t.key === category)?.label}`}
-                {search && ` · "${search}"`}
-              </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))] gap-5">
                 {products.map((p) => (
                   <ProductCard
@@ -199,7 +201,11 @@ export default function Products() {
                     isLoggedIn={!!user}
                     cartQty={items[p.id]?.quantity ?? 0}
                     onAdd={() => {
-                      add({ product_id: p.id, name: p.name, price: Number(p.price) });
+                      add({
+                        product_id: p.id,
+                        name: p.name,
+                        price: Number(p.price),
+                      });
                       toast.success(`${p.name} added to cart`);
                     }}
                     onInc={() => setQty(p.id, (items[p.id]?.quantity ?? 0) + 1)}
@@ -208,7 +214,12 @@ export default function Products() {
                 ))}
               </div>
               <div className="mt-10">
-                <AppPagination page={page} total={total} pageSize={12} onPageChange={goToPage} />
+                <AppPagination
+                  page={page}
+                  total={total}
+                  pageSize={12}
+                  onPageChange={goToPage}
+                />
               </div>
             </>
           )}
@@ -227,13 +238,19 @@ export default function Products() {
             Create an account to place orders and track your deliveries.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Button asChild size="lg" className="bg-primary text-primary-foreground hover:bg-primary-600">
-              <Link to="/register">
+            <Button
+              asChild
+              size="lg"
+              className="bg-primary text-primary-foreground hover:bg-primary-600"
+            >
+              <Link to="/login?tab=register">
                 Create account <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>
             <Button
-              asChild size="lg" variant="outline"
+              asChild
+              size="lg"
+              variant="outline"
               className="border-white/15 bg-transparent text-primary-200 hover:bg-white/10 hover:text-white"
             >
               <Link to="/login">Sign in</Link>
@@ -255,24 +272,30 @@ interface ProductCardProps {
   onDec: () => void;
 }
 
-function ProductCard({ product, isLoggedIn, cartQty, onAdd, onInc, onDec }: ProductCardProps) {
+function ProductCard({
+  product,
+  isLoggedIn,
+  cartQty,
+  onAdd,
+  onInc,
+  onDec,
+}: ProductCardProps) {
   const meta = CAT_META[product.category] ?? fallbackMeta;
   const outOfStock = product.stock_quantity === 0;
-  const [hovered, setHovered] = useState(false);
 
   return (
-    <Card
-      className="group flex flex-col overflow-hidden p-0 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <Card className="group flex flex-col overflow-hidden p-0 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
       <Link to={`/products/${product.id}`} className="block">
         <div
           className="relative flex h-40 items-center justify-center overflow-hidden"
           style={{ background: meta.gradient }}
         >
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <span className="text-6xl opacity-35">{meta.glyph}</span>
           )}
@@ -292,7 +315,9 @@ function ProductCard({ product, isLoggedIn, cartQty, onAdd, onInc, onDec }: Prod
       </Link>
 
       <CardContent className="flex flex-1 flex-col gap-2 px-5 pb-0 pt-4">
-        <Badge className={`self-start text-[10px] font-extrabold uppercase tracking-widest ${meta.badgeClass}`}>
+        <Badge
+          className={`self-start text-[10px] font-extrabold uppercase tracking-widest ${meta.badgeClass}`}
+        >
           {product.category_name ?? product.category}
         </Badge>
         <Link to={`/products/${product.id}`}>
@@ -314,37 +339,37 @@ function ProductCard({ product, isLoggedIn, cartQty, onAdd, onInc, onDec }: Prod
             RS. {product.price}
           </span>
           {!outOfStock && (
-            <div className="text-[11px] text-muted-foreground">{product.stock_quantity} in stock</div>
+            <div className="text-[11px] text-muted-foreground">
+              {product.stock_quantity} in stock
+            </div>
           )}
         </div>
 
         {outOfStock ? (
           <Button asChild variant="outline" size="sm">
-            <Link to={isLoggedIn ? "/customer/request-product" : "/login"}>Request</Link>
+            <Link to={isLoggedIn ? "/customer/request-product" : "/login"}>
+              Request
+            </Link>
           </Button>
         ) : isLoggedIn ? (
           cartQty > 0 ? (
             <QuantityStepper
               size="sm"
               value={cartQty}
-              onChange={(v) => v > cartQty ? onInc() : onDec()}
+              onChange={(v) => (v > cartQty ? onInc() : onDec())}
               min={0}
             />
           ) : (
-            <Button
-              size="sm"
-              className={`gap-1.5 transition-colors ${hovered ? "bg-foreground/80" : "bg-foreground"} text-background`}
-              onClick={onAdd}
-            >
+            <Button size="sm" onClick={onAdd}>
               <ShoppingCart className="h-3.5 w-3.5" />
-              Add to Cart
+              Add
             </Button>
           )
         ) : (
-          <Button asChild size="sm" className="gap-1.5 bg-foreground text-background hover:bg-foreground/80">
+          <Button asChild size="sm">
             <Link to="/login">
               <ShoppingCart className="h-3.5 w-3.5" />
-              Sign in to buy
+              Add
             </Link>
           </Button>
         )}

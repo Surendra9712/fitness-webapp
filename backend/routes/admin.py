@@ -40,7 +40,7 @@ class CreateUserSchema(BaseModel):
     name: str = Field(min_length=1)
     email: EmailStr
     password: str = Field(min_length=6)
-    role: Literal['admin', 'dietitian', 'user'] = 'user'
+    role: Literal['admin', 'dietitian', 'trainee'] = 'trainee'
 
     @field_validator('name', mode='before')
     @classmethod
@@ -56,8 +56,8 @@ class CreateUserSchema(BaseModel):
 class UpdateUserSchema(BaseModel):
     model_config = ConfigDict(extra='ignore')
     name: Optional[str] = None
-    role: Optional[Literal['admin', 'dietitian', 'user']] = None
-    is_active: Optional[bool] = None
+    role: Optional[Literal['admin', 'dietitian', 'trainee']] = None
+    status: Optional[Literal['inactive', 'active', 'pending']] = None
 
 
 class CreateExerciseSchema(BaseModel):
@@ -112,7 +112,7 @@ class TrainerAssignmentNoteSchema(BaseModel):
 # ── Categories ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/categories', methods=['GET'])
-@role_required('admin', 'dietitian', 'user')
+@role_required('admin', 'dietitian', 'trainee')
 def list_categories():
     page, page_size, offset = parse_page_params(default_size=20, max_size=200)
     conn = get_connection()
@@ -214,6 +214,8 @@ def delete_category(cid):
 def list_users():
     page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    role_filter = request.args.get('role', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -223,18 +225,47 @@ def list_users():
             like = f"%{search}%"
             base_where += " AND (u.name LIKE %s OR u.email LIKE %s)"
             params_count = [like, like]
+        if status_filter:
+            base_where += " AND u.status = %s"
+            params_count = params_count + [status_filter]
+        if role_filter:
+            base_where += " AND u.role = %s"
+            params_count = params_count + [role_filter]
         cursor.execute(
             f"SELECT COUNT(*) AS total FROM users u {base_where}", params_count
         )
         total = cursor.fetchone()['total']
         cursor.execute(
-            f"SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at, "
+            f"SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
             f"p.goal, p.weight_kg, p.height_cm "
             f"FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             f"{base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
             params_count + [page_size, offset]
         )
         return paginated_response(cursor.fetchall(), total, page, page_size)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/users/<int:uid>', methods=['GET'])
+@role_required('admin')
+def get_user(uid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
+            "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
+            "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country "
+            "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
+            "WHERE u.id = %s AND u.deleted_at IS NULL",
+            (uid,)
+        )
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify(user)
     finally:
         cursor.close()
         conn.close()
@@ -319,7 +350,7 @@ def delete_user(uid):
 # ── Exercises ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/exercises', methods=['GET'])
-@role_required('admin', 'dietitian', 'user')
+@role_required('admin', 'dietitian', 'trainee')
 def list_exercises():
     page, page_size, offset = parse_page_params(default_size=20, max_size=200)
     search   = request.args.get('search', '').strip()
@@ -857,7 +888,7 @@ def stats():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='user'")
+        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='trainee'")
         users_count = cursor.fetchone()['total']
         cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian'")
         dietitians_count = cursor.fetchone()['total']

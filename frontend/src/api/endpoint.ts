@@ -25,4 +25,5 @@ export const endpoint = {
   dietitianAssignmentRequests: "dietitian/assignment-requests",
 
   uploadImage: "upload/image",
+  authProfile: "auth/me",
 };
