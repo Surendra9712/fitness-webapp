@@ -16,7 +16,7 @@ export default function HeroSection() {
             "url(https://t4.ftcdn.net/jpg/03/50/81/89/360_F_350818949_lJTfzSTDr79e9Kn55PUVZjN19ct20uGc.jpg)",
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-950 via-primary-900/80 to-teal-950/90" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-950 via-primary-900/10 to-teal-950/90" />
 
       <div className="absolute -left-24 top-1/4  h-96 w-96 rounded-full bg-primary-600/10 blur-3xl float-a" />
       <div className="absolute -right-24 bottom-1/4 h-80 w-80 rounded-full bg-teal-500/10  blur-3xl float-b" />

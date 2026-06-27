@@ -31,7 +31,7 @@ export default function Home() {
       <ExerciseSection />
       <HowItWorksSection />
       <TrainersSection />
-      {/* <ProductsSection /> */}
+      <ProductsSection />
       <RolesSection />
       <TestimonialsSection />
       <FaqSection />
