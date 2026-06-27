@@ -1,37 +1,18 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fadeUp, scaleIn, stagger, VP } from "./animations";
+import usePublic from "@/hooks/usePublic";
 
-const products = [
-  {
-    img: "https://images.unsplash.com/photo-1576678927484-cc907957088c?w=400&h=300&fit=crop&q=80",
-    name: "Resistance Bands Set",
-    price: "Rs. 1,200",
-    tag: "Strength",
-  },
-  {
-    img: "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=400&h=300&fit=crop&q=80",
-    name: "Whey Protein 1kg",
-    price: "Rs. 4,500",
-    tag: "Nutrition",
-  },
-  {
-    img: "https://images.unsplash.com/photo-1544033527-b192daee1f5b?w=400&h=300&fit=crop&q=80",
-    name: "Yoga Mat Premium",
-    price: "Rs. 2,000",
-    tag: "Recovery",
-  },
-  {
-    img: "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=400&h=300&fit=crop&q=80",
-    name: "Adjustable Dumbbells",
-    price: "Rs. 8,000",
-    tag: "Strength",
-  },
-];
+const PLACEHOLDER_IMG =
+  "https://images.unsplash.com/photo-1576678927484-cc907957088c?w=400&h=300&fit=crop&q=80";
 
 export default function ProductsSection() {
+  const { GetProducts } = usePublic();
+  const { data } = GetProducts({ queryParams: { page_size: 5, page: 1 } });
+  const products = data?.items ?? [];
+
   return (
     <section className="bg-white px-6 py-24">
       <div className="mx-auto max-w-6xl">
@@ -54,46 +35,63 @@ export default function ProductsSection() {
               and recovery tools.
             </p>
           </div>
-          <Button variant="outline" className="shrink-0 border-gray-200" asChild>
+          <Button
+            variant="outline"
+            className="shrink-0 border-gray-200"
+            asChild
+          >
             <Link to="/products">
               View All Products <ShoppingBag className="ml-2 h-4 w-4" />
             </Link>
           </Button>
         </motion.div>
 
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="show"
-          viewport={VP}
-          className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
-        >
-          {products.map((p) => (
-            <motion.div
-              key={p.name}
-              variants={scaleIn}
-              className="hover-lift group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
-            >
-              <div className="img-zoom h-48 overflow-hidden bg-gray-50">
-                <img
-                  src={p.img}
-                  alt={p.name}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-              <div className="p-4">
-                <span className="mb-1 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  {p.tag}
-                </span>
-                <h3 className="mt-1 text-sm font-bold text-gray-900">{p.name}</h3>
-                <p className="mt-1 text-base font-extrabold text-emerald-600">
-                  {p.price}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+        {products.length > 0 ? (
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={VP}
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5"
+          >
+            {products.map((p) => (
+              <motion.div
+                key={p.id}
+                variants={scaleIn}
+                className="hover-lift group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+              >
+                <Link to={`/products/${p.id}`} className="flex flex-col h-full">
+                  {/* Fixed 4:3 image container */}
+                  <div className="relative w-full overflow-hidden bg-gray-50" style={{ paddingBottom: "75%" }}>
+                    <img
+                      src={p.image_url || PLACEHOLDER_IMG}
+                      alt={p.name}
+                      className="absolute inset-0 h-full w-full object-cover img-zoom"
+                      loading="lazy"
+                    />
+                  </div>
+                  {/* Content — fixed height so all cards align */}
+                  <div className="flex flex-col flex-1 p-4">
+                    <span className="mb-1 inline-block self-start rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 capitalize">
+                      {p.category_name ?? p.category}
+                    </span>
+                    <h3 className="mt-1 text-sm font-bold text-gray-900 line-clamp-2 flex-1">
+                      {p.name}
+                    </h3>
+                    <p className="mt-2 text-base font-extrabold text-emerald-600">
+                      Rs. {Number(p.price).toLocaleString()}
+                    </p>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-gray-400">
+            <Package className="h-12 w-12 opacity-30" />
+            <p className="text-sm">No products available yet.</p>
+          </div>
+        )}
       </div>
     </section>
   );

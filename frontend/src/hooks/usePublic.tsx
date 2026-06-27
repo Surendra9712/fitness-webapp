@@ -2,12 +2,13 @@ import { useQuery, useMutation, UseQueryResult, UseMutationResult } from "@tanst
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
 import type { QueryArgs } from "@/interfaces/iUseApi";
-import type { Product, Category, ReviewStats, PaginatedResponse, ReviewPayload } from "@/types";
+import type { Product, Category, ReviewStats, PaginatedResponse, ReviewPayload, TrainerInfo } from "@/types";
 
 interface UsePublicReturn {
   GetProducts: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Product>>;
   GetProduct: (id?: string) => UseQueryResult<Product>;
   GetCategories: (args?: QueryArgs) => UseQueryResult<Category[]>;
+  GetTrainers: (args?: QueryArgs) => UseQueryResult<TrainerInfo[]>;
   GetProductReviews: (productId?: string | number) => UseQueryResult<ReviewStats>;
   SubmitProductReview: (productId?: string | number) => UseMutationResult<void, Error, ReviewPayload>;
   DeleteProductReview: (productId?: string | number) => UseMutationResult<void, Error, void>;
@@ -17,6 +18,8 @@ const usePublic = (): UsePublicReturn => {
   const { api, get: GetProducts } = useApi({ endpoint: endpoint.publicProducts, queryKey: "publicProducts" });
 
   const { get: GetCategories } = useApi({ endpoint: endpoint.publicCategories, queryKey: "publicCategories" });
+
+  const { get: GetTrainers } = useApi({ endpoint: endpoint.publicTrainers, queryKey: "publicTrainers" });
 
   const GetProduct = (id?: string) =>
     useQuery({
@@ -60,7 +63,7 @@ const usePublic = (): UsePublicReturn => {
 
   return {
     GetProducts, GetProduct,
-    GetCategories,
+    GetCategories, GetTrainers,
     GetProductReviews, SubmitProductReview, DeleteProductReview,
   } as UsePublicReturn;
 };

@@ -19,6 +19,7 @@ export const endpoint = {
 
   publicProducts: "public/products",
   publicCategories: "public/categories",
+  publicTrainers: "public/trainers",
 
   dietitianProfile: "dietitian/profile",
   dietitianUsers: "dietitian/users",

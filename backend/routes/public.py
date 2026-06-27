@@ -49,7 +49,7 @@ def list_products():
             f"SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
             f"c.slug AS category, c.name AS category_name, p.image_url "
             f"FROM products p JOIN categories c ON p.category_id = c.id "
-            f"WHERE {where} ORDER BY c.name, p.name LIMIT %s OFFSET %s",
+            f"WHERE {where} ORDER BY p.created_at DESC LIMIT %s OFFSET %s",
             params + [page_size, offset],
         )
         return jsonify({
@@ -80,6 +80,36 @@ def get_product(product_id):
         if not product:
             return jsonify({'error': 'Product not found'}), 404
         return jsonify(product)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@public_bp.route('/trainers', methods=['GET'])
+def list_trainers():
+    page_size = max(1, min(20, int(request.args.get('page_size', 6))))
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT u.id, u.name, u.profile_image_url, "
+            "p.bio, p.specialization, "
+            "COALESCE(AVG(r.rating), 0) AS avg_rating, "
+            "COUNT(DISTINCT r.id) AS review_count, "
+            "COUNT(DISTINCT ta.id) AS customer_count "
+            "FROM users u "
+            "LEFT JOIN user_profiles p ON u.id = p.user_id "
+            "LEFT JOIN trainer_reviews r ON u.id = r.trainer_id "
+            "LEFT JOIN trainer_assignments ta ON u.id = ta.trainer_id "
+            "  AND ta.status = 'approved' AND ta.deleted_at IS NULL "
+            "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.deleted_at IS NULL "
+            "GROUP BY u.id "
+            "ORDER BY (COALESCE(AVG(r.rating), 0) * COUNT(DISTINCT r.id)) DESC, "
+            "COUNT(DISTINCT ta.id) DESC "
+            "LIMIT %s",
+            (page_size,)
+        )
+        return jsonify(cursor.fetchall())
     finally:
         cursor.close()
         conn.close()
