@@ -13,7 +13,7 @@ export default function HeroSection() {
         className="absolute inset-0 bg-cover bg-center"
         style={{
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1920&q=80')",
+            "url(https://t4.ftcdn.net/jpg/03/50/81/89/360_F_350818949_lJTfzSTDr79e9Kn55PUVZjN19ct20uGc.jpg)",
         }}
       />
       <div className="absolute inset-0 bg-gradient-to-br from-primary-950 via-primary-900/80 to-teal-950/90" />
