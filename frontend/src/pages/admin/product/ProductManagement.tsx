@@ -1,5 +1,15 @@
 import { useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Package, Search } from "lucide-react";
+import {
+  Plus,
+  Package,
+  Search,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { ProductFormDialog } from "@/pages/admin/product/ProductFormDialog";
@@ -30,8 +47,9 @@ export default function ProductManagement() {
 
   const { page, goToPage, resetPage, setPageSize, pageSize } = usePagination();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient = useQueryClient();
 
-  const { GetProducts, GetCategories, DeleteProduct } = useAdmin();
+  const { GetProducts, GetCategories, UpdateProduct, DeleteProduct } = useAdmin();
   const { data, isPlaceholderData } = GetProducts({
     queryParams: {
       page,
@@ -45,6 +63,7 @@ export default function ProductManagement() {
   });
 
   const categories = categoriesData?.items ?? [];
+  const updateProduct = UpdateProduct();
   const deleteProduct = DeleteProduct();
 
   const items = data?.items ?? [];
@@ -69,6 +88,19 @@ export default function ProductManagement() {
     setDialogOpen(true);
   }
 
+  async function toggleStatus(p: Product) {
+    const newStatus = p.status === "active" ? "inactive" : "active";
+    try {
+      await updateProduct.mutateAsync({ id: p.id, status: newStatus } as any);
+      toast.success(
+        `Product ${newStatus === "active" ? "activated" : "deactivated"}`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
   function handleDeleteClick(id: number) {
     setPendingDeleteId(id);
     setConfirmOpen(true);
@@ -79,6 +111,7 @@ export default function ProductManagement() {
     try {
       await deleteProduct.mutateAsync(pendingDeleteId);
       toast.success("Product deleted");
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -119,10 +152,10 @@ export default function ProductManagement() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Price(Rs)</TableHead>
+                <TableHead>Price (Rs)</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -131,7 +164,7 @@ export default function ProductManagement() {
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="capitalize">
-                      {p.category}
+                      {p.category_name ?? p.category}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">{p.price}</TableCell>
@@ -152,25 +185,42 @@ export default function ProductManagement() {
                       {p.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(p)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => handleDeleteClick(p.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(p)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => toggleStatus(p)}>
+                          {p.status === "active" ? (
+                            <>
+                              <ToggleLeft className="h-4 w-4 mr-2" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <ToggleRight className="h-4 w-4 mr-2 text-emerald-600" />
+                              Activate
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => handleDeleteClick(p.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}

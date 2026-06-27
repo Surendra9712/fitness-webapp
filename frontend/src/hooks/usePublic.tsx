@@ -1,8 +1,19 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, UseQueryResult, UseMutationResult } from "@tanstack/react-query";
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
+import type { QueryArgs } from "@/interfaces/iUseApi";
+import type { Product, Category, ReviewStats, PaginatedResponse, ReviewPayload } from "@/types";
 
-const usePublic = (): any => {
+interface UsePublicReturn {
+  GetProducts: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Product>>;
+  GetProduct: (id?: string) => UseQueryResult<Product>;
+  GetCategories: (args?: QueryArgs) => UseQueryResult<Category[]>;
+  GetProductReviews: (productId?: string | number) => UseQueryResult<ReviewStats>;
+  SubmitProductReview: (productId?: string | number) => UseMutationResult<void, Error, ReviewPayload>;
+  DeleteProductReview: (productId?: string | number) => UseMutationResult<void, Error, void>;
+}
+
+const usePublic = (): UsePublicReturn => {
   const { api, get: GetProducts } = useApi({ endpoint: endpoint.publicProducts, queryKey: "publicProducts" });
 
   const { get: GetCategories } = useApi({ endpoint: endpoint.publicCategories, queryKey: "publicCategories" });
@@ -51,7 +62,7 @@ const usePublic = (): any => {
     GetProducts, GetProduct,
     GetCategories,
     GetProductReviews, SubmitProductReview, DeleteProductReview,
-  };
+  } as UsePublicReturn;
 };
 
 export default usePublic;

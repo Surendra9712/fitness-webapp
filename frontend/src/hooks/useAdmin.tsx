@@ -1,8 +1,107 @@
-import { useMutation } from "@tanstack/react-query";
+import {
+  useMutation,
+  UseQueryResult,
+  UseMutationResult,
+} from "@tanstack/react-query";
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
+import type { QueryArgs } from "@/interfaces/iUseApi";
+import type {
+  AdminStats,
+  User,
+  Exercise,
+  Category,
+  Product,
+  Order,
+  TrainerAssignment,
+  ProductRequest,
+  PaginatedResponse,
+  CreateUserPayload,
+  UpdateUserPayload,
+  UpdateOrderStatusPayload,
+  AssignmentActionPayload,
+  ApproveProductRequestPayload,
+} from "@/types";
 
-const useAdmin = (): any => {
+interface UseAdminReturn {
+  GetStats: (args?: QueryArgs) => UseQueryResult<AdminStats>;
+  GetUsers: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<User>>;
+  GetUserDetail: (args?: QueryArgs) => UseQueryResult<User>;
+  CreateUser: () => UseMutationResult<User, Error, CreateUserPayload>;
+  UpdateUser: () => UseMutationResult<User, Error, UpdateUserPayload>;
+  DeleteUser: () => UseMutationResult<void, Error, number>;
+  GetCategories: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<Category>>;
+  CreateCategory: () => UseMutationResult<
+    Category,
+    Error,
+    Omit<Category, "id">
+  >;
+  UpdateCategory: () => UseMutationResult<
+    Category,
+    Error,
+    Partial<Category> & { id: number }
+  >;
+  DeleteCategory: () => UseMutationResult<void, Error, number>;
+  GetExercises: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<Exercise>>;
+  CreateExercise: () => UseMutationResult<
+    Exercise,
+    Error,
+    Omit<Exercise, "id">
+  >;
+  UpdateExercise: () => UseMutationResult<
+    Exercise,
+    Error,
+    Partial<Exercise> & { id: number }
+  >;
+  DeleteExercise: () => UseMutationResult<void, Error, number>;
+  GetProducts: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Product>>;
+  CreateProduct: () => UseMutationResult<Product, Error, Omit<Product, "id">>;
+  UpdateProduct: () => UseMutationResult<
+    Product,
+    Error,
+    Partial<Product> & { id: number }
+  >;
+  DeleteProduct: () => UseMutationResult<void, Error, number>;
+  GetOrders: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Order>>;
+  DeleteOrder: () => UseMutationResult<void, Error, number>;
+  UpdateOrderStatus: () => UseMutationResult<
+    Order,
+    Error,
+    UpdateOrderStatusPayload
+  >;
+  GetTrainerAssignments: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<TrainerAssignment>>;
+  ApproveTrainerAssignment: () => UseMutationResult<
+    void,
+    Error,
+    AssignmentActionPayload
+  >;
+  RejectTrainerAssignment: () => UseMutationResult<
+    void,
+    Error,
+    AssignmentActionPayload
+  >;
+  GetProductRequests: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<ProductRequest>>;
+  ApproveProductRequest: () => UseMutationResult<
+    void,
+    Error,
+    ApproveProductRequestPayload
+  >;
+  RejectProductRequest: () => UseMutationResult<
+    void,
+    Error,
+    AssignmentActionPayload
+  >;
+}
+
+const useAdmin = (): UseAdminReturn => {
   const { api, get: GetStats } = useApi({
     endpoint: endpoint.adminStats,
     queryKey: "adminStats",
@@ -10,6 +109,7 @@ const useAdmin = (): any => {
 
   const {
     get: GetUsers,
+    get: GetUserDetail,
     post: CreateUser,
     update: UpdateUser,
     delete: DeleteUser,
@@ -18,6 +118,7 @@ const useAdmin = (): any => {
   const {
     get: GetExercises,
     post: CreateExercise,
+    update: UpdateExercise,
     delete: DeleteExercise,
   } = useApi({ endpoint: endpoint.adminExercises, queryKey: "adminExercises" });
 
@@ -141,6 +242,7 @@ const useAdmin = (): any => {
   return {
     GetStats,
     GetUsers,
+    GetUserDetail,
     CreateUser,
     UpdateUser,
     DeleteUser,
@@ -150,6 +252,7 @@ const useAdmin = (): any => {
     DeleteCategory,
     GetExercises,
     CreateExercise,
+    UpdateExercise,
     DeleteExercise,
     GetProducts,
     CreateProduct,
@@ -164,7 +267,7 @@ const useAdmin = (): any => {
     GetProductRequests,
     ApproveProductRequest,
     RejectProductRequest,
-  };
+  } as UseAdminReturn;
 };
 
 export default useAdmin;

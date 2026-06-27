@@ -1,7 +1,17 @@
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
+import type { UseQueryResult, UseMutationResult } from "@tanstack/react-query";
+import type { QueryArgs } from "@/interfaces/iUseApi";
+import type { Category } from "@/types";
 
-const useProductCategory = (): any => {
+interface UseProductCategoryReturn {
+  GetCategories: (args?: QueryArgs) => UseQueryResult<Category[]>;
+  CreateCategory: () => UseMutationResult<Category, Error, Omit<Category, "id">>;
+  UpdateCategory: () => UseMutationResult<Category, Error, Partial<Category> & { id: number }>;
+  DeleteCategory: () => UseMutationResult<void, Error, number>;
+}
+
+const useProductCategory = (): UseProductCategoryReturn => {
   const { get: GetCategories } = useApi({
     endpoint: endpoint.categories,
     queryKey: "allCategories",
@@ -24,7 +34,7 @@ const useProductCategory = (): any => {
     CreateCategory,
     UpdateCategory,
     DeleteCategory,
-  };
+  } as UseProductCategoryReturn;
 };
 
 export default useProductCategory;

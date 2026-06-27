@@ -24,6 +24,7 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { Order, OrderStatus } from "@/types";
+import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_COLORS: Record<
   OrderStatus,
@@ -54,6 +55,7 @@ export default function OrderManagement() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const { page, pageSize, goToPage, setPageSize } = usePagination({
     initialPageSize: 20,
@@ -71,6 +73,7 @@ export default function OrderManagement() {
   async function handleUpdateStatus(orderId: number, status: OrderStatus) {
     try {
       await updateStatus.mutateAsync({ orderId, status });
+      queryClient.invalidateQueries({ queryKey: ["adminOrders"] });
     } catch (e) {
       toast.error((e as Error).message);
     }

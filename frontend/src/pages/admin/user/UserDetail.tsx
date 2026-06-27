@@ -16,15 +16,23 @@ import type { User, Role } from "@/types";
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
   dietitian: "info",
-  user: "success",
+  trainee: "success",
 };
 
-function InfoRow({ label, value }: { label: string; value?: string | number | null }) {
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
   if (!value && value !== 0) return null;
   return (
     <div className="flex justify-between py-2">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium capitalize">{String(value).replace(/_/g, " ")}</span>
+      <span className="text-sm font-medium capitalize">
+        {String(value).replace(/_/g, " ")}
+      </span>
     </div>
   );
 }
@@ -38,8 +46,8 @@ export default function UserDetail() {
   const [toggleConfirm, setToggleConfirm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  const { GetUsers, UpdateUser, DeleteUser } = useAdmin();
-  const { data: user, isLoading } = GetUsers({ id: Number(id) });
+  const { GetUserDetail, UpdateUser, DeleteUser } = useAdmin();
+  const { data: user, isLoading } = GetUserDetail({ id: Number(id) });
   const toggleActive = UpdateUser();
   const deleteUser = DeleteUser();
 
@@ -49,9 +57,11 @@ export default function UserDetail() {
       const newStatus = user.status === "active" ? "inactive" : "active";
       await toggleActive.mutateAsync({ id: user.id, status: newStatus });
       const label =
-        user.status === "active" ? "User disabled"
-        : user.status === "pending" ? "User approved"
-        : "User enabled";
+        user.status === "active"
+          ? "User disabled"
+          : user.status === "pending"
+            ? "User approved"
+            : "User enabled";
       toast.success(label);
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
     } catch (err) {
@@ -139,7 +149,9 @@ export default function UserDetail() {
               {u.status === "pending" ? (
                 <Badge variant="warning">Pending</Badge>
               ) : (
-                <Badge variant={u.status === "active" ? "success" : "secondary"}>
+                <Badge
+                  variant={u.status === "active" ? "success" : "secondary"}
+                >
                   {u.status === "active" ? "Active" : "Disabled"}
                 </Badge>
               )}
@@ -152,7 +164,12 @@ export default function UserDetail() {
 
             {/* Action buttons */}
             <div className="flex flex-col gap-2 w-full">
-              <Button variant="outline" size="sm" className="w-full" onClick={() => setModal(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setModal(true)}
+              >
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
               </Button>
@@ -167,7 +184,11 @@ export default function UserDetail() {
                 ) : (
                   <UserCheck className="h-4 w-4 mr-2" />
                 )}
-                {u.status === "active" ? "Disable" : u.status === "pending" ? "Approve" : "Enable"}
+                {u.status === "active"
+                  ? "Disable"
+                  : u.status === "pending"
+                    ? "Approve"
+                    : "Enable"}
               </Button>
               <Button
                 variant="outline"
@@ -205,8 +226,14 @@ export default function UserDetail() {
             </CardHeader>
             <CardContent className="divide-y">
               <InfoRow label="Gender" value={u.gender} />
-              <InfoRow label="Weight" value={u.weight_kg ? `${u.weight_kg} kg` : null} />
-              <InfoRow label="Height" value={u.height_cm ? `${u.height_cm} cm` : null} />
+              <InfoRow
+                label="Weight"
+                value={u.weight_kg ? `${u.weight_kg} kg` : null}
+              />
+              <InfoRow
+                label="Height"
+                value={u.height_cm ? `${u.height_cm} cm` : null}
+              />
               <InfoRow label="Goal" value={u.goal} />
               <InfoRow label="Activity Level" value={u.activity_level} />
             </CardContent>
@@ -231,31 +258,31 @@ export default function UserDetail() {
         </div>
       </div>
 
-      <UserModal
-        user={u as User}
-        open={modal}
-        onOpenChange={setModal}
-      />
+      <UserModal user={u as User} open={modal} onOpenChange={setModal} />
 
       <ConfirmDialog
         open={toggleConfirm}
         onOpenChange={setToggleConfirm}
         title={
-          u.status === "active" ? "Disable user?"
-          : u.status === "pending" ? "Approve user?"
-          : "Enable user?"
+          u.status === "active"
+            ? "Disable user?"
+            : u.status === "pending"
+              ? "Approve user?"
+              : "Enable user?"
         }
         description={
           u.status === "active"
             ? `${u.name} will lose access to the platform.`
             : u.status === "pending"
-            ? `${u.name}'s account will be approved and they can log in.`
-            : `${u.name} will regain access to the platform.`
+              ? `${u.name}'s account will be approved and they can log in.`
+              : `${u.name} will regain access to the platform.`
         }
         confirmLabel={
-          u.status === "active" ? "Disable"
-          : u.status === "pending" ? "Approve"
-          : "Enable"
+          u.status === "active"
+            ? "Disable"
+            : u.status === "pending"
+              ? "Approve"
+              : "Enable"
         }
         destructive={u.status === "active"}
         onConfirm={confirmToggle}

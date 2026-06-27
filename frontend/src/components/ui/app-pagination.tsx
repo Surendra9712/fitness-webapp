@@ -50,7 +50,6 @@ export function AppPagination({
   const totalPages = resolvedTotalPages;
   const showSizeSelector =
     pageSize !== undefined && onPageSizeChange !== undefined;
-  console.log({ totalPages });
 
   if (totalPages <= 0) return null;
 

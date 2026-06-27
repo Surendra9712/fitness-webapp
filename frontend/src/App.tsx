@@ -12,9 +12,9 @@ import ProductDetail from "@/pages/ProductDetail";
 import PaymentReturn from "@/pages/PaymentReturn";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
-import UserManagement from "@/pages/admin/UserManagement";
-import UserDetail from "@/pages/admin/UserDetail";
-import ExerciseLibrary from "@/pages/admin/ExerciseLibrary";
+import UserManagement from "@/pages/admin/user/UserManagement";
+import UserDetail from "@/pages/admin/user/UserDetail";
+import ExerciseLibrary from "@/pages/admin/exercise/ExerciseLibrary";
 import ProductManagement from "@/pages/admin/product/ProductManagement";
 import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
@@ -67,7 +67,10 @@ export default function App() {
           <Route path="/payment/khalti/return" element={<PaymentReturn />} />
           <Route path="/dashboard" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
-          <Route path="/register" element={<Navigate to="/login?tab=register" replace />} />
+          <Route
+            path="/register"
+            element={<Navigate to="/login?tab=register" replace />}
+          />
 
           {/* Admin */}
           <Route

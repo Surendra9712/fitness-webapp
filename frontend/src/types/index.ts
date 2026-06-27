@@ -70,7 +70,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
-  status?: 'inactive' | 'active' | 'pending';
+  status: UserStatus;
   created_at?: string;
   age?: number;
   weight_kg?: number;
@@ -185,11 +185,119 @@ export interface ReviewStats {
   reviews: Review[];
 }
 
+// ─── Status / shared ────────────────────────────────────────────────
+export type UserStatus = "inactive" | "active" | "pending";
+
+// ─── Admin stats ────────────────────────────────────────────────────
 export interface AdminStats {
   users: number;
   dietitians: number;
   products: number;
   orders: number;
   pending_requests: number;
+  pending_approvals: number;
+  pending_assignments: number;
+  total_revenue: number;
+  revenue_30d: number;
+  orders_by_status: Record<string, number>;
+  user_growth: { date: string; users: number }[];
+  order_trend: { date: string; orders: number; revenue: number }[];
   recent_users: User[];
+}
+
+// ─── Dietitian ───────────────────────────────────────────────────────
+export interface DietitianProfile {
+  id: number;
+  name: string;
+  email: string;
+  bio?: string;
+  specialization?: string;
+  profile_image_url?: string;
+}
+
+export interface DietitianStats {
+  client_count: number;
+  pending_assignments: number;
+}
+
+// ─── Mutation payloads ───────────────────────────────────────────────
+export interface CreateUserPayload {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+}
+
+export interface UpdateUserPayload {
+  id: number;
+  name?: string;
+  email?: string;
+  role?: Role;
+  status?: UserStatus;
+}
+
+export interface UpdateOrderStatusPayload {
+  orderId: number;
+  status: OrderStatus;
+}
+
+export interface AssignmentActionPayload {
+  id: number;
+  admin_note?: string;
+}
+
+export interface TrainerAssignmentActionPayload {
+  id: number;
+  trainer_note?: string;
+}
+
+export interface ApproveProductRequestPayload {
+  id: number;
+  price: number;
+  stock_quantity: number;
+  category: string;
+  admin_note?: string;
+}
+
+export interface CreateOrderPayload {
+  items: { product_id: number; quantity: number }[];
+  shipping_address: string;
+}
+
+export interface CreateProductRequestPayload {
+  product_name: string;
+  description?: string;
+  reason?: string;
+}
+
+export interface LogExercisePayload {
+  exercise_id: number;
+  logged_date: string;
+  duration_minutes: number;
+  notes?: string;
+}
+
+export interface ReviewPayload {
+  rating: number;
+  comment?: string | null;
+}
+
+export interface RequestTrainerPayload {
+  trainer_id: number;
+  customer_note?: string;
+}
+
+export interface UpdateProfilePayload {
+  id?: number;
+  name?: string;
+  email?: string;
+  bio?: string;
+  specialization?: string;
+  age?: number;
+  weight_kg?: number;
+  height_cm?: number;
+  gender?: string;
+  goal?: Goal;
+  activity_level?: string;
+  profile_image_url?: string;
 }
