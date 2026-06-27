@@ -2,6 +2,7 @@ export const endpoint = {
   categories: "admin/categories",
 
   adminStats: "admin/stats",
+  adminStatsTrends: "admin/stats/trends",
   adminUsers: "admin/users",
   adminExercises: "admin/exercises",
   adminProducts: "admin/products",

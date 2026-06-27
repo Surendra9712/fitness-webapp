@@ -190,13 +190,6 @@ export function TrainerList({ trainers, onRequest }: Props) {
           })
         )}
       </div>
-
-      {/* ── Footer: count + pagination ── */}
-      <AppPagination
-        page={safePage}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
     </div>
   );
 }

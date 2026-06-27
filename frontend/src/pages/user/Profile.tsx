@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Camera,
   Pencil,
@@ -15,9 +15,13 @@ import {
   Activity,
   User,
   Zap,
+  Flame,
+  Droplets,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { api } from "@/api/client";
 import {
   GOALS,
   DIETS,
@@ -29,6 +33,7 @@ import {
 import ProfileSetup from "./ProfileSetup";
 import { AvatarModal } from "./profile/AvatarModal";
 import { useAuth } from "@/context/AuthContext";
+import type { BodyMetrics } from "@/types";
 
 function asArr(v: unknown): string[] {
   if (Array.isArray(v)) return v as string[];
@@ -235,13 +240,155 @@ function TagSection({
   );
 }
 
+// ── BMI Gauge ─────────────────────────────────────────────────────────────────
+
+const BMI_MIN = 10, BMI_MAX = 40;
+function toGaugeAngle(bmi: number) {
+  return ((Math.min(Math.max(bmi, BMI_MIN), BMI_MAX) - BMI_MIN) / (BMI_MAX - BMI_MIN)) * 180;
+}
+function gaugePoint(cx: number, cy: number, r: number, deg: number) {
+  const rad = ((180 - deg) * Math.PI) / 180;
+  return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
+}
+function arcPath(cx: number, cy: number, r: number, s: number, e: number) {
+  const p1 = gaugePoint(cx, cy, r, toGaugeAngle(s));
+  const p2 = gaugePoint(cx, cy, r, toGaugeAngle(e));
+  const large = toGaugeAngle(e) - toGaugeAngle(s) > 180 ? 1 : 0;
+  return `M ${p1.x} ${p1.y} A ${r} ${r} 0 ${large} 0 ${p2.x} ${p2.y}`;
+}
+const BMI_ZONES = [
+  { label: "Underweight", start: 10, end: 18.5, color: "#60a5fa" },
+  { label: "Normal",      start: 18.5, end: 25,  color: "#34d399" },
+  { label: "Overweight",  start: 25,   end: 30,  color: "#fbbf24" },
+  { label: "Obese",       start: 30,   end: 40,  color: "#f87171" },
+];
+const BMI_CATEGORY_COLOR: Record<string, string> = {
+  Underweight: "#60a5fa", Normal: "#34d399", Overweight: "#fbbf24", Obese: "#f87171",
+};
+function BmiGauge({ bmi, category }: { bmi: number; category: string }) {
+  const cx = 110, cy = 100, r = 78, sw = 13;
+  const needleDeg = toGaugeAngle(bmi);
+  const tip = gaugePoint(cx, cy, r - 10, needleDeg);
+  const accent = BMI_CATEGORY_COLOR[category] ?? "#34d399";
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg viewBox="0 0 220 110" className="w-full max-w-xs">
+        <path d={arcPath(cx, cy, r, BMI_MIN, BMI_MAX)} fill="none" stroke="#e5e7eb" strokeWidth={sw} />
+        {BMI_ZONES.map((z) => (
+          <path key={z.label} d={arcPath(cx, cy, r, z.start, z.end)} fill="none" stroke={z.color} strokeWidth={sw} strokeLinecap="butt" />
+        ))}
+        <line x1={cx} y1={cy} x2={tip.x} y2={tip.y} stroke="#111827" strokeWidth={2.5} strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r={5} fill="#111827" />
+        <text x={cx} y={cy - 18} textAnchor="middle" fontSize={22} fontWeight="700" fill="#111827">{bmi}</text>
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={10} fill={accent} fontWeight="600">{category}</text>
+        <text x={cx - r - 4} y={cy + 14} textAnchor="end" fontSize={9} fill="#9ca3af">10</text>
+        <text x={cx + r + 4} y={cy + 14} textAnchor="start" fontSize={9} fill="#9ca3af">40</text>
+      </svg>
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+        {BMI_ZONES.map((z) => (
+          <span key={z.label} className="flex items-center gap-1 text-xs text-gray-500">
+            <span className="h-2 w-2 rounded-full inline-block" style={{ background: z.color }} />
+            {z.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Macro Donut ───────────────────────────────────────────────────────────────
+
+const MACRO_CONFIG = [
+  { key: "protein", label: "Protein", color: "#a78bfa", calPerG: 4 },
+  { key: "carbs",   label: "Carbs",   color: "#60a5fa", calPerG: 4 },
+  { key: "fat",     label: "Fat",     color: "#fbbf24", calPerG: 9 },
+] as const;
+
+function MacroDonut({ macros }: { macros: BodyMetrics["macros"] }) {
+  const cx = 60, cy = 60, r = 44, sw = 14;
+  const circumference = 2 * Math.PI * r;
+  const cals = MACRO_CONFIG.map((m) => ({ ...m, kcal: macros[m.key] * m.calPerG }));
+  const totalKcal = cals.reduce((s, m) => s + m.kcal, 0) || 1;
+  let offset = 0;
+  const segments = cals.map((m) => {
+    const dash = (m.kcal / totalKcal) * circumference;
+    const gap = circumference - dash;
+    const currentOffset = offset;
+    offset += dash;
+    return { ...m, dash, gap, offset: currentOffset };
+  });
+  return (
+    <div className="flex items-center gap-6">
+      <svg viewBox="0 0 120 120" className="w-28 h-28 shrink-0 -rotate-90">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={sw} />
+        {segments.map((s) => (
+          <circle key={s.key} cx={cx} cy={cy} r={r} fill="none" stroke={s.color} strokeWidth={sw}
+            strokeDasharray={`${s.dash} ${s.gap}`} strokeDashoffset={-s.offset} strokeLinecap="butt" />
+        ))}
+      </svg>
+      <div className="flex flex-col gap-2 min-w-0">
+        {MACRO_CONFIG.map((m) => {
+          const grams = macros[m.key];
+          const pct = Math.round(((grams * m.calPerG) / totalKcal) * 100);
+          return (
+            <div key={m.key} className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: m.color }} />
+              <span className="text-sm font-medium text-gray-700 w-14">{m.label}</span>
+              <span className="text-sm text-gray-900 font-semibold">{grams}g</span>
+              <span className="text-xs text-gray-400 ml-auto">{pct}%</span>
+            </div>
+          );
+        })}
+        <div className="mt-1 pt-1 border-t border-gray-100">
+          <span className="text-xs text-gray-500">Total macros ≈ {Math.round(totalKcal)} kcal</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Metric Row Card ───────────────────────────────────────────────────────────
+
+function MetricRowCard({ icon, label, value, unit, sub, accent }: {
+  icon: React.ReactNode; label: string; value: number; unit: string; sub: string; accent: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: `${accent}18` }}>
+        <span style={{ color: accent }}>{icon}</span>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 leading-tight">
+          {value.toLocaleString()}
+          <span className="text-sm font-normal text-gray-400 ml-1">{unit}</span>
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
 export default function Profile() {
   const [modalOpen, setModalOpen] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [metrics, setMetrics] = useState<BodyMetrics | null>(null);
 
   const { user, loading: isLoading, refreshUser } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = user as any;
+  const hasProfile = Boolean(data?.full_name);
+
+  useEffect(() => {
+    if (!hasProfile) return;
+    const today = new Date().toISOString().split("T")[0];
+    api
+      .get<{ metrics: BodyMetrics | null }>(`/user/dashboard?date=${today}`)
+      .then((res) => setMetrics(res.metrics))
+      .catch(() => {});
+  }, [hasProfile]);
 
   const handleDone = () => {
     setModalOpen(false);
@@ -256,7 +403,6 @@ export default function Profile() {
     );
   }
 
-  const hasProfile = Boolean(data?.full_name);
   const displayName = data?.full_name || data?.name || "";
   const initials = displayName
     .split(" ")
@@ -417,6 +563,61 @@ export default function Profile() {
               iconColor={bmiInfo?.textColor ?? "text-gray-400"}
             />
           </div>
+
+          {/* ── Body Metrics ──────────────────────────────── */}
+          {metrics && (
+            <section className="space-y-4">
+              <h2 className="text-base font-semibold text-gray-800">Body Metrics</h2>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <Card className="lg:col-span-1">
+                  <CardHeader className="pb-1">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Activity className="h-4 w-4 text-emerald-500" /> BMI
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <BmiGauge bmi={metrics.bmi} category={metrics.bmi_category} />
+                  </CardContent>
+                </Card>
+                <div className="lg:col-span-2 flex flex-col gap-4">
+                  <MetricRowCard
+                    icon={<Flame className="h-5 w-5" />}
+                    label="Basal Metabolic Rate (BMR)"
+                    value={metrics.bmr}
+                    unit="kcal/day"
+                    sub="Calories your body burns completely at rest"
+                    accent="#f97316"
+                  />
+                  <MetricRowCard
+                    icon={<Zap className="h-5 w-5" />}
+                    label="Total Daily Energy Expenditure (TDEE)"
+                    value={metrics.tdee}
+                    unit="kcal/day"
+                    sub="BMR × activity multiplier — your true maintenance"
+                    accent="#8b5cf6"
+                  />
+                  <MetricRowCard
+                    icon={<Droplets className="h-5 w-5" />}
+                    label="Daily Calorie Target"
+                    value={metrics.daily_calories}
+                    unit="kcal/day"
+                    sub="Adjusted for your goal (lose / gain / maintain)"
+                    accent="#10b981"
+                  />
+                </div>
+              </div>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Daily Macro Targets
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <MacroDonut macros={metrics.macros} />
+                </CardContent>
+              </Card>
+            </section>
+          )}
 
           {/* ── Personal Details ──────────────────────────── */}
           <SectionCard

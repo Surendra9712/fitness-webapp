@@ -200,9 +200,15 @@ export interface AdminStats {
   total_revenue: number;
   revenue_30d: number;
   orders_by_status: Record<string, number>;
+  users_by_status: { status: string; count: number }[];
+}
+
+export interface AdminStatsTrends {
   user_growth: { date: string; users: number }[];
   order_trend: { date: string; orders: number; revenue: number }[];
-  recent_users: User[];
+  group_by: 'day' | 'month';
+  date_from: string;
+  date_to: string;
 }
 
 // ─── Dietitian ───────────────────────────────────────────────────────

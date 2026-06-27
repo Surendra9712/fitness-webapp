@@ -885,10 +885,10 @@ def reject_trainer_assignment(aid):
 @admin_bp.route('/stats', methods=['GET'])
 @role_required('admin')
 def stats():
+    """Overall (all-time) KPI counts — no date filter."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        # Core counts
         cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='trainee' AND deleted_at IS NULL")
         users_count = cursor.fetchone()['total']
         cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND deleted_at IS NULL")
@@ -904,7 +904,6 @@ def stats():
         cursor.execute("SELECT COUNT(*) AS total FROM trainer_assignments WHERE status='pending_admin' AND deleted_at IS NULL")
         pending_assignments = cursor.fetchone()['total']
 
-        # Revenue totals
         cursor.execute("SELECT COALESCE(SUM(total_amount), 0) AS total FROM orders WHERE deleted_at IS NULL")
         total_revenue = float(cursor.fetchone()['total'])
         cursor.execute(
@@ -913,51 +912,22 @@ def stats():
         )
         revenue_30d = float(cursor.fetchone()['total'])
 
-        # Orders by status
         cursor.execute(
             "SELECT status, COUNT(*) AS count FROM orders "
             "WHERE deleted_at IS NULL GROUP BY status"
         )
         orders_by_status = {row['status']: row['count'] for row in cursor.fetchall()}
 
-        # User registrations — last 7 days
         cursor.execute(
-            "SELECT DATE(created_at) AS day, COUNT(*) AS count "
-            "FROM users WHERE deleted_at IS NULL "
-            "AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) "
-            "GROUP BY DATE(created_at) ORDER BY day"
+            "SELECT status, COUNT(*) AS count FROM users "
+            "WHERE role != 'admin' AND deleted_at IS NULL GROUP BY status"
         )
-        user_growth_raw = {str(row['day']): row['count'] for row in cursor.fetchall()}
-
-        # Orders + revenue — last 7 days
-        cursor.execute(
-            "SELECT DATE(created_at) AS day, COUNT(*) AS count, "
-            "COALESCE(SUM(total_amount), 0) AS revenue "
-            "FROM orders WHERE deleted_at IS NULL "
-            "AND created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) "
-            "GROUP BY DATE(created_at) ORDER BY day"
-        )
-        order_trend_raw = {str(row['day']): {'count': row['count'], 'revenue': float(row['revenue'])}
-                          for row in cursor.fetchall()}
-
-        # Fill in missing days so frontend always has 7 points
-        from datetime import date, timedelta
-        today = date.today()
-        user_growth, order_trend = [], []
-        for i in range(6, -1, -1):
-            d = str(today - timedelta(days=i))
-            label = (today - timedelta(days=i)).strftime('%b %d')
-            user_growth.append({'date': label, 'users': user_growth_raw.get(d, 0)})
-            od = order_trend_raw.get(d, {'count': 0, 'revenue': 0})
-            order_trend.append({'date': label, 'orders': od['count'], 'revenue': od['revenue']})
-
-        # Recent users
-        cursor.execute(
-            "SELECT u.name, u.email, u.role, u.status, u.created_at "
-            "FROM users u WHERE u.deleted_at IS NULL "
-            "ORDER BY u.created_at DESC LIMIT 6"
-        )
-        recent_users = cursor.fetchall()
+        users_by_status_raw = {row['status']: row['count'] for row in cursor.fetchall()}
+        users_by_status = [
+            {'status': 'Active',   'count': users_by_status_raw.get('active', 0)},
+            {'status': 'Pending',  'count': users_by_status_raw.get('pending', 0)},
+            {'status': 'Inactive', 'count': users_by_status_raw.get('inactive', 0)},
+        ]
 
         return jsonify({
             'users': users_count,
@@ -970,9 +940,111 @@ def stats():
             'total_revenue': total_revenue,
             'revenue_30d': revenue_30d,
             'orders_by_status': orders_by_status,
+            'users_by_status': users_by_status,
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/stats/trends', methods=['GET'])
+@role_required('admin')
+def stats_trends():
+    """Date-range charts: user_growth, order_trend, users_by_status."""
+    from datetime import date, timedelta, datetime as dt
+    today = date.today()
+    date_from_str = request.args.get('date_from')
+    date_to_str   = request.args.get('date_to')
+    try:
+        date_from = dt.strptime(date_from_str, '%Y-%m-%d').date() if date_from_str else date(today.year, 1, 1)
+    except ValueError:
+        date_from = date(today.year, 1, 1)
+    try:
+        date_to = dt.strptime(date_to_str, '%Y-%m-%d').date() if date_to_str else today
+    except ValueError:
+        date_to = today
+
+    if date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    span_days = (date_to - date_from).days
+    by_month  = span_days > 60
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        if by_month:
+            period_expr = "CONCAT(YEAR(created_at), '-', LPAD(MONTH(created_at), 2, '0'))"
+            cursor.execute(
+                f"SELECT {period_expr} AS period, COUNT(*) AS count "
+                "FROM users WHERE deleted_at IS NULL "
+                "AND DATE(created_at) BETWEEN %s AND %s "
+                "GROUP BY period ORDER BY period",
+                (str(date_from), str(date_to))
+            )
+            user_growth_raw = {row['period']: row['count'] for row in cursor.fetchall()}
+
+            cursor.execute(
+                f"SELECT {period_expr} AS period, COUNT(*) AS count, "
+                "COALESCE(SUM(total_amount), 0) AS revenue "
+                "FROM orders WHERE deleted_at IS NULL "
+                "AND DATE(created_at) BETWEEN %s AND %s "
+                "GROUP BY period ORDER BY period",
+                (str(date_from), str(date_to))
+            )
+            order_trend_raw = {row['period']: {'count': row['count'], 'revenue': float(row['revenue'])}
+                               for row in cursor.fetchall()}
+
+            user_growth, order_trend = [], []
+            from calendar import month_abbr
+            y, m = date_from.year, date_from.month
+            while (y, m) <= (date_to.year, date_to.month):
+                key   = f'{y:04d}-{m:02d}'
+                label = f"{month_abbr[m]} {y}" if span_days > 365 else month_abbr[m]
+                user_growth.append({'date': label, 'users': user_growth_raw.get(key, 0)})
+                od = order_trend_raw.get(key, {'count': 0, 'revenue': 0})
+                order_trend.append({'date': label, 'orders': od['count'], 'revenue': od['revenue']})
+                m += 1
+                if m > 12:
+                    m = 1
+                    y += 1
+        else:
+            cursor.execute(
+                "SELECT DATE(created_at) AS day, COUNT(*) AS count "
+                "FROM users WHERE deleted_at IS NULL "
+                "AND DATE(created_at) BETWEEN %s AND %s "
+                "GROUP BY day ORDER BY day",
+                (str(date_from), str(date_to))
+            )
+            user_growth_raw = {str(row['day']): row['count'] for row in cursor.fetchall()}
+
+            cursor.execute(
+                "SELECT DATE(created_at) AS day, COUNT(*) AS count, "
+                "COALESCE(SUM(total_amount), 0) AS revenue "
+                "FROM orders WHERE deleted_at IS NULL "
+                "AND DATE(created_at) BETWEEN %s AND %s "
+                "GROUP BY day ORDER BY day",
+                (str(date_from), str(date_to))
+            )
+            order_trend_raw = {str(row['day']): {'count': row['count'], 'revenue': float(row['revenue'])}
+                               for row in cursor.fetchall()}
+
+            user_growth, order_trend = [], []
+            cur = date_from
+            while cur <= date_to:
+                key   = str(cur)
+                label = cur.strftime('%b %d')
+                user_growth.append({'date': label, 'users': user_growth_raw.get(key, 0)})
+                od = order_trend_raw.get(key, {'count': 0, 'revenue': 0})
+                order_trend.append({'date': label, 'orders': od['count'], 'revenue': od['revenue']})
+                cur += timedelta(days=1)
+
+        return jsonify({
             'user_growth': user_growth,
             'order_trend': order_trend,
-            'recent_users': recent_users,
+            'group_by': 'month' if by_month else 'day',
+            'date_from': str(date_from),
+            'date_to': str(date_to),
         })
     finally:
         cursor.close()

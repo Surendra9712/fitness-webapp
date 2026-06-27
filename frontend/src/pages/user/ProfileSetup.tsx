@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, User } from "lucide-react";
+import { Check } from "lucide-react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
@@ -33,10 +34,12 @@ export default function ProfileSetup({
   isOpen = false,
   onDone,
   onClose,
+  inline = false,
 }: {
-  isOpen: boolean;
+  isOpen?: boolean;
   onDone?: () => void;
-  onClose: (val: boolean) => void;
+  onClose?: (val: boolean) => void;
+  inline?: boolean;
 }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -220,60 +223,125 @@ export default function ProfileSetup({
 
   const pct = ((step - 1) / 5) * 100;
 
+  const StepIndicator = () =>
+    step <= 5 ? (
+      <div>
+        <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
+          <span className="font-semibold text-gray-700">
+            Step {step} of 5 — {STEPS[step - 1]}
+          </span>
+          <span>{Math.round(pct)}%</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="mt-4 flex items-center">
+          {STEPS.map((label, i) => (
+            <div
+              key={i}
+              className={cn("flex items-center", i < STEPS.length - 1 && "flex-1")}
+            >
+              <div
+                title={label}
+                className={cn(
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 transition-colors",
+                  step > i + 1 || step === i + 1
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : "border-gray-200 bg-white text-gray-400",
+                )}
+              >
+                {step > i + 1 ? <Check className="h-3.5 w-3.5" /> : i + 1}
+              </div>
+              {i < STEPS.length - 1 && (
+                <div
+                  className={cn(
+                    "h-0.5 flex-1 mx-1 transition-colors",
+                    step > i + 1 ? "bg-emerald-500" : "bg-gray-200",
+                  )}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : null;
+
+  const DoneScreen = () => (
+    <div className="flex flex-col items-center py-8 text-center gap-2">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
+        <Check className="h-8 w-8 text-primary-600" />
+      </div>
+      <h2 className="text-2xl font-bold text-gray-900">You're all set! 🎉</h2>
+      <p className="mt-2 max-w-sm text-sm text-gray-500">
+        Your personalised fitness profile is ready. Head to your dashboard to
+        start tracking.
+      </p>
+      <Button onClick={() => (onDone ? onDone() : navigate("/dashboard"))}>
+        {onDone ? "Done" : "Go to Dashboard"}
+      </Button>
+    </div>
+  );
+
+  const NavButtons = () =>
+    step <= 5 ? (
+      <div className="flex justify-between">
+        <div>
+          {step > 1 && (
+            <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)}>
+              ← Previous
+            </Button>
+          )}
+        </div>
+        <Button type="button" onClick={next} disabled={loading}>
+          {loading ? "Saving…" : step === 5 ? "Finish Setup" : "Continue →"}
+        </Button>
+      </div>
+    ) : null;
+
+  if (inline) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+            Complete Your Profile
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Set up your fitness profile to unlock personalised metrics and recommendations.
+          </p>
+        </div>
+        <StepIndicator />
+        <Form {...form}>
+          <Card>
+            <CardContent className="pt-6 space-y-5">
+              {step === 1 && <Step1Personal />}
+              {step === 2 && <Step2Goals />}
+              {step === 3 && <Step3Diet />}
+              {step === 4 && <Step4Habits />}
+              {step === 5 && <Step5Health />}
+              {step === 6 && <DoneScreen />}
+            </CardContent>
+            {step <= 5 && (
+              <CardFooter className="w-full">
+                <div className="w-full">
+                  <NavButtons />
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+        </Form>
+      </div>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          {/* Step indicator */}
-          {step <= 5 && (
-            <div>
-              <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
-                <span className="font-semibold text-gray-700">
-                  Step {step} of 5 — {STEPS[step - 1]}
-                </span>
-                <span>{Math.round(pct)}%</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all duration-300"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <div className="mt-4 flex items-center">
-                {STEPS.map((label, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex items-center",
-                      i < STEPS.length - 1 && "flex-1",
-                    )}
-                  >
-                    <div
-                      title={label}
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 transition-colors",
-                        step > i + 1 || step === i + 1
-                          ? "border-emerald-600 bg-emerald-600 text-white"
-                          : "border-gray-200 bg-white text-gray-400",
-                      )}
-                    >
-                      {step > i + 1 ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                    </div>
-                    {i < STEPS.length - 1 && (
-                      <div
-                        className={cn(
-                          "h-0.5 flex-1 mx-1 transition-colors",
-                          step > i + 1 ? "bg-emerald-500" : "bg-gray-200",
-                        )}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <StepIndicator />
         </DialogHeader>
-
         <Form {...form}>
           <DialogBody>
             <div className="space-y-5">
@@ -282,51 +350,12 @@ export default function ProfileSetup({
               {step === 3 && <Step3Diet />}
               {step === 4 && <Step4Habits />}
               {step === 5 && <Step5Health />}
-
-              {/* Done screen */}
-              {step === 6 && (
-                <div className="flex flex-col items-center py-8 text-center gap-2">
-                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
-                    <Check className="h-8 w-8 text-primary-600" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    You're all set! 🎉
-                  </h2>
-                  <p className="mt-2 max-w-sm text-sm text-gray-500">
-                    Your personalised fitness profile is ready. Head to your
-                    dashboard to start tracking.
-                  </p>
-                  <Button
-                    onClick={() => (onDone ? onDone() : navigate("/dashboard"))}
-                  >
-                    {onDone ? "Done" : "Go to Dashboard"}
-                  </Button>
-                </div>
-              )}
+              {step === 6 && <DoneScreen />}
             </div>
           </DialogBody>
-
-          {/* Navigation */}
           {step <= 5 && (
             <DialogFooter className="justify-between!">
-              <div>
-                {step > 1 && step <= 5 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setStep((s) => s - 1)}
-                  >
-                    ← Previous
-                  </Button>
-                )}
-              </div>
-              <Button type="button" onClick={next} disabled={loading}>
-                {loading
-                  ? "Saving…"
-                  : step === 5
-                    ? "Finish Setup"
-                    : "Continue →"}
-              </Button>
+              <NavButtons />
             </DialogFooter>
           )}
         </Form>

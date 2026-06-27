@@ -8,6 +8,7 @@ import { useApi } from "./useApi";
 import type { QueryArgs } from "@/interfaces/iUseApi";
 import type {
   AdminStats,
+  AdminStatsTrends,
   User,
   Exercise,
   Category,
@@ -25,6 +26,7 @@ import type {
 
 interface UseAdminReturn {
   GetStats: (args?: QueryArgs) => UseQueryResult<AdminStats>;
+  GetStatsTrends: (args?: QueryArgs) => UseQueryResult<AdminStatsTrends>;
   GetUsers: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<User>>;
   GetUserDetail: (args?: QueryArgs) => UseQueryResult<User>;
   CreateUser: () => UseMutationResult<User, Error, CreateUserPayload>;
@@ -105,6 +107,11 @@ const useAdmin = (): UseAdminReturn => {
   const { api, get: GetStats } = useApi({
     endpoint: endpoint.adminStats,
     queryKey: "adminStats",
+  });
+
+  const { get: GetStatsTrends } = useApi({
+    endpoint: endpoint.adminStatsTrends,
+    queryKey: "adminStatsTrends",
   });
 
   const {
@@ -241,6 +248,7 @@ const useAdmin = (): UseAdminReturn => {
 
   return {
     GetStats,
+    GetStatsTrends,
     GetUsers,
     GetUserDetail,
     CreateUser,

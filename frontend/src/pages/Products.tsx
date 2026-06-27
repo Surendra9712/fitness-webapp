@@ -68,9 +68,11 @@ export default function Products() {
   });
   const products = data?.items ?? [];
   const total = data?.total ?? 0;
-  const { data: categoriesData } = GetCategories({
+  const { data: categoriesData = [] } = GetCategories({
     queryParams: { page_size: 100 },
   });
+
+  console.log({ data, categoriesData });
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -88,7 +90,7 @@ export default function Products() {
 
   const tabs = [
     { key: "all", label: "All Equipment" },
-    ...categoriesData.map((c) => ({ key: c.slug, label: c.name })),
+    ...categoriesData?.map((c) => ({ key: c.slug, label: c.name })),
   ];
 
   return (
