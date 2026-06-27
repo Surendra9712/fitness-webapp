@@ -36,7 +36,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { UserModal } from "./UserModal";
 import { toast } from "sonner";
 import type { User, Role } from "@/types";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_LABELS } from "@/lib/constant";
 
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
@@ -76,13 +76,15 @@ export default function UserManagement({ role }: Props) {
   }>({ open: false, user: null });
 
   const queryClient = useQueryClient();
-  const { page, goToPage, setPageSize, pageSize } = usePagination();
+  const { page, goToPage, setPageSize, pageSize } = usePagination({
+    initialPageSize: 20,
+  });
 
   const { GetUsers, UpdateUser, DeleteUser } = useAdmin();
   const { data, isPlaceholderData } = GetUsers({
     queryParams: {
       page,
-      page_size: 20,
+      page_size: pageSize,
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
       ...(role ? { role } : {}),
     },

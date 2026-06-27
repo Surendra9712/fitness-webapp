@@ -17,10 +17,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth, PendingApprovalError } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { ApiError } from "@/api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Mail, User, Lock, EyeOff, Eye, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Mail,
+  User,
+  Lock,
+  EyeOff,
+  Eye,
+  Loader2,
+} from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
@@ -73,7 +81,10 @@ export const RegisterForm = () => {
         <CheckCircle2 className="h-12 w-12 text-emerald-500" />
         <p className="font-semibold text-gray-800">Account Created!</p>
         <p className="text-sm text-muted-foreground">{pendingMessage}</p>
-        <Link to="/login" className="text-sm font-medium text-primary hover:underline">
+        <Link
+          to="/login"
+          className="text-sm font-medium text-primary hover:underline"
+        >
           Back to Login
         </Link>
       </div>

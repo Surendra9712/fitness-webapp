@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { ApiError } from "@/api/client";
 import { Loader2, Mail, Lock, EyeOff, Eye } from "lucide-react";
 import { useState } from "react";

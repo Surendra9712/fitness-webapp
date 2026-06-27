@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/CheckoutDialog";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { toast } from "sonner";
 
 export default function Navbar() {

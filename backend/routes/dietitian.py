@@ -1,7 +1,8 @@
+import json
 from flask import Blueprint, request, jsonify
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 from pydantic import ConfigDict
-from typing import Optional
+from typing import Optional, List
 from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
@@ -20,12 +21,39 @@ class AssignmentNoteSchema(BaseModel):
 class UpdateTrainerProfileSchema(BaseModel):
     model_config = ConfigDict(extra='ignore')
     name:              Optional[str] = None
+    full_name:         Optional[str] = None
+    date_of_birth:     Optional[str] = None
     bio:               Optional[str] = None
     specialization:    Optional[str] = None
+    experience_years:  Optional[int] = None
     profile_image_url: Optional[str] = None
     phone_number:      Optional[str] = None
     city:              Optional[str] = None
     country:           Optional[str] = None
+    available_time:    Optional[List[dict]] = None  # [{"day":"Monday","from":"08:00","to":"17:00"}]
+
+
+class CertificationSchema(BaseModel):
+    name:         str
+    issued_by:    Optional[str] = None
+    issued_date:  Optional[str] = None
+    file_url:     Optional[str] = None
+    file_type:    str = 'url'
+
+    @field_validator('name')
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError('Certification name is required')
+        return v
+
+    @field_validator('file_type')
+    @classmethod
+    def valid_file_type(cls, v: str) -> str:
+        if v not in ('image', 'pdf', 'url'):
+            raise ValueError('file_type must be image, pdf, or url')
+        return v
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -39,19 +67,48 @@ def get_profile():
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.status, "
             "COALESCE(u.profile_image_url, p.profile_image_url) AS profile_image_url, "
-            "p.bio, p.specialization, p.phone_number, p.city, p.country "
+            "p.full_name, p.date_of_birth, p.bio, p.specialization, "
+            "p.experience_years, p.phone_number, p.city, p.country, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s",
             (request.user_id,),
         )
-        return jsonify(cursor.fetchone())
+        row = cursor.fetchone()
+        if row:
+            # Parse available_time JSON string returned by MySQL
+            if isinstance(row.get('available_time'), str):
+                try:
+                    row['available_time'] = json.loads(row['available_time'])
+                except (ValueError, TypeError):
+                    row['available_time'] = []
+            elif row.get('available_time') is None:
+                row['available_time'] = []
+            # Fetch certifications
+            if row.get('date_of_birth'):
+                import datetime
+                dob = row['date_of_birth']
+                if isinstance(dob, (datetime.date, datetime.datetime)):
+                    row['date_of_birth'] = dob.isoformat()
+            cursor.execute(
+                "SELECT id, name, issued_by, issued_date, file_url, file_type, created_at "
+                "FROM trainer_certifications WHERE user_id = %s ORDER BY created_at",
+                (request.user_id,),
+            )
+            certs = cursor.fetchall()
+            for c in certs:
+                if hasattr(c.get('issued_date'), 'isoformat'):
+                    c['issued_date'] = c['issued_date'].isoformat()
+                if hasattr(c.get('created_at'), 'isoformat'):
+                    c['created_at'] = c['created_at'].isoformat()
+            row['certifications'] = certs
+        return jsonify(row)
     finally:
         cursor.close()
         conn.close()
 
 
 @dietitian_bp.route('/profile', methods=['PUT'])
-@role_required('dietitian', 'trainer')
+@role_required('dietitian')
 def update_profile():
     try:
         body = UpdateTrainerProfileSchema.model_validate(request.get_json() or {})
@@ -63,7 +120,11 @@ def update_profile():
         return jsonify({'error': 'No valid fields'}), 400
 
     user_fields    = {k: v for k, v in updates.items() if k in ('name', 'profile_image_url')}
-    profile_fields = {k: v for k, v in updates.items() if k != 'name'}
+    profile_fields = {k: v for k, v in updates.items() if k not in ('name',)}
+
+    # Serialize available_time list → JSON string for storage
+    if 'available_time' in profile_fields:
+        profile_fields['available_time'] = json.dumps(profile_fields['available_time'])
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -82,6 +143,73 @@ def update_profile():
             )
         conn.commit()
         return jsonify({'message': 'Profile updated'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@dietitian_bp.route('/certifications', methods=['POST'])
+@role_required('dietitian')
+def add_certification():
+    try:
+        body = CertificationSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "INSERT INTO trainer_certifications (user_id, name, issued_by, issued_date, file_url, file_type) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (
+                request.user_id,
+                body.name,
+                body.issued_by or None,
+                body.issued_date or None,
+                body.file_url or None,
+                body.file_type,
+            ),
+        )
+        cert_id = cursor.lastrowid
+        conn.commit()
+        cursor.execute(
+            "SELECT id, name, issued_by, issued_date, file_url, file_type, created_at "
+            "FROM trainer_certifications WHERE id = %s",
+            (cert_id,),
+        )
+        cert = cursor.fetchone()
+        if cert:
+            for field in ('issued_date', 'created_at'):
+                if hasattr(cert.get(field), 'isoformat'):
+                    cert[field] = cert[field].isoformat()
+        return jsonify(cert), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@dietitian_bp.route('/certifications/<int:cert_id>', methods=['DELETE'])
+@role_required('dietitian')
+def delete_certification(cert_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id FROM trainer_certifications WHERE id = %s AND user_id = %s",
+            (cert_id, request.user_id),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'Certification not found'}), 404
+        cursor.execute("DELETE FROM trainer_certifications WHERE id = %s", (cert_id,))
+        conn.commit()
+        return jsonify({'message': 'Deleted'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

@@ -1,4 +1,9 @@
-import { useQuery, useMutation, UseQueryResult, UseMutationResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  UseQueryResult,
+  UseMutationResult,
+} from "@tanstack/react-query";
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
 import type { QueryArgs } from "@/interfaces/iUseApi";
@@ -19,21 +24,37 @@ import type {
 } from "@/types";
 
 interface UseUserReturn {
-  GetTrainers: (args?: QueryArgs) => UseQueryResult<TrainerInfo[]>;
+  GetTrainers: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<TrainerInfo>>;
   GetTrainer: (id?: string | number) => UseQueryResult<TrainerInfo>;
-  GetTrainerAssignment: (args?: QueryArgs) => UseQueryResult<TrainerAssignment | null>;
+  GetTrainerAssignment: (
+    args?: QueryArgs,
+  ) => UseQueryResult<TrainerAssignment | null>;
   RequestTrainer: () => UseMutationResult<void, Error, RequestTrainerPayload>;
   CancelTrainerAssignment: () => UseMutationResult<void, Error, void>;
   GetTrainerReviews: (trainerId?: number) => UseQueryResult<ReviewStats>;
-  SubmitTrainerReview: (trainerId?: number) => UseMutationResult<void, Error, ReviewPayload>;
-  DeleteTrainerReview: (trainerId?: number) => UseMutationResult<void, Error, void>;
+  SubmitTrainerReview: (
+    trainerId?: number,
+  ) => UseMutationResult<void, Error, ReviewPayload>;
+  DeleteTrainerReview: (
+    trainerId?: number,
+  ) => UseMutationResult<void, Error, void>;
   GetOrders: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Order>>;
   CreateOrder: () => UseMutationResult<Order, Error, CreateOrderPayload>;
   CancelOrder: () => UseMutationResult<void, Error, number>;
-  GetProductRequests: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<ProductRequest>>;
-  CreateProductRequest: () => UseMutationResult<ProductRequest, Error, CreateProductRequestPayload>;
+  GetProductRequests: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<ProductRequest>>;
+  CreateProductRequest: () => UseMutationResult<
+    ProductRequest,
+    Error,
+    CreateProductRequestPayload
+  >;
   GetExercises: (args?: QueryArgs) => UseQueryResult<Exercise[]>;
-  GetExerciseLogs: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<ExerciseLog>>;
+  GetExerciseLogs: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<ExerciseLog>>;
   LogExercise: () => UseMutationResult<ExerciseLog, Error, LogExercisePayload>;
   DeleteExerciseLog: () => UseMutationResult<void, Error, number>;
   GetAuthProfile: (args?: QueryArgs) => UseQueryResult<import("@/types").User>;

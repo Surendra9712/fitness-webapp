@@ -664,6 +664,7 @@ def list_trainers():
 @user_bp.route('/trainers/<int:trainer_id>', methods=['GET'])
 @role_required('trainee')
 def get_trainer(trainer_id):
+    import json as _json
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -676,6 +677,8 @@ def get_trainer(trainer_id):
                 u.profile_image_url,
                 up.bio,
                 up.specialization,
+                up.experience_years,
+                up.available_time,
                 (
                     SELECT COUNT(*)
                     FROM trainer_assignments ta
@@ -705,18 +708,28 @@ def get_trainer(trainer_id):
             """,
             (trainer_id,),
         )
-        # cursor.execute(
-        #     "SELECT u.id, u.name, u.email, u.profile_image_url, "
-        #     "(SELECT COUNT(*) FROM trainer_assignments ta "
-        #     " WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count, "
-        #     "COALESCE((SELECT ROUND(AVG(r.rating), 1) FROM trainer_reviews r WHERE r.trainer_id = u.id), 0) AS avg_rating, "
-        #     "(SELECT COUNT(*) FROM trainer_reviews r WHERE r.trainer_id = u.id) AS review_count "
-        #     "FROM users u WHERE u.id = %s AND u.role = 'dietitian' AND u.status = 'active' AND u.deleted_at IS NULL",
-        #     (trainer_id,),
-        # )
         trainer = cursor.fetchone()
         if not trainer:
             return jsonify({'error': 'Trainer not found'}), 404
+        # Parse available_time JSON
+        if isinstance(trainer.get('available_time'), str):
+            try:
+                trainer['available_time'] = _json.loads(trainer['available_time'])
+            except (ValueError, TypeError):
+                trainer['available_time'] = []
+        elif trainer.get('available_time') is None:
+            trainer['available_time'] = []
+        # Fetch certifications
+        cursor.execute(
+            "SELECT id, name, issued_by, issued_date, file_url, file_type "
+            "FROM trainer_certifications WHERE user_id = %s ORDER BY created_at",
+            (trainer_id,),
+        )
+        certs = cursor.fetchall()
+        for c in certs:
+            if hasattr(c.get('issued_date'), 'isoformat'):
+                c['issued_date'] = c['issued_date'].isoformat()
+        trainer['certifications'] = certs
         return jsonify(trainer)
     finally:
         cursor.close()

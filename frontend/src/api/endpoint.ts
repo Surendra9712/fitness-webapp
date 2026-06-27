@@ -25,7 +25,9 @@ export const endpoint = {
   dietitianUsers: "dietitian/users",
   dietitianStats: "dietitian/stats",
   dietitianAssignmentRequests: "dietitian/assignment-requests",
+  dietitianCertifications: "dietitian/certifications",
 
   uploadImage: "upload/image",
+  uploadCert: "upload/cert",
   authProfile: "auth/me",
 };

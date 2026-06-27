@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Leaf, Flame, TrendingUp, ArrowRight, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { Button } from "@/components/ui/button";
 
 export default function HeroSection() {

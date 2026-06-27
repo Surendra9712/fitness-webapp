@@ -7,6 +7,7 @@ export interface PaginatedResponse<T> {
 }
 
 export type Role = "admin" | "dietitian" | "trainee";
+export type Gender = "male" | "female" | "other";
 export type Goal = "lose_weight" | "maintain" | "gain_muscle";
 export type ExerciseCategory =
   | "cardio"
@@ -26,6 +27,23 @@ export type AssignmentStatus =
   | "approved"
   | "rejected";
 
+export interface TrainerCertification {
+  id: number;
+  user_id?: number;
+  name: string;
+  issued_by?: string;
+  issued_date?: string;
+  file_url?: string;
+  file_type: "image" | "pdf" | "url";
+  created_at?: string;
+}
+
+export interface AvailableSlot {
+  day: string;
+  from: string;
+  to: string;
+}
+
 export interface TrainerInfo {
   id: number;
   name: string;
@@ -36,6 +54,10 @@ export interface TrainerInfo {
   profile_image_url: string;
   bio?: string;
   specialization?: string;
+  experience_years?: number;
+  date_of_birth?: string;
+  available_time?: AvailableSlot[];
+  certifications?: TrainerCertification[];
 }
 
 export interface TrainerAssignment {
@@ -206,7 +228,7 @@ export interface AdminStats {
 export interface AdminStatsTrends {
   user_growth: { date: string; users: number }[];
   order_trend: { date: string; orders: number; revenue: number }[];
-  group_by: 'day' | 'month';
+  group_by: "day" | "month";
   date_from: string;
   date_to: string;
 }
@@ -215,10 +237,19 @@ export interface AdminStatsTrends {
 export interface DietitianProfile {
   id: number;
   name: string;
+  full_name?: string;
   email: string;
   bio?: string;
   specialization?: string;
+  experience_years?: number;
+  date_of_birth?: string;
+  phone_number?: string;
+  city?: string;
+  country?: string;
+  status?: string;
   profile_image_url?: string;
+  available_time?: AvailableSlot[];
+  certifications?: TrainerCertification[];
 }
 
 export interface DietitianStats {

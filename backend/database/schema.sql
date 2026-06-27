@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     profile_image_url    VARCHAR(500),
     bio                  TEXT,
     specialization       VARCHAR(200),
+    available_time       JSON DEFAULT NULL,
+    experience_years     TINYINT UNSIGNED DEFAULT NULL,
 
     updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -76,9 +78,23 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 -- Run once on existing databases:
 -- ALTER TABLE user_profiles
---   ADD COLUMN IF NOT EXISTS profile_image_url VARCHAR(500),
---   ADD COLUMN IF NOT EXISTS bio               TEXT,
---   ADD COLUMN IF NOT EXISTS specialization    VARCHAR(200);
+--   ADD COLUMN IF NOT EXISTS profile_image_url  VARCHAR(500),
+--   ADD COLUMN IF NOT EXISTS bio                TEXT,
+--   ADD COLUMN IF NOT EXISTS specialization     VARCHAR(200),
+--   ADD COLUMN IF NOT EXISTS available_time     JSON DEFAULT NULL,
+--   ADD COLUMN IF NOT EXISTS experience_years   TINYINT UNSIGNED DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS trainer_certifications (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL,
+    name         VARCHAR(200) NOT NULL,
+    issued_by    VARCHAR(200),
+    issued_date  DATE,
+    file_url     VARCHAR(500),
+    file_type    ENUM('image','pdf','url') NOT NULL DEFAULT 'url',
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS exercises (
     id                       INT AUTO_INCREMENT PRIMARY KEY,

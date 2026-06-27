@@ -257,7 +257,8 @@ def get_user(uid):
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
             "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
-            "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country "
+            "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country, "
+            "p.experience_years, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s AND u.deleted_at IS NULL",
             (uid,)
@@ -265,6 +266,19 @@ def get_user(uid):
         user = cursor.fetchone()
         if not user:
             return jsonify({'error': 'User not found'}), 404
+        if user.get('available_time') and isinstance(user['available_time'], str):
+            import json as _json
+            try:
+                user['available_time'] = _json.loads(user['available_time'])
+            except Exception:
+                user['available_time'] = []
+        if user.get('role') == 'dietitian':
+            cursor.execute(
+                "SELECT id, name, file_url, file_type, created_at "
+                "FROM trainer_certifications WHERE user_id = %s ORDER BY created_at",
+                (uid,)
+            )
+            user['certifications'] = cursor.fetchall()
         return jsonify(user)
     finally:
         cursor.close()

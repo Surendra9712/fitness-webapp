@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -37,8 +37,16 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
-    { to: "/admin/trainees", label: "Trainees", icon: <UserRound className="h-4 w-4" /> },
-    { to: "/admin/trainers", label: "Trainers", icon: <UserCheck className="h-4 w-4" /> },
+    {
+      to: "/admin/trainees",
+      label: "Trainees",
+      icon: <UserRound className="h-4 w-4" />,
+    },
+    {
+      to: "/admin/trainers",
+      label: "Trainers",
+      icon: <UserCheck className="h-4 w-4" />,
+    },
     {
       to: "/admin/products",
       label: "Products",

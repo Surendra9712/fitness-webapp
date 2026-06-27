@@ -191,7 +191,8 @@ def me():
             "p.snacks_between_meals, p.cooking_frequency, p.eating_out_frequency, "
             "p.track_hydration, p.avg_sleep_hours, p.emotional_eater, p.stress_level, "
             "p.health_conditions, p.notes, "
-            "p.age, p.weight_kg, p.goal "
+            "p.age, p.weight_kg, p.goal, "
+            "p.bio, p.specialization, p.experience_years, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s",
             (request.user_id,),
