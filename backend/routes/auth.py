@@ -76,16 +76,17 @@ def register():
             return jsonify({'errors': {'email': 'Email already registered'}}), 422
 
         cursor.execute(
-            "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s, %s, %s, %s, 'pending')",
+            "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s, %s, %s, %s, 'active')",
             (name, email, password_hash, role),
         )
         user_id = cursor.lastrowid
         cursor.execute("INSERT INTO user_profiles (user_id) VALUES (%s)", (user_id,))
         conn.commit()
 
+        token = generate_token(user_id, role)
         return jsonify({
-            'pending': True,
-            'message': 'Registration successful. Your account is awaiting admin approval.',
+            'token': token,
+            'user': {'id': user_id, 'name': name, 'email': email, 'role': role},
         }), 201
     except Exception as e:
         conn.rollback()
@@ -116,8 +117,6 @@ def login():
         if not user or not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
             return jsonify({'error': 'Invalid email or password'}), 401
         if user['status'] != 'active':
-            if user['status'] == 'pending':
-                return jsonify({'error': 'Your account is pending admin approval'}), 403
             return jsonify({'error': 'Account is disabled'}), 403
 
         token = generate_token(user['id'], user['role'])

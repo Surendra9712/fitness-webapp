@@ -94,7 +94,7 @@ export default function CheckoutDialog({
   items: initialItems,
   onSuccess,
 }: Props) {
-  const { setQty, remove } = useCartStore();
+  const { setQty, remove, clear } = useCartStore();
   const [cartItems, setCartItems] = useState<CheckoutItem[]>([]);
   const [shippingAddress, setShippingAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
@@ -111,7 +111,11 @@ export default function CheckoutDialog({
   function updateQty(productId: number, delta: number) {
     setCartItems((prev) => {
       const next = prev
-        .map((i) => i.product_id === productId ? { ...i, quantity: i.quantity + delta } : i)
+        .map((i) =>
+          i.product_id === productId
+            ? { ...i, quantity: i.quantity + delta }
+            : i,
+        )
         .filter((i) => i.quantity > 0);
       const item = next.find((i) => i.product_id === productId);
       if (item) setQty(productId, item.quantity);
@@ -144,6 +148,7 @@ export default function CheckoutDialog({
         shipping_address: shippingAddress,
         payment_method: paymentMethod,
       });
+      clear();
 
       if (paymentMethod === "cod") {
         toast.success("Order placed successfully!");
@@ -210,7 +215,9 @@ export default function CheckoutDialog({
                     <QuantityStepper
                       size="sm"
                       value={item.quantity}
-                      onChange={(v) => updateQty(item.product_id, v - item.quantity)}
+                      onChange={(v) =>
+                        updateQty(item.product_id, v - item.quantity)
+                      }
                       min={1}
                       className="shrink-0"
                     />

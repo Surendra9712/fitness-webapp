@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash     VARCHAR(255)  NOT NULL,
     role              ENUM('admin','dietitian','trainee') NOT NULL DEFAULT 'trainee',
     status            ENUM('inactive','active','pending') NOT NULL DEFAULT 'active',
+    is_verified       TINYINT(1) NOT NULL DEFAULT 0,
     profile_image_url VARCHAR(500),
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

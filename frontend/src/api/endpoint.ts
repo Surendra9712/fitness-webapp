@@ -4,6 +4,7 @@ export const endpoint = {
   adminStats: "admin/stats",
   adminStatsTrends: "admin/stats/trends",
   adminUsers: "admin/users",
+  adminVerifyTrainer: "admin/users",
   adminExercises: "admin/exercises",
   adminProducts: "admin/products",
   adminOrders: "admin/orders",

@@ -641,7 +641,7 @@ def list_trainers():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        base_where = "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.deleted_at IS NULL"
+        base_where = "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.is_verified = 1 AND u.deleted_at IS NULL"
         params = []
         if search:
             base_where += " AND u.name LIKE %s"
@@ -704,6 +704,7 @@ def get_trainer(trainer_id):
             WHERE u.id = %s
             AND u.role = 'dietitian'
             AND u.status = 'active'
+            AND u.is_verified = 1
             AND u.deleted_at IS NULL
             """,
             (trainer_id,),
@@ -777,7 +778,7 @@ def request_trainer():
             return jsonify({'error': f"You already have an active assignment (status: {existing['status']})"}), 409
 
         cursor.execute(
-            "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND status = 'active' AND deleted_at IS NULL",
+            "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND status = 'active' AND is_verified = 1 AND deleted_at IS NULL",
             (body.trainer_id,),
         )
         if not cursor.fetchone():

@@ -20,6 +20,7 @@ import {
   X,
   UserCheck,
   UserRound,
+  ShieldCheck,
 } from "lucide-react";
 import type { Role } from "@/types";
 
@@ -76,6 +77,11 @@ const navLinks: Record<Role, NavItem[]> = {
       to: "/admin/trainer-assignments",
       label: "Trainer Assign.",
       icon: <UserCheck className="h-4 w-4" />,
+    },
+    {
+      to: "/admin/trainer-verification",
+      label: "Trainer Request",
+      icon: <ShieldCheck className="h-4 w-4" />,
     },
   ],
   dietitian: [

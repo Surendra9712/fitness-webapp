@@ -101,6 +101,7 @@ interface UseAdminReturn {
     Error,
     AssignmentActionPayload
   >;
+  VerifyTrainer: () => UseMutationResult<{ is_verified: boolean }, Error, number>;
 }
 
 const useAdmin = (): UseAdminReturn => {
@@ -246,6 +247,14 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
+  const VerifyTrainer = () =>
+    useMutation({
+      mutationFn: async (uid: number) => {
+        const { data } = await api.put(`${endpoint.adminUsers}/${uid}/verify`);
+        return data as { is_verified: boolean };
+      },
+    });
+
   return {
     GetStats,
     GetStatsTrends,
@@ -275,6 +284,7 @@ const useAdmin = (): UseAdminReturn => {
     GetProductRequests,
     ApproveProductRequest,
     RejectProductRequest,
+    VerifyTrainer,
   } as UseAdminReturn;
 };
 

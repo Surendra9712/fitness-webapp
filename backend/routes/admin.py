@@ -214,8 +214,9 @@ def delete_category(cid):
 def list_users():
     page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     search = request.args.get('search', '').strip()
-    status_filter = request.args.get('status', '').strip()
-    role_filter = request.args.get('role', '').strip()
+    status_filter    = request.args.get('status', '').strip()
+    role_filter      = request.args.get('role', '').strip()
+    verified_filter  = request.args.get('is_verified', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -231,13 +232,17 @@ def list_users():
         if role_filter:
             base_where += " AND u.role = %s"
             params_count = params_count + [role_filter]
+        if verified_filter in ('0', '1'):
+            base_where += " AND u.is_verified = %s"
+            params_count = params_count + [int(verified_filter)]
         cursor.execute(
             f"SELECT COUNT(*) AS total FROM users u {base_where}", params_count
         )
         total = cursor.fetchone()['total']
         cursor.execute(
-            f"SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
-            f"p.goal, p.weight_kg, p.height_cm "
+            f"SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
+            f"p.specialization, p.bio, "
+            f"(SELECT COUNT(*) FROM trainer_certifications tc WHERE tc.user_id = u.id) AS cert_count "
             f"FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             f"{base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
             params_count + [page_size, offset]
@@ -255,7 +260,7 @@ def get_user(uid):
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
+            "SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
             "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
             "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country, "
             "p.experience_years, p.available_time "
@@ -353,6 +358,30 @@ def delete_user(uid):
         cursor.execute("UPDATE users SET deleted_at = NOW() WHERE id = %s", (uid,))
         conn.commit()
         return jsonify({'message': 'User deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/users/<int:uid>/verify', methods=['PUT'])
+@role_required('admin')
+def verify_trainer(uid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT role, is_verified FROM users WHERE id = %s AND deleted_at IS NULL", (uid,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        if user['role'] != 'dietitian':
+            return jsonify({'error': 'Only trainers can be verified'}), 400
+        new_val = 0 if user['is_verified'] else 1
+        cursor.execute("UPDATE users SET is_verified = %s WHERE id = %s", (new_val, uid))
+        conn.commit()
+        return jsonify({'is_verified': bool(new_val)})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -907,7 +936,7 @@ def stats():
         users_count = cursor.fetchone()['total']
         cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND deleted_at IS NULL")
         dietitians_count = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE status='pending' AND deleted_at IS NULL")
+        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND is_verified=0 AND deleted_at IS NULL")
         pending_approvals = cursor.fetchone()['total']
         cursor.execute("SELECT COUNT(*) AS total FROM products WHERE status='active' AND deleted_at IS NULL")
         products_count = cursor.fetchone()['total']

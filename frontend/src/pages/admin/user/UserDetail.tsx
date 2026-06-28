@@ -44,10 +44,11 @@ export default function UserDetail() {
   const [toggleConfirm, setToggleConfirm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  const { GetUserDetail, UpdateUser, DeleteUser } = useAdmin();
-  const { data: user, isLoading } = GetUserDetail({ id: Number(id) });
+  const { GetUserDetail, UpdateUser, DeleteUser, VerifyTrainer } = useAdmin();
+  const { data: user, isLoading, refetch } = GetUserDetail({ id: Number(id) });
   const toggleActive = UpdateUser();
   const deleteUser = DeleteUser();
+  const verifyTrainer = VerifyTrainer();
 
   async function confirmToggle() {
     if (!user) return;
@@ -147,13 +148,12 @@ export default function UserDetail() {
             </div>
             <div className="flex gap-2 flex-wrap justify-center">
               <Badge variant={roleBadge[u.role]}>{ROLE_LABELS[u.role]}</Badge>
-              {u.status === "pending" ? (
-                <Badge variant="warning">Pending</Badge>
-              ) : (
-                <Badge
-                  variant={u.status === "active" ? "success" : "secondary"}
-                >
-                  {u.status === "active" ? "Active" : "Disabled"}
+              <Badge variant={u.status === "active" ? "success" : "secondary"}>
+                {u.status === "active" ? "Active" : "Disabled"}
+              </Badge>
+              {u.role === "dietitian" && (
+                <Badge variant={u.is_verified ? "success" : "warning"}>
+                  {u.is_verified ? "Verified" : "Unverified"}
                 </Badge>
               )}
             </div>
@@ -191,6 +191,26 @@ export default function UserDetail() {
                     ? "Approve"
                     : "Enable"}
               </Button>
+              {u.role === "dietitian" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`w-full ${u.is_verified ? "text-orange-600 hover:text-orange-700" : "text-emerald-600 hover:text-emerald-700"}`}
+                  disabled={verifyTrainer.isPending}
+                  onClick={async () => {
+                    try {
+                      await verifyTrainer.mutateAsync(u.id);
+                      toast.success(u.is_verified ? "Trainer unverified" : "Trainer verified");
+                      refetch();
+                    } catch (err) {
+                      toast.error((err as Error).message);
+                    }
+                  }}
+                >
+                  <Award className="h-4 w-4 mr-2" />
+                  {u.is_verified ? "Unverify Trainer" : "Verify Trainer"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

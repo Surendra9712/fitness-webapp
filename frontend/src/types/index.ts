@@ -93,6 +93,7 @@ export interface User {
   email: string;
   role: Role;
   status: UserStatus;
+  is_verified?: number;
   created_at?: string;
   age?: number;
   weight_kg?: number;
@@ -299,6 +300,7 @@ export interface ApproveProductRequestPayload {
 export interface CreateOrderPayload {
   items: { product_id: number; quantity: number }[];
   shipping_address: string;
+  payment_method: string;
 }
 
 export interface CreateProductRequestPayload {

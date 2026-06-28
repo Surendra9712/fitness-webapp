@@ -16,19 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth, PendingApprovalError } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { getDashboardPath } from "@/lib/constant";
 import { ApiError } from "@/api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  CheckCircle2,
-  Mail,
-  User,
-  Lock,
-  EyeOff,
-  Eye,
-  Loader2,
-} from "lucide-react";
+import { Mail, User, Lock, EyeOff, Eye, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
@@ -46,7 +38,6 @@ export const RegisterForm = () => {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState("");
-  const [pendingMessage, setPendingMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<RegisterValues>({
@@ -59,13 +50,9 @@ export const RegisterForm = () => {
     setServerError("");
     try {
       await registerUser(data.name, data.email, data.password, data.role);
-      // If we get here, register returned a user — navigate to dashboard
-      // (AuthContext sets the user, so we read it from useAuth if needed)
-      navigate("/login");
+      navigate(getDashboardPath(data.role));
     } catch (err) {
-      if (err instanceof PendingApprovalError) {
-        setPendingMessage(err.message);
-      } else if (err instanceof ApiError && err.fieldErrors) {
+      if (err instanceof ApiError && err.fieldErrors) {
         Object.entries(err.fieldErrors).forEach(([field, message]) => {
           form.setError(field as keyof RegisterValues, { message });
         });
@@ -73,22 +60,6 @@ export const RegisterForm = () => {
         setServerError((err as Error).message);
       }
     }
-  }
-
-  if (pendingMessage) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-4 text-center">
-        <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-        <p className="font-semibold text-gray-800">Account Created!</p>
-        <p className="text-sm text-muted-foreground">{pendingMessage}</p>
-        <Link
-          to="/login"
-          className="text-sm font-medium text-primary hover:underline"
-        >
-          Back to Login
-        </Link>
-      </div>
-    );
   }
 
   return (

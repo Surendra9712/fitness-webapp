@@ -20,6 +20,7 @@ import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
 import CategoryManagement from "@/pages/admin/category/CategoryManagement";
 import TrainerAssignments from "@/pages/admin/TrainerAssignments";
+import TrainerVerification from "@/pages/admin/TrainerVerification";
 
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
 import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
@@ -31,6 +32,7 @@ import RequestProduct from "@/pages/user/RequestProduct";
 import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
 import MyTrainer from "@/pages/user/MyTrainer";
+import TrainerRequest from "@/pages/user/TrainerRequest";
 import TrainerDetail from "@/pages/user/TrainerDetail";
 import AuthLayout from "./pages/auth/AuthLayout";
 
@@ -179,6 +181,16 @@ export default function App() {
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
                   <TrainerAssignments />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/trainer-verification"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <TrainerVerification />
                 </Layout>
               </ProtectedRoute>
             }
