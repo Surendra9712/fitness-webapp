@@ -28,6 +28,9 @@ export const endpoint = {
   dietitianAssignmentRequests: "dietitian/assignment-requests",
   dietitianCertifications: "dietitian/certifications",
 
+  userSubscription: "user/subscription",
+  adminSubscriptions: "admin/subscriptions",
+
   uploadImage: "upload/image",
   uploadCert: "upload/cert",
   authProfile: "auth/me",

@@ -102,6 +102,9 @@ interface UseAdminReturn {
     AssignmentActionPayload
   >;
   VerifyTrainer: () => UseMutationResult<{ is_verified: boolean }, Error, number>;
+  GetSubscriptions: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<User>>;
+  ApproveSubscription: () => UseMutationResult<void, Error, number>;
+  RejectSubscription: () => UseMutationResult<void, Error, number>;
 }
 
 const useAdmin = (): UseAdminReturn => {
@@ -255,6 +258,25 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
+  const { get: GetSubscriptions } = useApi({
+    endpoint: endpoint.adminSubscriptions,
+    queryKey: "adminSubscriptions",
+  });
+
+  const ApproveSubscription = () =>
+    useMutation({
+      mutationFn: async (uid: number) => {
+        await api.put(`${endpoint.adminSubscriptions}/${uid}/approve`);
+      },
+    });
+
+  const RejectSubscription = () =>
+    useMutation({
+      mutationFn: async (uid: number) => {
+        await api.put(`${endpoint.adminSubscriptions}/${uid}/reject`);
+      },
+    });
+
   return {
     GetStats,
     GetStatsTrends,
@@ -285,6 +307,9 @@ const useAdmin = (): UseAdminReturn => {
     ApproveProductRequest,
     RejectProductRequest,
     VerifyTrainer,
+    GetSubscriptions,
+    ApproveSubscription,
+    RejectSubscription,
   } as UseAdminReturn;
 };
 

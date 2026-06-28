@@ -59,6 +59,12 @@ interface UseUserReturn {
   DeleteExerciseLog: () => UseMutationResult<void, Error, number>;
   GetAuthProfile: (args?: QueryArgs) => UseQueryResult<import("@/types").User>;
   UpdateAvatar: () => UseMutationResult<void, Error, string>;
+  GetSubscription: (args?: QueryArgs) => UseQueryResult<{ subscription_plan: import("@/types").SubscriptionPlan; subscription_status: import("@/types").SubscriptionStatus }>;
+  UpdateSubscription: () => UseMutationResult<
+    { subscription_plan?: import("@/types").SubscriptionPlan; subscription_status?: import("@/types").SubscriptionStatus; payment_method?: string; esewa_url?: string; esewa_params?: import("@/types").EsewaParams },
+    Error,
+    { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }
+  >;
 }
 
 const useUser = (): UseUserReturn => {
@@ -169,6 +175,19 @@ const useUser = (): UseUserReturn => {
       },
     });
 
+  const { get: GetSubscription } = useApi({
+    endpoint: endpoint.userSubscription,
+    queryKey: "userSubscription",
+  });
+
+  const UpdateSubscription = () =>
+    useMutation({
+      mutationFn: async ({ plan, method }: { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }) => {
+        const { data } = await api.put(endpoint.userSubscription, { plan, method });
+        return data;
+      },
+    });
+
   return {
     GetTrainers,
     GetTrainer,
@@ -189,6 +208,8 @@ const useUser = (): UseUserReturn => {
     DeleteExerciseLog,
     GetAuthProfile,
     UpdateAvatar,
+    GetSubscription,
+    UpdateSubscription,
   } as UseUserReturn;
 };
 

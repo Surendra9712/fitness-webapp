@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserCheck } from "lucide-react";
+import { UserCheck, Lock, Crown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import useUser from "@/hooks/useUser";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +18,7 @@ export default function MyTrainer() {
   const { data: assignment, isLoading } = GetTrainerAssignment();
   const cancelMutation = CancelTrainerAssignment();
 
+  const isPro = user?.subscription_plan === "pro" && user?.subscription_status === "active";
   const userId = (user as unknown as { id: number } | null)?.id ?? 0;
 
   async function cancelRequest() {
@@ -35,6 +36,28 @@ export default function MyTrainer() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-24 text-center max-w-md mx-auto">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <Lock className="h-8 w-8 text-primary" />
+        </div>
+        <h2 className="text-xl font-bold">Pro Feature</h2>
+        <p className="text-sm text-muted-foreground">
+          The Trainer feature is available exclusively on the Pro plan.
+          {user?.subscription_plan === "pro" && user?.subscription_status === "pending"
+            ? " Your upgrade request is pending admin approval."
+            : " Upgrade to connect with a certified trainer."}
+        </p>
+        <Button asChild className="mt-2 gap-2">
+          <Link to="/customer/subscription">
+            <Crown className="h-4 w-4" /> View Plans
+          </Link>
+        </Button>
       </div>
     );
   }

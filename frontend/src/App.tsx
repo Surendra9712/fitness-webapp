@@ -21,6 +21,8 @@ import OrderManagement from "@/pages/admin/OrderManagement";
 import CategoryManagement from "@/pages/admin/category/CategoryManagement";
 import TrainerAssignments from "@/pages/admin/TrainerAssignments";
 import TrainerVerification from "@/pages/admin/TrainerVerification";
+import SubscriptionManagement from "@/pages/admin/SubscriptionManagement";
+import SubscriptionPaymentReturn from "@/pages/SubscriptionPaymentReturn";
 
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
 import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
@@ -32,8 +34,9 @@ import RequestProduct from "@/pages/user/RequestProduct";
 import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
 import MyTrainer from "@/pages/user/MyTrainer";
-import TrainerRequest from "@/pages/user/TrainerRequest";
 import TrainerDetail from "@/pages/user/TrainerDetail";
+import Subscription from "@/pages/user/Subscription";
+import AiRecommendation from "@/pages/user/AiRecommendation";
 import AuthLayout from "./pages/auth/AuthLayout";
 
 function RoleRedirect() {
@@ -67,6 +70,8 @@ export default function App() {
           <Route path="/payment/esewa/success" element={<PaymentReturn />} />
           <Route path="/payment/esewa/failure" element={<PaymentReturn />} />
           <Route path="/payment/khalti/return" element={<PaymentReturn />} />
+          <Route path="/payment/subscription/esewa/success" element={<SubscriptionPaymentReturn />} />
+          <Route path="/payment/subscription/esewa/failure" element={<SubscriptionPaymentReturn />} />
           <Route path="/dashboard" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
           <Route
@@ -195,6 +200,16 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/subscriptions"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <SubscriptionManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
           {/* Trainer */}
           <Route
@@ -299,6 +314,26 @@ export default function App() {
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <Profile />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/subscription"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <Subscription />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/ai-recommendation"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <AiRecommendation />
                 </Layout>
               </ProtectedRoute>
             }

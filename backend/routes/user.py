@@ -1021,3 +1021,101 @@ def update_profile():
     finally:
         cursor.close()
         conn.close()
+
+
+# ── Subscription ──────────────────────────────────────────────────────────────
+
+@user_bp.route('/subscription', methods=['GET'])
+@role_required('trainee')
+def get_subscription():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT subscription_plan, subscription_status FROM users WHERE id = %s",
+            (request.user_id,),
+        )
+        row = cursor.fetchone()
+        return jsonify(row or {'subscription_plan': 'free', 'subscription_status': 'active'})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+SUBSCRIPTION_PRICE_NPR = 999  # Rs 999 per month for Pro
+
+@user_bp.route('/subscription', methods=['PUT'])
+@role_required('trainee')
+def update_subscription():
+    body = request.get_json() or {}
+    plan   = body.get('plan', '').strip()
+    method = body.get('method', 'cash').strip()  # 'cash' or 'esewa'
+
+    if plan not in ('free', 'pro'):
+        return jsonify({'error': 'plan must be free or pro'}), 400
+    if plan == 'pro' and method not in ('cash', 'esewa'):
+        return jsonify({'error': 'method must be cash or esewa'}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT subscription_plan, subscription_status FROM users WHERE id = %s",
+            (request.user_id,),
+        )
+        current = cursor.fetchone()
+
+        if plan == 'free':
+            cursor.execute(
+                "UPDATE users SET subscription_plan='free', subscription_status='active', "
+                "subscription_payment_method=NULL WHERE id = %s",
+                (request.user_id,),
+            )
+            conn.commit()
+            return jsonify({'subscription_plan': 'free', 'subscription_status': 'active'})
+
+        if current and current['subscription_plan'] == 'pro' and current['subscription_status'] == 'active':
+            return jsonify({'error': 'Already on Pro plan'}), 400
+
+        if method == 'cash':
+            cursor.execute(
+                "UPDATE users SET subscription_plan='pro', subscription_status='pending', "
+                "subscription_payment_method='cash' WHERE id = %s",
+                (request.user_id,),
+            )
+            conn.commit()
+            return jsonify({'subscription_plan': 'pro', 'subscription_status': 'pending', 'payment_method': 'cash'})
+
+        # eSewa — build payment form, don't update plan yet (update on verify)
+        amount_str       = f"{SUBSCRIPTION_PRICE_NPR}.00"
+        transaction_uuid = f"sub-{request.user_id}-{int(time.time() * 1000)}"
+        message = f"total_amount={amount_str},transaction_uuid={transaction_uuid},product_code={ESEWA_PRODUCT_CODE}"
+        sig = base64.b64encode(
+            hmac.new(ESEWA_SECRET.encode(), message.encode(), hashlib.sha256).digest()
+        ).decode()
+
+        esewa_params = {
+            'amount':                   amount_str,
+            'tax_amount':               '0',
+            'total_amount':             amount_str,
+            'transaction_uuid':         transaction_uuid,
+            'product_code':             ESEWA_PRODUCT_CODE,
+            'product_service_charge':   '0',
+            'product_delivery_charge':  '0',
+            'success_url': f"{FRONTEND_URL}/payment/subscription/esewa/success",
+            'failure_url': f"{FRONTEND_URL}/payment/subscription/esewa/failure",
+            'signed_field_names': 'total_amount,transaction_uuid,product_code',
+            'signature': sig,
+        }
+        return jsonify({
+            'payment_method': 'esewa',
+            'esewa_url':    ESEWA_URL,
+            'esewa_params': esewa_params,
+        })
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()

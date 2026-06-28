@@ -181,6 +181,7 @@ def me():
     try:
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.profile_image_url, "
+            "u.subscription_plan, u.subscription_status, "
             "p.full_name, p.date_of_birth, p.gender, p.phone_number, p.city, p.country, "
             "p.occupation, p.height_cm, p.current_weight_kg, p.activity_level, "
             "p.primary_goal, p.fitness_level, p.target_water_ml, "

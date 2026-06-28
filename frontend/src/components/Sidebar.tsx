@@ -21,6 +21,8 @@ import {
   UserCheck,
   UserRound,
   ShieldCheck,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import type { Role } from "@/types";
 
@@ -83,6 +85,11 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Trainer Request",
       icon: <ShieldCheck className="h-4 w-4" />,
     },
+    {
+      to: "/admin/subscriptions",
+      label: "Subscriptions",
+      icon: <Crown className="h-4 w-4" />,
+    },
   ],
   dietitian: [
     {
@@ -136,6 +143,16 @@ const navLinks: Record<Role, NavItem[]> = {
       to: "/customer/profile",
       label: "Profile",
       icon: <User className="h-4 w-4" />,
+    },
+    {
+      to: "/customer/subscription",
+      label: "Subscription",
+      icon: <Crown className="h-4 w-4" />,
+    },
+    {
+      to: "/customer/ai-recommendation",
+      label: "AI Recommendation",
+      icon: <Sparkles className="h-4 w-4" />,
     },
   ],
 };

@@ -390,6 +390,96 @@ def verify_trainer(uid):
         conn.close()
 
 
+# ── Subscriptions ────────────────────────────────────────────────────────────
+
+@admin_bp.route('/subscriptions', methods=['GET'])
+@role_required('admin')
+def list_subscriptions():
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', 'pending').strip()
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        base_where = "WHERE u.role = 'trainee' AND u.deleted_at IS NULL"
+        params = []
+        if status_filter in ('pending', 'active', 'rejected'):
+            base_where += " AND u.subscription_status = %s"
+            params.append(status_filter)
+        if search:
+            base_where += " AND (u.name LIKE %s OR u.email LIKE %s)"
+            params += [f"%{search}%", f"%{search}%"]
+        cursor.execute(f"SELECT COUNT(*) AS total FROM users u {base_where}", params)
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            f"SELECT u.id, u.name, u.email, u.subscription_plan, u.subscription_status, "
+            f"u.subscription_payment_method, u.created_at "
+            f"FROM users u {base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        return paginated_response(cursor.fetchall(), total, page, page_size)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/subscriptions/<int:uid>/approve', methods=['PUT'])
+@role_required('admin')
+def approve_subscription(uid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT subscription_plan, subscription_status FROM users WHERE id = %s AND deleted_at IS NULL",
+            (uid,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'error': 'User not found'}), 404
+        if row['subscription_status'] != 'pending':
+            return jsonify({'error': 'No pending subscription request'}), 400
+        cursor.execute(
+            "UPDATE users SET subscription_status='active' WHERE id = %s", (uid,)
+        )
+        conn.commit()
+        return jsonify({'message': 'Subscription approved'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/subscriptions/<int:uid>/reject', methods=['PUT'])
+@role_required('admin')
+def reject_subscription(uid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT subscription_status FROM users WHERE id = %s AND deleted_at IS NULL",
+            (uid,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'error': 'User not found'}), 404
+        if row['subscription_status'] != 'pending':
+            return jsonify({'error': 'No pending subscription request'}), 400
+        cursor.execute(
+            "UPDATE users SET subscription_plan='free', subscription_status='active' WHERE id = %s",
+            (uid,),
+        )
+        conn.commit()
+        return jsonify({'message': 'Subscription rejected — user reverted to Free'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # ── Exercises ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/exercises', methods=['GET'])

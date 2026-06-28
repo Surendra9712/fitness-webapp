@@ -87,6 +87,18 @@ export interface Category {
   description?: string;
 }
 
+export type SubscriptionPlan          = 'free' | 'pro';
+export type SubscriptionStatus        = 'active' | 'pending' | 'rejected';
+export type SubscriptionPaymentMethod = 'cash' | 'esewa';
+
+export interface EsewaParams {
+  amount: string; tax_amount: string; total_amount: string;
+  transaction_uuid: string; product_code: string;
+  product_service_charge: string; product_delivery_charge: string;
+  success_url: string; failure_url: string;
+  signed_field_names: string; signature: string;
+}
+
 export interface User {
   id: number;
   name: string;
@@ -94,6 +106,9 @@ export interface User {
   role: Role;
   status: UserStatus;
   is_verified?: number;
+  subscription_plan?: SubscriptionPlan;
+  subscription_status?: SubscriptionStatus;
+  subscription_payment_method?: SubscriptionPaymentMethod;
   created_at?: string;
   age?: number;
   weight_kg?: number;
