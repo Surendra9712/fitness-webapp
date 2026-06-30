@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     localStorage.setItem("token", data.token);
-    setUser(data.user);
+    await refreshUser();
     return data.user;
   };
 
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       { name, email, password, role },
     );
     localStorage.setItem("token", data.token);
-    setUser(data.user);
+    await refreshUser();
   };
 
   const logout = () => {
@@ -79,7 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

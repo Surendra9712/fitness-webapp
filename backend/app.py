@@ -11,6 +11,7 @@ from routes.public import public_bp
 from routes.onboarding import onboarding_bp
 from routes.payment import payment_bp
 from routes.upload import upload_bp
+from routes.notifications import notifications_bp
 
 load_dotenv()
 
@@ -24,7 +25,8 @@ app.register_blueprint(user_bp,       url_prefix='/api/user')
 app.register_blueprint(public_bp,     url_prefix='/api/public')
 app.register_blueprint(onboarding_bp, url_prefix='/api/onboarding')
 app.register_blueprint(payment_bp,    url_prefix='/api/payments')
-app.register_blueprint(upload_bp,     url_prefix='/api/upload')
+app.register_blueprint(upload_bp,          url_prefix='/api/upload')
+app.register_blueprint(notifications_bp,  url_prefix='/api/notifications')
 
 
 @app.route('/api/health')

@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Search, Crown, CheckCircle2, XCircle, Banknote, CreditCard } from "lucide-react";
+import {
+  Search,
+  Crown,
+  CheckCircle2,
+  XCircle,
+  Banknote,
+  CreditCard,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
@@ -9,36 +16,46 @@ import { Badge } from "@/components/ui/badge";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { toast } from "sonner";
 import type { User } from "@/types";
+import SubscriptionRejectDialog from "./SubscriptionRejectDialog";
 
-type SubUser = User & { subscription_payment_method?: 'cash' | 'esewa' };
+type SubUser = User & { subscription_payment_method?: "cash" | "esewa" };
 
 const STATUS_TABS = [
-  { label: "Pending",  value: "pending"  },
-  { label: "Active",   value: "active"   },
+  { label: "Pending", value: "pending" },
+  { label: "Active", value: "active" },
   { label: "Rejected", value: "rejected" },
 ] as const;
 
 export default function SubscriptionManagement() {
   const queryClient = useQueryClient();
-  const [tab, setTab]           = useState<"pending" | "active" | "rejected">("pending");
-  const [search, setSearch]     = useState("");
+  const [tab, setTab] = useState<"pending" | "active" | "rejected">("pending");
+  const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [acting, setActing]     = useState<number | null>(null);
+  const [acting, setActing] = useState<number | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<SubUser | null>(null);
 
-  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({ initialPageSize: 15 });
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
+    initialPageSize: 15,
+  });
 
-  const { GetSubscriptions, ApproveSubscription, RejectSubscription } = useAdmin();
+  const { GetSubscriptions, ApproveSubscription, RejectSubscription } =
+    useAdmin();
   const approveMut = ApproveSubscription();
-  const rejectMut  = RejectSubscription();
+  const rejectMut = RejectSubscription();
 
   const { data, isLoading } = GetSubscriptions({
-    queryParams: { status: tab, search: searchQuery, page, page_size: pageSize },
+    queryParams: {
+      status: tab,
+      search: searchQuery,
+      page,
+      page_size: pageSize,
+    },
   });
 
   const rows: SubUser[] = (data?.items ?? []) as SubUser[];
   const total = data?.total ?? 0;
 
-  function handleSearch(e: React.FormEvent) {
+  function handleSearch(e: React.SyntheticEvent) {
     e.preventDefault();
     setSearchQuery(search.trim());
     resetPage();
@@ -58,10 +75,13 @@ export default function SubscriptionManagement() {
     }
   }
 
-  async function reject(user: SubUser) {
+  async function confirmReject(note: string) {
+    if (!rejectTarget) return;
+    const user = rejectTarget;
+    setRejectTarget(null);
     setActing(user.id);
     try {
-      await rejectMut.mutateAsync(user.id);
+      await rejectMut.mutateAsync({ id: user.id, admin_note: note });
       toast.success(`${user.name} reverted to Free plan`);
       queryClient.invalidateQueries({ queryKey: ["adminSubscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["adminStats"] });
@@ -75,7 +95,9 @@ export default function SubscriptionManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Subscription Plans</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Subscription Plans
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Review and approve trainee Pro plan requests.
         </p>
@@ -86,7 +108,10 @@ export default function SubscriptionManagement() {
         {STATUS_TABS.map((t) => (
           <button
             key={t.value}
-            onClick={() => { setTab(t.value); resetPage(); }}
+            onClick={() => {
+              setTab(t.value);
+              resetPage();
+            }}
             className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors
               ${tab === t.value ? "bg-white shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
@@ -122,7 +147,10 @@ export default function SubscriptionManagement() {
       ) : (
         <div className="rounded-lg border divide-y">
           {rows.map((u) => (
-            <div key={u.id} className="flex items-center gap-4 px-4 py-4 hover:bg-muted/30 transition-colors">
+            <div
+              key={u.id}
+              className="flex items-center gap-4 px-4 py-4 hover:bg-muted/30 transition-colors"
+            >
               {/* Avatar */}
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
                 {u.name.charAt(0).toUpperCase()}
@@ -132,25 +160,46 @@ export default function SubscriptionManagement() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{u.name}</span>
-                  <Badge variant={u.subscription_plan === "pro" ? "info" : "secondary"} className="text-xs gap-1">
-                    {u.subscription_plan === "pro" && <Crown className="h-3 w-3" />}
+                  <Badge
+                    variant={
+                      u.subscription_plan === "pro" ? "info" : "secondary"
+                    }
+                    className="text-xs gap-1"
+                  >
+                    {u.subscription_plan === "pro" && (
+                      <Crown className="h-3 w-3" />
+                    )}
                     {u.subscription_plan === "pro" ? "Pro" : "Free"}
                   </Badge>
                   <Badge
-                    variant={u.subscription_status === "active" ? "success" : u.subscription_status === "pending" ? "warning" : "destructive"}
+                    variant={
+                      u.subscription_status === "active"
+                        ? "success"
+                        : u.subscription_status === "pending"
+                          ? "warning"
+                          : "destructive"
+                    }
                     className="text-xs"
                   >
                     {u.subscription_status}
                   </Badge>
                   {u.subscription_payment_method && (
                     <Badge variant="outline" className="text-xs gap-1">
-                      {u.subscription_payment_method === "esewa"
-                        ? <><CreditCard className="h-3 w-3" /> eSewa</>
-                        : <><Banknote className="h-3 w-3" /> Cash</>}
+                      {u.subscription_payment_method === "esewa" ? (
+                        <>
+                          <CreditCard className="h-3 w-3" /> eSewa
+                        </>
+                      ) : (
+                        <>
+                          <Banknote className="h-3 w-3" /> Cash
+                        </>
+                      )}
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {u.email}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Joined {new Date(u.created_at!).toLocaleDateString()}
                 </p>
@@ -164,7 +213,7 @@ export default function SubscriptionManagement() {
                     variant="outline"
                     className="gap-1.5 text-destructive hover:text-destructive"
                     disabled={acting === u.id}
-                    onClick={() => reject(u)}
+                    onClick={() => setRejectTarget(u)}
                   >
                     <XCircle className="h-4 w-4" /> Reject
                   </Button>
@@ -184,15 +233,20 @@ export default function SubscriptionManagement() {
         </div>
       )}
 
-      {total > pageSize && (
-        <AppPagination
-          page={page}
-          total={total}
-          pageSize={pageSize}
-          onPageSizeChange={setPageSize}
-          onPageChange={goToPage}
-        />
-      )}
+      <AppPagination
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onPageChange={goToPage}
+      />
+
+      <SubscriptionRejectDialog
+        open={!!rejectTarget}
+        userName={rejectTarget?.name ?? null}
+        onConfirm={confirmReject}
+        onCancel={() => setRejectTarget(null)}
+      />
     </div>
   );
 }

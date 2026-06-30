@@ -15,7 +15,11 @@ import type {
   Exercise,
   ExerciseLog,
   ReviewStats,
+  PromoValidateResult,
+  PointsData,
+  GlobalDiscount,
   PaginatedResponse,
+  Notification,
   CreateOrderPayload,
   CreateProductRequestPayload,
   LogExercisePayload,
@@ -24,6 +28,11 @@ import type {
 } from "@/types";
 
 interface UseUserReturn {
+  GetNotifications: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Notification>>;
+  GetUnreadCount: () => UseQueryResult<{ count: number }>;
+  MarkRead: () => UseMutationResult<void, Error, number>;
+  MarkAllRead: () => UseMutationResult<void, Error, void>;
+  DeleteNotification: () => UseMutationResult<void, Error, number>;
   GetTrainers: (
     args?: QueryArgs,
   ) => UseQueryResult<PaginatedResponse<TrainerInfo>>;
@@ -65,6 +74,10 @@ interface UseUserReturn {
     Error,
     { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }
   >;
+  ValidatePromo: () => UseMutationResult<PromoValidateResult, Error, { code: string; order_total: number }>;
+  GetPoints: (args?: QueryArgs) => UseQueryResult<PointsData>;
+  GetAvailablePromos: (args?: QueryArgs) => UseQueryResult<import("@/types").PromoCode[]>;
+  GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
 }
 
 const useUser = (): UseUserReturn => {
@@ -188,6 +201,68 @@ const useUser = (): UseUserReturn => {
       },
     });
 
+  const ValidatePromo = () =>
+    useMutation({
+      mutationFn: async ({ code, order_total }: { code: string; order_total: number }) => {
+        const { data } = await api.post(endpoint.userPromoValidate, { code, order_total });
+        return data as PromoValidateResult;
+      },
+    });
+
+  const { get: GetPoints } = useApi({
+    endpoint: endpoint.userPoints,
+    queryKey: "userPoints",
+  });
+
+  const { get: GetAvailablePromos } = useApi({
+    endpoint: endpoint.userPromoAvailable,
+    queryKey: "userAvailablePromos",
+  });
+
+  const { get: GetGlobalDiscount } = useApi({
+    endpoint: endpoint.publicGlobalDiscount,
+    queryKey: "publicGlobalDiscount",
+  });
+
+  const { get: GetNotifications } = useApi({
+    endpoint: endpoint.notifications,
+    queryKey: "notifications",
+  });
+
+  const GetUnreadCount = () =>
+    useQuery({
+      queryKey: ["notificationsUnreadCount"],
+      queryFn: async () => {
+        const { data } = await api.get(endpoint.notificationsUnreadCount);
+        return data as { count: number };
+      },
+      refetchInterval: 30000,
+    });
+
+  const MarkRead = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        const { data } = await api.put(`${endpoint.notifications}/${id}/read`, {});
+        return data;
+      },
+    });
+
+  const MarkAllRead = () =>
+    useMutation({
+      mutationFn: async () => {
+        const { data } = await api.put(`${endpoint.notifications}/read-all`, {});
+        return data;
+      },
+    });
+
+  const DeleteNotification = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        const { data } = await api.delete(`${endpoint.notifications}/${id}`);
+        return data;
+      },
+    });
+
   return {
     GetTrainers,
     GetTrainer,
@@ -210,6 +285,15 @@ const useUser = (): UseUserReturn => {
     UpdateAvatar,
     GetSubscription,
     UpdateSubscription,
+    ValidatePromo,
+    GetPoints,
+    GetAvailablePromos,
+    GetGlobalDiscount,
+    GetNotifications,
+    GetUnreadCount,
+    MarkRead,
+    MarkAllRead,
+    DeleteNotification,
   } as UseUserReturn;
 };
 

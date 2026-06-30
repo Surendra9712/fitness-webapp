@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     subscription_plan           ENUM('free','pro') NOT NULL DEFAULT 'free',
     subscription_status         ENUM('active','pending','rejected') NOT NULL DEFAULT 'active',
     subscription_payment_method ENUM('cash','esewa') DEFAULT NULL,
+    reward_points       INT NOT NULL DEFAULT 0,
     profile_image_url   VARCHAR(500),
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -156,6 +157,34 @@ CREATE TABLE IF NOT EXISTS products (
     FOREIGN KEY (created_by)  REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS promo_codes (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    code             VARCHAR(50)  NOT NULL UNIQUE,
+    description      VARCHAR(200),
+    discount_type    ENUM('percentage','fixed') NOT NULL DEFAULT 'percentage',
+    discount_value   DECIMAL(10,2) NOT NULL,
+    min_order_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+    max_uses         INT DEFAULT NULL,
+    current_uses     INT NOT NULL DEFAULT 0,
+    valid_from       DATE DEFAULT NULL,
+    valid_to         DATE DEFAULT NULL,
+    is_active        TINYINT(1) NOT NULL DEFAULT 1,
+    created_by       INT DEFAULT NULL,
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS point_transactions (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT NOT NULL,
+    points         INT NOT NULL,
+    type           ENUM('earned','redeemed') NOT NULL,
+    reference_id   INT DEFAULT NULL,
+    description    VARCHAR(200),
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     id               INT AUTO_INCREMENT PRIMARY KEY,
     user_id          INT NOT NULL,
@@ -165,10 +194,15 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_status   VARCHAR(20) NOT NULL DEFAULT 'pending',
     payment_ref      VARCHAR(255) NULL,
     shipping_address TEXT,
+    promo_code_id    INT DEFAULT NULL,
+    discount_amount  DECIMAL(10,2) NOT NULL DEFAULT 0,
+    points_redeemed  INT NOT NULL DEFAULT 0,
+    points_discount  DECIMAL(10,2) NOT NULL DEFAULT 0,
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at       TIMESTAMP NULL DEFAULT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (promo_code_id) REFERENCES promo_codes(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS order_items (

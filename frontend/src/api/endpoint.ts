@@ -30,8 +30,17 @@ export const endpoint = {
 
   userSubscription: "user/subscription",
   adminSubscriptions: "admin/subscriptions",
+  adminPromoCodes: "admin/promo-codes",
+  adminGlobalDiscount: "admin/global-discount",
+  publicGlobalDiscount: "public/global-discount",
+  userPromoValidate: "user/promo/validate",
+  userPromoAvailable: "user/promo/available",
+  userPoints: "user/points",
 
   uploadImage: "upload/image",
   uploadCert: "upload/cert",
   authProfile: "auth/me",
+
+  notifications: "notifications",
+  notificationsUnreadCount: "notifications/unread-count",
 };

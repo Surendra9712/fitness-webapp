@@ -7,6 +7,7 @@ from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
+from utils.notify import push, push_to_admins
 
 dietitian_bp = Blueprint('dietitian', __name__)
 
@@ -340,6 +341,14 @@ def approve_assignment(aid):
             "trainer_reviewed_at=NOW() WHERE id = %s",
             (body.trainer_note, aid),
         )
+        push(cursor, row['customer_id'], 'trainer_accepted',
+             'Trainer Accepted Your Request',
+             'Your trainer has accepted your request. It is now pending admin approval.',
+             aid)
+        push_to_admins(cursor, 'trainer_request_to_admin',
+                       'Trainer Assignment Needs Approval',
+                       'A trainer has accepted a client request. Please review and approve.',
+                       aid)
         conn.commit()
         return jsonify({'message': 'Approved — awaiting admin confirmation'})
     except Exception as e:
@@ -376,6 +385,10 @@ def reject_assignment(aid):
             "trainer_reviewed_at=NOW() WHERE id = %s",
             (body.trainer_note, aid),
         )
+        push(cursor, row['customer_id'], 'trainer_rejected',
+             'Trainer Declined Your Request',
+             'Your trainer request was declined by the trainer. You may choose a different trainer.',
+             aid)
         conn.commit()
         return jsonify({'message': 'Assignment rejected'})
     except Exception as e:

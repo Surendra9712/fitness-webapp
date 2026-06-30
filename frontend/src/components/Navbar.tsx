@@ -83,21 +83,18 @@ export default function Navbar() {
       </header>
 
       {/* Global checkout drawer */}
-      <CheckoutDialog
-        open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        items={cartItems.map((i) => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          name: i.name,
-          price: i.price,
-        }))}
-        onSuccess={() => {
-          clear();
-          toast.success("Order placed! Check My Orders to track it.");
-          navigate("/customer/orders");
-        }}
-      />
+      {user && (
+        <CheckoutDialog
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          items={cartItems}
+          onSuccess={() => {
+            clear();
+            toast.success("Order placed! Check My Orders to track it.");
+            navigate("/customer/orders");
+          }}
+        />
+      )}
     </>
   );
 }

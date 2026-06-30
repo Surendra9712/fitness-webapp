@@ -23,8 +23,12 @@ import {
   ShieldCheck,
   Crown,
   Sparkles,
+  Percent,
+  Gift,
+  BadgePercent,
 } from "lucide-react";
 import type { Role } from "@/types";
+import useUser from "@/hooks/useUser";
 
 interface NavItem {
   to: string;
@@ -70,11 +74,11 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Orders",
       icon: <ShoppingBag className="h-4 w-4" />,
     },
-    {
-      to: "/admin/exercises",
-      label: "Exercises",
-      icon: <Dumbbell className="h-4 w-4" />,
-    },
+    // {
+    //   to: "/admin/exercises",
+    //   label: "Exercises",
+    //   icon: <Dumbbell className="h-4 w-4" />,
+    // },
     {
       to: "/admin/trainer-assignments",
       label: "Trainer Assign.",
@@ -89,6 +93,21 @@ const navLinks: Record<Role, NavItem[]> = {
       to: "/admin/subscriptions",
       label: "Subscriptions",
       icon: <Crown className="h-4 w-4" />,
+    },
+    {
+      to: "/admin/promo-codes",
+      label: "Promo Codes",
+      icon: <Percent className="h-4 w-4" />,
+    },
+    {
+      to: "/admin/discounts",
+      label: "Discounts",
+      icon: <BadgePercent className="h-4 w-4" />,
+    },
+    {
+      to: "/admin/notifications",
+      label: "Notifications",
+      icon: <Bell className="h-4 w-4" />,
     },
   ],
   dietitian: [
@@ -106,6 +125,11 @@ const navLinks: Record<Role, NavItem[]> = {
       to: "/trainer/profile",
       label: "My Profile",
       icon: <User className="h-4 w-4" />,
+    },
+    {
+      to: "/trainer/notifications",
+      label: "Notifications",
+      icon: <Bell className="h-4 w-4" />,
     },
   ],
   trainee: [
@@ -134,11 +158,11 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Request",
       icon: <Bell className="h-4 w-4" />,
     },
-    {
-      to: "/customer/log-exercise",
-      label: "Exercise",
-      icon: <Dumbbell className="h-4 w-4" />,
-    },
+    // {
+    //   to: "/customer/log-exercise",
+    //   label: "Exercise",
+    //   icon: <Dumbbell className="h-4 w-4" />,
+    // },
     {
       to: "/customer/profile",
       label: "Profile",
@@ -154,6 +178,16 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "AI Recommendation",
       icon: <Sparkles className="h-4 w-4" />,
     },
+    {
+      to: "/customer/rewards",
+      label: "Rewards",
+      icon: <Gift className="h-4 w-4" />,
+    },
+    {
+      to: "/customer/notifications",
+      label: "Notifications",
+      icon: <Bell className="h-4 w-4" />,
+    },
   ],
 };
 
@@ -167,6 +201,9 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const { GetUnreadCount } = useUser();
+  const { data: unreadData } = GetUnreadCount();
+  const unreadCount = unreadData?.count ?? 0;
 
   if (!user) return null;
 
@@ -196,26 +233,34 @@ export default function Sidebar() {
       {/* Nav links */}
       <nav className="flex-1 overflow-y-auto px-2 py-1">
         <ul className="space-y-0.5">
-          {links.map((l) => (
-            <li key={l.to}>
-              <NavLink
-                to={l.to}
-                end={l.to.split("/").length === 2}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
-                  ${
-                    isActive
-                      ? "bg-emerald-500/20 text-white"
-                      : "text-emerald-200/80 hover:bg-white/8 hover:text-white"
-                  }`
-                }
-              >
-                {l.icon}
-                {l.label}
-              </NavLink>
-            </li>
-          ))}
+          {links.map((l) => {
+            const isNotifLink = l.label === "Notifications";
+            return (
+              <li key={l.to}>
+                <NavLink
+                  to={l.to}
+                  end={l.to.split("/").length === 2}
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
+                    ${
+                      isActive
+                        ? "bg-emerald-500/20 text-white"
+                        : "text-emerald-200/80 hover:bg-white/8 hover:text-white"
+                    }`
+                  }
+                >
+                  {l.icon}
+                  <span className="flex-1">{l.label}</span>
+                  {isNotifLink && unreadCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
 

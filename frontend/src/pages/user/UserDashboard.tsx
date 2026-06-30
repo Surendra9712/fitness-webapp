@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
-import ProfileSetup from "./ProfileSetup";
+import ProfileSetup from "./profile/ProfileSetup";
 import type { DashboardStats } from "@/types";
 
 const today = new Date().toISOString().split("T")[0];
@@ -13,7 +13,6 @@ export default function UserDashboard() {
   const { user, loading: authLoading, refreshUser } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState("");
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hasProfile = Boolean((user as any)?.full_name);
 

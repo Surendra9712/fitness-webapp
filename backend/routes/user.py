@@ -13,6 +13,7 @@ from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
+from utils.notify import push, push_to_admins
 
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
 ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
@@ -42,6 +43,8 @@ class PlaceOrderSchema(BaseModel):
     items: list[OrderItemSchema] = Field(min_length=1)
     shipping_address: Optional[str] = None
     payment_method: str = 'cod'
+    promo_code: Optional[str] = None
+    points_to_redeem: int = Field(default=0, ge=0)
 
     @field_validator('payment_method')
     @classmethod
@@ -55,6 +58,7 @@ class RequestProductSchema(BaseModel):
     product_name: str = Field(min_length=1)
     description: Optional[str] = None
     reason: Optional[str] = None
+    image_url: Optional[str] = None
 
     @field_validator('product_name', mode='before')
     @classmethod
@@ -351,6 +355,32 @@ def dashboard():
 
 # ── Products (shop) ───────────────────────────────────────────────────────────
 
+def _compute_effective_price(price, discount_type, discount_value):
+    """Return (effective_price, discounted_price_or_None)."""
+    price = float(price)
+    if not discount_type or not discount_value or float(discount_value) <= 0:
+        return price, None
+    dv = float(discount_value)
+    if discount_type == 'percentage':
+        ep = round(price * (1 - dv / 100), 2)
+    else:
+        ep = round(max(0.0, price - dv), 2)
+    return ep, ep
+
+
+def _get_global_discount(cursor):
+    cursor.execute(
+        "SELECT `key`, value FROM site_settings "
+        "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active')"
+    )
+    s = {row['key']: row['value'] for row in cursor.fetchall()}
+    return {
+        'type':      s.get('global_discount_type', 'percentage'),
+        'value':     float(s.get('global_discount_value', '0') or '0'),
+        'is_active': s.get('global_discount_active', '0') == '1',
+    }
+
+
 @user_bp.route('/products', methods=['GET'])
 @role_required('trainee')
 def list_products():
@@ -360,7 +390,8 @@ def list_products():
     try:
         base = (
             "SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
-            "c.slug AS category, c.name AS category_name, p.image_url "
+            "c.slug AS category, c.name AS category_name, p.image_url, "
+            "p.discount_type, p.discount_value "
             "FROM products p JOIN categories c ON p.category_id = c.id "
             "WHERE p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL "
         )
@@ -368,13 +399,18 @@ def list_products():
             cursor.execute(base + "AND c.slug = %s ORDER BY p.name", (category_slug,))
         else:
             cursor.execute(base + "ORDER BY c.name, p.name")
-        return jsonify(cursor.fetchall())
+        rows = cursor.fetchall()
+        for row in rows:
+            _, dp = _compute_effective_price(row['price'], row.get('discount_type'), row.get('discount_value'))
+            row['discounted_price'] = dp
+        return jsonify(rows)
     finally:
         cursor.close()
         conn.close()
 
 
 # ── Orders ────────────────────────────────────────────────────────────────────
+
 
 @user_bp.route('/orders', methods=['POST'])
 @role_required('trainee')
@@ -387,13 +423,13 @@ def place_order():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        # Resolve products and compute total
-        total = 0.0
+        # Resolve products and compute cart total (using effective prices after product discounts)
+        item_subtotal = 0.0
         resolved = []
         for item in body.items:
             cursor.execute(
-                "SELECT id, name, price, stock_quantity FROM products "
-                "WHERE id = %s AND status = 'active' AND deleted_at IS NULL",
+                "SELECT id, name, price, stock_quantity, discount_type, discount_value "
+                "FROM products WHERE id = %s AND status = 'active' AND deleted_at IS NULL",
                 (item.product_id,),
             )
             product = cursor.fetchone()
@@ -401,18 +437,73 @@ def place_order():
                 return jsonify({'error': f"Product {item.product_id} not found"}), 404
             if product['stock_quantity'] < item.quantity:
                 return jsonify({'error': f"Insufficient stock for '{product['name']}'"}), 400
-            total += float(product['price']) * item.quantity
-            resolved.append({'product': product, 'quantity': item.quantity})
+            effective_price, _ = _compute_effective_price(
+                product['price'], product.get('discount_type'), product.get('discount_value')
+            )
+            item_subtotal += effective_price * item.quantity
+            resolved.append({'product': product, 'quantity': item.quantity, 'effective_price': effective_price})
 
-        total = round(total, 2)
+        item_subtotal = round(item_subtotal, 2)
 
-        # For COD confirm immediately; for digital payments mark payment_status pending
-        payment_status = 'pending' if body.payment_method in ('esewa', 'khalti') else 'pending'
+        # --- Global discount ---
+        gd = _get_global_discount(cursor)
+        global_discount_amount = 0.0
+        if gd['is_active'] and gd['value'] > 0:
+            if gd['type'] == 'percentage':
+                global_discount_amount = round(item_subtotal * gd['value'] / 100, 2)
+            else:
+                global_discount_amount = min(gd['value'], item_subtotal)
+        after_global = round(item_subtotal - global_discount_amount, 2)
+
+        # --- Promo code validation ---
+        promo_code_id = None
+        discount_amount = 0.0
+        if body.promo_code:
+            cursor.execute(
+                "SELECT id, discount_type, discount_value, min_order_amount, "
+                "max_uses, current_uses, valid_from, valid_to, is_active "
+                "FROM promo_codes WHERE code = %s",
+                (body.promo_code.strip().upper(),),
+            )
+            promo = cursor.fetchone()
+            if not promo:
+                return jsonify({'error': 'Promo code not found'}), 404
+            if not promo['is_active']:
+                return jsonify({'error': 'Promo code is inactive'}), 400
+            today = datetime.date.today()
+            if promo['valid_from'] and today < promo['valid_from']:
+                return jsonify({'error': 'Promo code is not yet valid'}), 400
+            if promo['valid_to'] and today > promo['valid_to']:
+                return jsonify({'error': 'Promo code has expired'}), 400
+            if promo['max_uses'] is not None and promo['current_uses'] >= promo['max_uses']:
+                return jsonify({'error': 'Promo code usage limit reached'}), 400
+            if after_global < float(promo['min_order_amount']):
+                return jsonify({'error': f"Minimum order amount is Rs. {promo['min_order_amount']}"}), 400
+            promo_code_id = promo['id']
+            if promo['discount_type'] == 'percentage':
+                discount_amount = round(after_global * float(promo['discount_value']) / 100, 2)
+            else:
+                discount_amount = min(float(promo['discount_value']), after_global)
+
+        # --- Points redemption ---
+        points_to_redeem = body.points_to_redeem
+        points_discount = 0.0
+        if points_to_redeem > 0:
+            cursor.execute("SELECT reward_points FROM users WHERE id = %s", (request.user_id,))
+            u = cursor.fetchone()
+            if not u or u['reward_points'] < points_to_redeem:
+                return jsonify({'error': 'Insufficient reward points'}), 400
+            points_discount = float(points_to_redeem)  # 1 point = Rs. 1
+
+        # --- Final total ---
+        final_total = max(0.0, round(after_global - discount_amount - points_discount, 2))
 
         cursor.execute(
-            "INSERT INTO orders (user_id, total_amount, shipping_address, payment_method, payment_status) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (request.user_id, total, body.shipping_address, body.payment_method, payment_status),
+            "INSERT INTO orders (user_id, total_amount, shipping_address, payment_method, payment_status, "
+            "promo_code_id, discount_amount, points_redeemed, points_discount, global_discount_amount) "
+            "VALUES (%s, %s, %s, %s, 'pending', %s, %s, %s, %s, %s)",
+            (request.user_id, final_total, body.shipping_address, body.payment_method,
+             promo_code_id, discount_amount, points_to_redeem, points_discount, global_discount_amount),
         )
         order_id = cursor.lastrowid
 
@@ -420,35 +511,58 @@ def place_order():
             cursor.execute(
                 "INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) "
                 "VALUES (%s, %s, %s, %s)",
-                (order_id, r['product']['id'], r['quantity'], r['product']['price']),
+                (order_id, r['product']['id'], r['quantity'], r['effective_price']),
             )
-            # Decrement stock only for COD; for digital payments deduct after verification
             if body.payment_method == 'cod':
                 cursor.execute(
                     "UPDATE products SET stock_quantity = stock_quantity - %s WHERE id = %s",
                     (r['quantity'], r['product']['id']),
                 )
 
+        if promo_code_id:
+            cursor.execute(
+                "UPDATE promo_codes SET current_uses = current_uses + 1 WHERE id = %s",
+                (promo_code_id,),
+            )
+        if points_to_redeem > 0:
+            cursor.execute(
+                "UPDATE users SET reward_points = reward_points - %s WHERE id = %s",
+                (points_to_redeem, request.user_id),
+            )
+            cursor.execute(
+                "INSERT INTO point_transactions (user_id, points, type, reference_id, description) "
+                "VALUES (%s, %s, 'redeemed', %s, %s)",
+                (request.user_id, points_to_redeem, order_id, f"Points redeemed for order #{order_id}"),
+            )
+
+        push_to_admins(cursor, 'order_received',
+                       f"New Order #{order_id} Received",
+                       f"A new order of Rs. {final_total} has been placed.",
+                       order_id)
         conn.commit()
 
-        # ── COD: done ────────────────────────────────────────────────────────
+        # ── COD: return (points awarded when admin marks order as shipped) ──
         if body.payment_method == 'cod':
-            return jsonify({'id': order_id, 'total_amount': total, 'payment_method': 'cod'}), 201
+            return jsonify({
+                'id': order_id,
+                'total_amount': final_total,
+                'payment_method': 'cod',
+            }), 201
 
         transaction_uuid = f"order-{order_id}-{int(time.time() * 1000)}"
+        final_str = f"{final_total:.2f}"
 
         # ── eSewa ────────────────────────────────────────────────────────────
         if body.payment_method == 'esewa':
-            total_str = f"{total:.2f}"   # must be "500.00" not "500.0"
-            message = f"total_amount={total_str},transaction_uuid={transaction_uuid},product_code={ESEWA_PRODUCT_CODE}"
+            message = f"total_amount={final_str},transaction_uuid={transaction_uuid},product_code={ESEWA_PRODUCT_CODE}"
             sig = base64.b64encode(
                 hmac.new(ESEWA_SECRET.encode(), message.encode(), hashlib.sha256).digest()
             ).decode()
 
             esewa_params = {
-                'amount': total_str,
+                'amount': final_str,
                 'tax_amount': '0',
-                'total_amount': total_str,
+                'total_amount': final_str,
                 'transaction_uuid': transaction_uuid,
                 'product_code': ESEWA_PRODUCT_CODE,
                 'product_service_charge': '0',
@@ -474,7 +588,7 @@ def place_order():
             payload = {
                 'return_url': f"{FRONTEND_URL}/payment/khalti/return",
                 'website_url': FRONTEND_URL,
-                'amount': int(total * 100),   # paisa
+                'amount': int(final_total * 100),
                 'purchase_order_id': transaction_uuid,
                 'purchase_order_name': f"SmartDiet Order #{order_id}",
                 'customer_info': {
@@ -486,7 +600,6 @@ def place_order():
                 resp = http_req.post(KHALTI_INITIATE_URL, json=payload, headers=headers, timeout=10)
                 resp.raise_for_status()
             except http_req.RequestException as e:
-                # Roll back the order if Khalti initiation fails
                 cursor.execute("DELETE FROM order_items WHERE order_id = %s", (order_id,))
                 cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
                 conn.commit()
@@ -503,6 +616,122 @@ def place_order():
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/promo/available', methods=['GET'])
+@role_required('trainee')
+def available_promos():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        today = datetime.date.today()
+        cursor.execute(
+            """
+            SELECT p.id, p.code, p.description, p.discount_type, p.discount_value,
+                   p.min_order_amount, p.max_uses, p.current_uses, p.valid_from, p.valid_to
+            FROM promo_codes p
+            WHERE p.is_active = 1
+              AND (p.valid_from IS NULL OR p.valid_from <= %s)
+              AND (p.valid_to IS NULL OR p.valid_to >= %s)
+              AND (p.max_uses IS NULL OR p.current_uses < p.max_uses)
+              AND p.id NOT IN (
+                  SELECT promo_code_id FROM orders
+                  WHERE user_id = %s AND promo_code_id IS NOT NULL AND deleted_at IS NULL
+              )
+            ORDER BY p.created_at DESC
+            """,
+            (today, today, request.user_id),
+        )
+        return jsonify(cursor.fetchall())
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/promo/validate', methods=['POST'])
+@role_required('trainee')
+def validate_promo():
+    body = request.get_json() or {}
+    code = (body.get('code') or '').strip().upper()
+    order_total = float(body.get('order_total', 0))
+    if not code:
+        return jsonify({'error': 'code is required'}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, code, discount_type, discount_value, min_order_amount, "
+            "max_uses, current_uses, valid_from, valid_to, is_active "
+            "FROM promo_codes WHERE code = %s",
+            (code,),
+        )
+        promo = cursor.fetchone()
+        if not promo:
+            return jsonify({'error': 'Promo code not found'}), 404
+        if not promo['is_active']:
+            return jsonify({'error': 'Promo code is inactive'}), 400
+        today = datetime.date.today()
+        if promo['valid_from'] and today < promo['valid_from']:
+            return jsonify({'error': 'Promo code is not yet valid'}), 400
+        if promo['valid_to'] and today > promo['valid_to']:
+            return jsonify({'error': 'Promo code has expired'}), 400
+        if promo['max_uses'] is not None and promo['current_uses'] >= promo['max_uses']:
+            return jsonify({'error': 'Promo code usage limit reached'}), 400
+        if order_total > 0 and order_total < float(promo['min_order_amount']):
+            return jsonify({'error': f"Minimum order amount is Rs. {promo['min_order_amount']}"}), 400
+
+        if promo['discount_type'] == 'percentage':
+            discount = round(order_total * float(promo['discount_value']) / 100, 2) if order_total > 0 else 0
+        else:
+            discount = min(float(promo['discount_value']), order_total) if order_total > 0 else float(promo['discount_value'])
+
+        return jsonify({
+            'promo_id': promo['id'],
+            'code': promo['code'],
+            'discount_type': promo['discount_type'],
+            'discount_value': float(promo['discount_value']),
+            'discount_amount': discount,
+            'min_order_amount': float(promo['min_order_amount']),
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@user_bp.route('/points', methods=['GET'])
+@role_required('trainee')
+def get_points():
+    page, page_size, offset = parse_page_params(default_size=20)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT reward_points FROM users WHERE id = %s AND deleted_at IS NULL",
+            (request.user_id,),
+        )
+        user_row = cursor.fetchone()
+        if not user_row:
+            return jsonify({'error': 'User not found'}), 404
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM point_transactions WHERE user_id = %s",
+            (request.user_id,),
+        )
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            "SELECT id, points, type, reference_id, description, created_at "
+            "FROM point_transactions WHERE user_id = %s "
+            "ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            (request.user_id, page_size, offset),
+        )
+        return jsonify({
+            'reward_points': user_row['reward_points'],
+            'transactions': cursor.fetchall(),
+            'total': total,
+        })
     finally:
         cursor.close()
         conn.close()
@@ -592,14 +821,19 @@ def request_product():
         return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "INSERT INTO product_requests (user_id, product_name, description, reason) VALUES (%s,%s,%s,%s)",
-            (request.user_id, body.product_name, body.description, body.reason),
+            "INSERT INTO product_requests (user_id, product_name, description, reason, image_url) VALUES (%s,%s,%s,%s,%s)",
+            (request.user_id, body.product_name, body.description, body.reason, body.image_url),
         )
+        req_id = cursor.lastrowid
+        push_to_admins(cursor, 'product_request',
+                       'New Product Request',
+                       f"A user requested '{body.product_name}'.",
+                       req_id)
         conn.commit()
-        return jsonify({'id': cursor.lastrowid, 'message': 'Request submitted'}), 201
+        return jsonify({'id': req_id, 'message': 'Request submitted'}), 201
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -788,8 +1022,20 @@ def request_trainer():
             "INSERT INTO trainer_assignments (customer_id, trainer_id, customer_note) VALUES (%s,%s,%s)",
             (request.user_id, body.trainer_id, body.customer_note),
         )
+        assignment_id = cursor.lastrowid
+        cursor.execute("SELECT name FROM users WHERE id = %s", (request.user_id,))
+        requester = cursor.fetchone()
+        requester_name = requester['name'] if requester else 'A user'
+        push(cursor, body.trainer_id, 'trainer_request',
+             'New Client Request',
+             f"{requester_name} has requested you as their trainer.",
+             assignment_id)
+        push_to_admins(cursor, 'trainer_request',
+                       'New Trainer Request',
+                       f"{requester_name} has sent a trainer assignment request.",
+                       assignment_id)
         conn.commit()
-        return jsonify({'id': cursor.lastrowid, 'message': 'Request sent to trainer'}), 201
+        return jsonify({'id': assignment_id, 'message': 'Request sent to trainer'}), 201
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1083,6 +1329,10 @@ def update_subscription():
                 "subscription_payment_method='cash' WHERE id = %s",
                 (request.user_id,),
             )
+            push_to_admins(cursor, 'subscription_request',
+                           'New Pro Subscription Request',
+                           'A user has requested a Pro plan upgrade (cash payment). Please verify and approve.',
+                           request.user_id)
             conn.commit()
             return jsonify({'subscription_plan': 'pro', 'subscription_status': 'pending', 'payment_method': 'cash'})
 

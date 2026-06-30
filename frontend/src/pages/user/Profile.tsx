@@ -30,7 +30,7 @@ import {
   COOKING,
   STRESS,
 } from "./profile/constants";
-import ProfileSetup from "./ProfileSetup";
+import ProfileSetup from "./profile/ProfileSetup";
 import { AvatarModal } from "./profile/AvatarModal";
 import { useAuth } from "@/context/AuthContext";
 import type { BodyMetrics } from "@/types";
@@ -146,11 +146,11 @@ function StatCard({
         <span className={iconColor}>{icon}</span>
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
+        <p className="text-2xl font-bold text-gray-900 leading-tight">
+          {value}
+        </p>
         {sub && (
-          <p className={cn("text-xs font-semibold mt-0.5", subColor)}>
-            {sub}
-          </p>
+          <p className={cn("text-xs font-semibold mt-0.5", subColor)}>{sub}</p>
         )}
         <p className="text-xs text-gray-400 mt-0.5">{label}</p>
       </div>
@@ -223,13 +223,7 @@ function TagList({ items }: { items?: string[] }) {
   );
 }
 
-function TagSection({
-  label,
-  items,
-}: {
-  label: string;
-  items?: string[];
-}) {
+function TagSection({ label, items }: { label: string; items?: string[] }) {
   return (
     <div>
       <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
@@ -242,9 +236,14 @@ function TagSection({
 
 // ── BMI Gauge ─────────────────────────────────────────────────────────────────
 
-const BMI_MIN = 10, BMI_MAX = 40;
+const BMI_MIN = 10,
+  BMI_MAX = 40;
 function toGaugeAngle(bmi: number) {
-  return ((Math.min(Math.max(bmi, BMI_MIN), BMI_MAX) - BMI_MIN) / (BMI_MAX - BMI_MIN)) * 180;
+  return (
+    ((Math.min(Math.max(bmi, BMI_MIN), BMI_MAX) - BMI_MIN) /
+      (BMI_MAX - BMI_MIN)) *
+    180
+  );
 }
 function gaugePoint(cx: number, cy: number, r: number, deg: number) {
   const rad = ((180 - deg) * Math.PI) / 180;
@@ -258,36 +257,102 @@ function arcPath(cx: number, cy: number, r: number, s: number, e: number) {
 }
 const BMI_ZONES = [
   { label: "Underweight", start: 10, end: 18.5, color: "#60a5fa" },
-  { label: "Normal",      start: 18.5, end: 25,  color: "#34d399" },
-  { label: "Overweight",  start: 25,   end: 30,  color: "#fbbf24" },
-  { label: "Obese",       start: 30,   end: 40,  color: "#f87171" },
+  { label: "Normal", start: 18.5, end: 25, color: "#34d399" },
+  { label: "Overweight", start: 25, end: 30, color: "#fbbf24" },
+  { label: "Obese", start: 30, end: 40, color: "#f87171" },
 ];
 const BMI_CATEGORY_COLOR: Record<string, string> = {
-  Underweight: "#60a5fa", Normal: "#34d399", Overweight: "#fbbf24", Obese: "#f87171",
+  Underweight: "#60a5fa",
+  Normal: "#34d399",
+  Overweight: "#fbbf24",
+  Obese: "#f87171",
 };
 function BmiGauge({ bmi, category }: { bmi: number; category: string }) {
-  const cx = 110, cy = 100, r = 78, sw = 13;
+  const cx = 110,
+    cy = 100,
+    r = 78,
+    sw = 13;
   const needleDeg = toGaugeAngle(bmi);
   const tip = gaugePoint(cx, cy, r - 10, needleDeg);
   const accent = BMI_CATEGORY_COLOR[category] ?? "#34d399";
   return (
     <div className="flex flex-col items-center gap-2">
       <svg viewBox="0 0 220 110" className="w-full max-w-xs">
-        <path d={arcPath(cx, cy, r, BMI_MIN, BMI_MAX)} fill="none" stroke="#e5e7eb" strokeWidth={sw} />
+        <path
+          d={arcPath(cx, cy, r, BMI_MIN, BMI_MAX)}
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth={sw}
+        />
         {BMI_ZONES.map((z) => (
-          <path key={z.label} d={arcPath(cx, cy, r, z.start, z.end)} fill="none" stroke={z.color} strokeWidth={sw} strokeLinecap="butt" />
+          <path
+            key={z.label}
+            d={arcPath(cx, cy, r, z.start, z.end)}
+            fill="none"
+            stroke={z.color}
+            strokeWidth={sw}
+            strokeLinecap="butt"
+          />
         ))}
-        <line x1={cx} y1={cy} x2={tip.x} y2={tip.y} stroke="#111827" strokeWidth={2.5} strokeLinecap="round" />
+        <line
+          x1={cx}
+          y1={cy}
+          x2={tip.x}
+          y2={tip.y}
+          stroke="#111827"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
         <circle cx={cx} cy={cy} r={5} fill="#111827" />
-        <text x={cx} y={cy - 18} textAnchor="middle" fontSize={22} fontWeight="700" fill="#111827">{bmi}</text>
-        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={10} fill={accent} fontWeight="600">{category}</text>
-        <text x={cx - r - 4} y={cy + 14} textAnchor="end" fontSize={9} fill="#9ca3af">10</text>
-        <text x={cx + r + 4} y={cy + 14} textAnchor="start" fontSize={9} fill="#9ca3af">40</text>
+        <text
+          x={cx}
+          y={cy - 18}
+          textAnchor="middle"
+          fontSize={22}
+          fontWeight="700"
+          fill="#111827"
+        >
+          {bmi}
+        </text>
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fontSize={10}
+          fill={accent}
+          fontWeight="600"
+        >
+          {category}
+        </text>
+        <text
+          x={cx - r - 4}
+          y={cy + 14}
+          textAnchor="end"
+          fontSize={9}
+          fill="#9ca3af"
+        >
+          10
+        </text>
+        <text
+          x={cx + r + 4}
+          y={cy + 14}
+          textAnchor="start"
+          fontSize={9}
+          fill="#9ca3af"
+        >
+          40
+        </text>
       </svg>
       <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
         {BMI_ZONES.map((z) => (
-          <span key={z.label} className="flex items-center gap-1 text-xs text-gray-500">
-            <span className="h-2 w-2 rounded-full inline-block" style={{ background: z.color }} />
+          <span
+            key={z.label}
+            className="flex items-center gap-1 text-xs text-gray-500"
+          >
+            <span
+              className="h-2 w-2 rounded-full inline-block"
+              style={{ background: z.color }}
+            />
             {z.label}
           </span>
         ))}
@@ -300,14 +365,20 @@ function BmiGauge({ bmi, category }: { bmi: number; category: string }) {
 
 const MACRO_CONFIG = [
   { key: "protein", label: "Protein", color: "#a78bfa", calPerG: 4 },
-  { key: "carbs",   label: "Carbs",   color: "#60a5fa", calPerG: 4 },
-  { key: "fat",     label: "Fat",     color: "#fbbf24", calPerG: 9 },
+  { key: "carbs", label: "Carbs", color: "#60a5fa", calPerG: 4 },
+  { key: "fat", label: "Fat", color: "#fbbf24", calPerG: 9 },
 ] as const;
 
 function MacroDonut({ macros }: { macros: BodyMetrics["macros"] }) {
-  const cx = 60, cy = 60, r = 44, sw = 14;
+  const cx = 60,
+    cy = 60,
+    r = 44,
+    sw = 14;
   const circumference = 2 * Math.PI * r;
-  const cals = MACRO_CONFIG.map((m) => ({ ...m, kcal: macros[m.key] * m.calPerG }));
+  const cals = MACRO_CONFIG.map((m) => ({
+    ...m,
+    kcal: macros[m.key] * m.calPerG,
+  }));
   const totalKcal = cals.reduce((s, m) => s + m.kcal, 0) || 1;
   let offset = 0;
   const segments = cals.map((m) => {
@@ -320,10 +391,27 @@ function MacroDonut({ macros }: { macros: BodyMetrics["macros"] }) {
   return (
     <div className="flex items-center gap-6">
       <svg viewBox="0 0 120 120" className="w-28 h-28 shrink-0 -rotate-90">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={sw} />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke="#f3f4f6"
+          strokeWidth={sw}
+        />
         {segments.map((s) => (
-          <circle key={s.key} cx={cx} cy={cy} r={r} fill="none" stroke={s.color} strokeWidth={sw}
-            strokeDasharray={`${s.dash} ${s.gap}`} strokeDashoffset={-s.offset} strokeLinecap="butt" />
+          <circle
+            key={s.key}
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={s.color}
+            strokeWidth={sw}
+            strokeDasharray={`${s.dash} ${s.gap}`}
+            strokeDashoffset={-s.offset}
+            strokeLinecap="butt"
+          />
         ))}
       </svg>
       <div className="flex flex-col gap-2 min-w-0">
@@ -332,15 +420,24 @@ function MacroDonut({ macros }: { macros: BodyMetrics["macros"] }) {
           const pct = Math.round(((grams * m.calPerG) / totalKcal) * 100);
           return (
             <div key={m.key} className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: m.color }} />
-              <span className="text-sm font-medium text-gray-700 w-14">{m.label}</span>
-              <span className="text-sm text-gray-900 font-semibold">{grams}g</span>
+              <span
+                className="h-2.5 w-2.5 rounded-full shrink-0"
+                style={{ background: m.color }}
+              />
+              <span className="text-sm font-medium text-gray-700 w-14">
+                {m.label}
+              </span>
+              <span className="text-sm text-gray-900 font-semibold">
+                {grams}g
+              </span>
               <span className="text-xs text-gray-400 ml-auto">{pct}%</span>
             </div>
           );
         })}
         <div className="mt-1 pt-1 border-t border-gray-100">
-          <span className="text-xs text-gray-500">Total macros ≈ {Math.round(totalKcal)} kcal</span>
+          <span className="text-xs text-gray-500">
+            Total macros ≈ {Math.round(totalKcal)} kcal
+          </span>
         </div>
       </div>
     </div>
@@ -349,12 +446,27 @@ function MacroDonut({ macros }: { macros: BodyMetrics["macros"] }) {
 
 // ── Metric Row Card ───────────────────────────────────────────────────────────
 
-function MetricRowCard({ icon, label, value, unit, sub, accent }: {
-  icon: React.ReactNode; label: string; value: number; unit: string; sub: string; accent: string;
+function MetricRowCard({
+  icon,
+  label,
+  value,
+  unit,
+  sub,
+  accent,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  unit: string;
+  sub: string;
+  accent: string;
 }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: `${accent}18` }}>
+      <div
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+        style={{ background: `${accent}18` }}
+      >
         <span style={{ color: accent }}>{icon}</span>
       </div>
       <div>
@@ -567,7 +679,9 @@ export default function Profile() {
           {/* ── Body Metrics ──────────────────────────────── */}
           {metrics && (
             <section className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">Body Metrics</h2>
+              <h2 className="text-base font-semibold text-gray-800">
+                Body Metrics
+              </h2>
               <div className="grid gap-4 lg:grid-cols-3">
                 <Card className="lg:col-span-1">
                   <CardHeader className="pb-1">
@@ -576,7 +690,10 @@ export default function Profile() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <BmiGauge bmi={metrics.bmi} category={metrics.bmi_category} />
+                    <BmiGauge
+                      bmi={metrics.bmi}
+                      category={metrics.bmi_category}
+                    />
                   </CardContent>
                 </Card>
                 <div className="lg:col-span-2 flex flex-col gap-4">
@@ -688,9 +805,7 @@ export default function Profile() {
               <div className="grid grid-cols-2 gap-3">
                 <InfoItem
                   label="Diet Type"
-                  value={
-                    data?.diet_type ? DIET_MAP[data.diet_type] : undefined
-                  }
+                  value={data?.diet_type ? DIET_MAP[data.diet_type] : undefined}
                 />
                 <TagSection
                   label="Dietary Restrictions"
@@ -698,10 +813,7 @@ export default function Profile() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <TagSection
-                  label="Allergens"
-                  items={asArr(data?.allergens)}
-                />
+                <TagSection label="Allergens" items={asArr(data?.allergens)} />
                 <TagSection
                   label="Cuisine Preferences"
                   items={asArr(data?.cuisine_preferences)}
@@ -749,9 +861,7 @@ export default function Profile() {
               <InfoItem
                 label="Stress Level"
                 value={
-                  data?.stress_level
-                    ? STRESS_MAP[data.stress_level]
-                    : undefined
+                  data?.stress_level ? STRESS_MAP[data.stress_level] : undefined
                 }
               />
               <InfoItem

@@ -184,6 +184,7 @@ def _mark_paid(order_id: int, ref: str):
             "UPDATE orders SET payment_status = 'paid', payment_ref = %s WHERE id = %s",
             (ref, order_id),
         )
+
         conn.commit()
         return jsonify({'message': 'Payment verified', 'order_id': order_id})
     except Exception as e:

@@ -41,12 +41,12 @@ export default function HeroSection() {
       </div>
 
       <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24 text-center">
-        <div className="hero-tag mb-6 flex justify-center">
+        {/* <div className="hero-tag mb-6 flex justify-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-5 py-2 text-sm font-medium text-emerald-300 backdrop-blur">
             <Leaf className="h-3.5 w-3.5" /> Nepal's Smart Fitness & Nutrition
             Platform
           </span>
-        </div>
+        </div> */}
         <h1 className="hero-h1 text-5xl font-extrabold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
           Transform Your Health
           <br />
