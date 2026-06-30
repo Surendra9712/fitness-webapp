@@ -24,7 +24,7 @@ export default function Navbar() {
           <Link to="/" className="flex items-center gap-2">
             <Leaf className="h-5 w-5 text-emerald-600" />
             <span className="text-lg font-bold tracking-tight text-emerald-900">
-              FitStore
+              SmartDiet Pro
             </span>
           </Link>
 
