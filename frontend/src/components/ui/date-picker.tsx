@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import "react-day-picker/dist/style.css";
+const today = new Date();
 
 export interface DatePickerProps {
   value?: string; // YYYY-MM-DD or ""
@@ -30,14 +31,14 @@ export function DatePicker({
   disabled,
   disabledDates,
   startYear = 1940,
-  endYear = new Date().getFullYear(),
-  defaultMonth,
+  endYear = today.getFullYear(),
+  defaultMonth = today,
   className,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
   // Append T00:00:00 to avoid timezone-shift when parsing YYYY-MM-DD
-  const selected = value ? new Date(value + "T00:00:00") : undefined;
+  const selected = value ? new Date(value) : null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

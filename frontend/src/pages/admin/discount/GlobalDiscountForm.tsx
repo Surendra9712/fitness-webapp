@@ -217,6 +217,16 @@ export default function GlobalDiscountForm() {
                       onChange={(v) => field.onChange(v || null)}
                       placeholder="No start date"
                       disabled={!isActive}
+                      disabledDates={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        const d = new Date(date);
+                        d.setHours(0, 0, 0, 0);
+
+                        return d < today;
+                      }}
+                      startYear={new Date().getFullYear()}
                       endYear={new Date().getFullYear() + 5}
                     />
                   </FormControl>
@@ -236,6 +246,16 @@ export default function GlobalDiscountForm() {
                       onChange={(v) => field.onChange(v || null)}
                       placeholder="No end date"
                       disabled={!isActive}
+                      disabledDates={(date) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        const d = new Date(date);
+                        d.setHours(0, 0, 0, 0);
+
+                        return d < today;
+                      }}
+                      startYear={new Date().getFullYear()}
                       endYear={new Date().getFullYear() + 5}
                     />
                   </FormControl>

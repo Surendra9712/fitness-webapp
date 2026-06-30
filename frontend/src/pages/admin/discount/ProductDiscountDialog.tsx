@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogBody,
 } from "@/components/ui/dialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ export default function ProductDiscountDialog({
   const { SetProductDiscount, ClearProductDiscount } = useAdmin();
   const setDiscount = SetProductDiscount();
   const clearDiscount = ClearProductDiscount();
-
+  const today = new Date();
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -138,125 +139,154 @@ export default function ProductDiscountDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Set Discount — {product.name}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Original price:{" "}
-              <strong>Rs. {Number(product.price).toFixed(2)}</strong>
-            </p>
+            <DialogBody>
+              <p className="text-sm text-muted-foreground">
+                Original price:{" "}
+                <strong>Rs. {Number(product.price).toFixed(2)}</strong>
+              </p>
 
-            {/* Discount type */}
-            <FormField
-              control={form.control}
-              name="discount_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Discount Type</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="percentage">Percentage (%)</SelectItem>
-                      <SelectItem value="fixed">Fixed Amount (Rs.)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Discount value */}
-            <FormField
-              control={form.control}
-              name="discount_value"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Discount Value{" "}
-                    <span className="font-normal text-muted-foreground">
-                      ({discountType === "percentage" ? "%" : "Rs."})
-                    </span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      step={discountType === "percentage" ? "1" : "0.01"}
-                      max={discountType === "percentage" ? "100" : undefined}
-                      placeholder={
-                        discountType === "percentage" ? "e.g. 10" : "e.g. 500"
-                      }
-                      value={field.value || ""}
-                      onChange={(e) =>
-                        field.onChange(parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Date range */}
-            <div className="grid grid-cols-2 gap-3">
+              {/* Discount type */}
               <FormField
                 control={form.control}
-                name="valid_from"
+                name="discount_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valid From</FormLabel>
+                    <FormLabel>Discount Type</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="percentage">
+                          Percentage (%)
+                        </SelectItem>
+                        <SelectItem value="fixed">
+                          Fixed Amount (Rs.)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Discount value */}
+              <FormField
+                control={form.control}
+                name="discount_value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Discount Value{" "}
+                      <span className="font-normal text-muted-foreground">
+                        ({discountType === "percentage" ? "%" : "Rs."})
+                      </span>
+                    </FormLabel>
                     <FormControl>
-                      <DatePicker
-                        value={field.value ?? ""}
-                        onChange={(v) => field.onChange(v || null)}
-                        placeholder="No start date"
-                        endYear={new Date().getFullYear() + 5}
+                      <Input
+                        type="number"
+                        min="0"
+                        step={discountType === "percentage" ? "1" : "0.01"}
+                        max={discountType === "percentage" ? "100" : undefined}
+                        placeholder={
+                          discountType === "percentage" ? "e.g. 10" : "e.g. 500"
+                        }
+                        value={field.value || ""}
+                        onChange={(e) =>
+                          field.onChange(parseFloat(e.target.value) || 0)
+                        }
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="valid_to"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valid To</FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        value={field.value ?? ""}
-                        onChange={(v) => field.onChange(v || null)}
-                        placeholder="No end date"
-                        endYear={new Date().getFullYear() + 5}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
-            {/* Price preview */}
-            {effectivePrice != null && (
-              <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-sm">
-                <span className="text-muted-foreground">Discounted price: </span>
-                <strong className="text-primary-700 text-base">
-                  Rs. {effectivePrice.toFixed(2)}
-                </strong>
-                <span className="ml-2 line-through text-muted-foreground text-xs">
-                  Rs. {Number(product.price).toFixed(2)}
-                </span>
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="valid_from"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valid From</FormLabel>
+                      <FormControl>
+                        <DatePicker
+                          value={field.value ?? ""}
+                          onChange={(v) => field.onChange(v || null)}
+                          placeholder="No start date"
+                          disabledDates={(date) => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+
+                            const d = new Date(date);
+                            d.setHours(0, 0, 0, 0);
+
+                            return d < today;
+                          }}
+                          defaultMonth={today}
+                          startYear={new Date().getFullYear()}
+                          endYear={new Date().getFullYear() + 5}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="valid_to"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valid To</FormLabel>
+                      <FormControl>
+                        <DatePicker
+                          value={field.value ?? ""}
+                          onChange={(v) => field.onChange(v || null)}
+                          placeholder="No end date"
+                          disabledDates={(date) => {
+                            today.setHours(0, 0, 0, 0);
+
+                            const d = new Date(date);
+                            d.setHours(0, 0, 0, 0);
+
+                            return d < today;
+                          }}
+                          defaultMonth={today}
+                          startYear={new Date().getFullYear()}
+                          endYear={new Date().getFullYear() + 5}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            )}
+
+              {/* Price preview */}
+              {effectivePrice != null && (
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-4 py-3 text-sm mt-4">
+                  <span className="text-muted-foreground">
+                    Discounted price:{" "}
+                  </span>
+                  <strong className="text-primary-700 text-base">
+                    Rs. {effectivePrice.toFixed(2)}
+                  </strong>
+                  <span className="ml-2 line-through text-muted-foreground text-xs">
+                    Rs. {Number(product.price).toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </DialogBody>
 
             <DialogFooter className="gap-2 pt-2">
               {product.discount_value && (
