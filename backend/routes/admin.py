@@ -911,8 +911,16 @@ def update_order_status(oid):
         if not order:
             return jsonify({'error': 'Order not found'}), 404
 
-        cursor.execute("UPDATE orders SET status = %s WHERE id = %s", (body.status, oid))
-
+        if body.status == "delivered":
+            cursor.execute(
+                "UPDATE orders SET status = %s, payment_status = 'paid' WHERE id = %s",
+                (body.status, oid),
+            )
+        else:
+            cursor.execute(
+                "UPDATE orders SET status = %s WHERE id = %s",
+                (body.status, oid),
+            )
         # Award reward points only when order is first marked shipped
         if body.status == 'shipped' and order['status'] != 'shipped':
             points_earned = int(float(order['total_amount'] or 0) // 50)

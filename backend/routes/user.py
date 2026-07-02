@@ -1,16 +1,18 @@
 from flask import Blueprint, request, jsonify
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from pydantic import ConfigDict
-from typing import Optional
+from typing import List, Optional
 import base64
 import datetime
 import hashlib
 import hmac
+import json
 import os
 import time
 import requests as http_req
 from database.connection import get_connection
-from middleware.auth import role_required
+from middleware.auth import generate_token, role_required
+from routes.dietitian import UpdateTrainerProfileSchema, CertificationSchema
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_admins
@@ -26,6 +28,10 @@ user_bp = Blueprint('user', __name__)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
+class BecomeTrainerSchema(UpdateTrainerProfileSchema):
+    certifications: List[CertificationSchema] = Field(default_factory=list)
+
 
 class LogExerciseSchema(BaseModel):
     exercise_id: int
@@ -1363,6 +1369,86 @@ def update_subscription():
             'esewa_params': esewa_params,
         })
 
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Become a trainer ─────────────────────────────────────────────────────────
+
+@user_bp.route('/become-trainer', methods=['POST'])
+@role_required('trainee')
+def become_trainer():
+    try:
+        body = BecomeTrainerSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    if not body.experience_years:
+        return jsonify({'error': 'Experience years is required'}), 422
+    if not body.available_time:
+        return jsonify({'error': 'At least one availability slot is required'}), 422
+    if not body.certifications:
+        return jsonify({'error': 'At least one certification is required'}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT full_name FROM user_profiles WHERE user_id = %s", (request.user_id,),
+        )
+        row = cursor.fetchone()
+        if not row or not row['full_name']:
+            return jsonify({'error': 'Complete your profile before requesting to become a trainer'}), 400
+
+        updates = body.model_dump(exclude={'certifications'}, exclude_unset=True)
+        user_fields    = {k: v for k, v in updates.items() if k in ('name', 'profile_image_url')}
+        profile_fields = {k: v for k, v in updates.items() if k not in ('name',)}
+        if 'available_time' in profile_fields:
+            profile_fields['available_time'] = json.dumps(profile_fields['available_time'])
+
+        if user_fields:
+            set_clause = ', '.join(f"{k} = %s" for k in user_fields)
+            cursor.execute(
+                f"UPDATE users SET {set_clause} WHERE id = %s",
+                list(user_fields.values()) + [request.user_id],
+            )
+        if profile_fields:
+            set_clause = ', '.join(f"{k} = %s" for k in profile_fields)
+            cursor.execute(
+                f"UPDATE user_profiles SET {set_clause} WHERE user_id = %s",
+                list(profile_fields.values()) + [request.user_id],
+            )
+
+        for cert in body.certifications:
+            cursor.execute(
+                "INSERT INTO trainer_certifications (user_id, name, issued_by, issued_date, file_url, file_type) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (request.user_id, cert.name, cert.issued_by or None,
+                 cert.issued_date or None, cert.file_url or None, cert.file_type),
+            )
+
+        cursor.execute(
+            "UPDATE users SET role='dietitian', is_verified=0 WHERE id = %s",
+            (request.user_id,),
+        )
+
+        cursor.execute("SELECT name, email FROM users WHERE id = %s", (request.user_id,))
+        user = cursor.fetchone()
+        push_to_admins(cursor, 'trainer_signup_request',
+                       'New Trainer Request',
+                       f"{user['name']} has requested to become a trainer. Please review and verify.",
+                       request.user_id)
+        conn.commit()
+
+        token = generate_token(request.user_id, 'dietitian')
+        return jsonify({
+            'token': token,
+            'user': {'id': request.user_id, 'name': user['name'], 'email': user['email'], 'role': 'dietitian'},
+        }), 201
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

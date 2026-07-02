@@ -1,7 +1,41 @@
+import bcrypt
+import json
 from flask import Blueprint, request, jsonify
+from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
+from typing import List, Optional
 from database.connection import get_connection
+from middleware.auth import generate_token
+from routes.dietitian import CertificationSchema
+from utils.notify import push_to_admins
+from utils.validation import pydantic_errors
 
 public_bp = Blueprint('public', __name__)
+
+
+class PublicBecomeTrainerSchema(BaseModel):
+    name: str = Field(min_length=1)
+    email: EmailStr
+    password: str = Field(min_length=6)
+    date_of_birth: str = Field(min_length=1)
+    specialization: str = Field(min_length=1)
+    experience_years: int
+    bio: Optional[str] = None
+    phone_number: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    available_time: List[dict] = Field(default_factory=list)
+    certifications: List[CertificationSchema] = Field(default_factory=list)
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def strip_name(cls, v):
+        return str(v).strip() if v else v
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def normalise_email(cls, v):
+        return str(v).strip().lower() if v else v
 
 
 def _compute_discounted_price(price, discount_type, discount_value):
@@ -170,6 +204,80 @@ def list_product_reviews(product_id):
         reviews = cursor.fetchall()
         avg = sum(r['rating'] for r in reviews) / len(reviews) if reviews else 0
         return jsonify({'reviews': reviews, 'avg_rating': round(avg, 1), 'count': len(reviews)})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@public_bp.route('/become-trainer', methods=['POST'])
+def become_trainer_public():
+    try:
+        body = PublicBecomeTrainerSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    if not body.available_time:
+        return jsonify({'error': 'At least one availability slot is required'}), 422
+    if not body.certifications:
+        return jsonify({'error': 'At least one certification is required'}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id FROM users WHERE email = %s", (body.email,))
+        if cursor.fetchone():
+            return jsonify({'errors': {'email': 'Email already registered'}}), 422
+
+        password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+        cursor.execute(
+            "INSERT INTO users (name, email, password_hash, role, status, is_verified) "
+            "VALUES (%s, %s, %s, 'dietitian', 'active', 0)",
+            (body.name, body.email, password_hash),
+        )
+        user_id = cursor.lastrowid
+        cursor.execute("INSERT INTO user_profiles (user_id) VALUES (%s)", (user_id,))
+
+        profile_fields = {
+            'full_name':         body.name,
+            'date_of_birth':     body.date_of_birth,
+            'bio':                body.bio,
+            'specialization':    body.specialization,
+            'experience_years':  body.experience_years,
+            'phone_number':      body.phone_number,
+            'city':              body.city,
+            'country':           body.country,
+            'profile_image_url': body.profile_image_url,
+            'available_time':    json.dumps(body.available_time),
+        }
+        profile_fields = {k: v for k, v in profile_fields.items() if v is not None}
+        set_clause = ', '.join(f"{k} = %s" for k in profile_fields)
+        cursor.execute(
+            f"UPDATE user_profiles SET {set_clause} WHERE user_id = %s",
+            list(profile_fields.values()) + [user_id],
+        )
+
+        for cert in body.certifications:
+            cursor.execute(
+                "INSERT INTO trainer_certifications (user_id, name, issued_by, issued_date, file_url, file_type) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (user_id, cert.name, cert.issued_by or None,
+                 cert.issued_date or None, cert.file_url or None, cert.file_type),
+            )
+
+        push_to_admins(cursor, 'trainer_signup_request',
+                       'New Trainer Request',
+                       f"{body.name} has requested to become a trainer. Please review and verify.",
+                       user_id)
+        conn.commit()
+
+        token = generate_token(user_id, 'dietitian')
+        return jsonify({
+            'token': token,
+            'user': {'id': user_id, 'name': body.name, 'email': body.email, 'role': 'dietitian'},
+        }), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

@@ -2,7 +2,16 @@ import { useQuery, useMutation, UseQueryResult, UseMutationResult } from "@tanst
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
 import type { QueryArgs } from "@/interfaces/iUseApi";
-import type { Product, Category, ReviewStats, PaginatedResponse, ReviewPayload, TrainerInfo } from "@/types";
+import type {
+  Product,
+  Category,
+  ReviewStats,
+  PaginatedResponse,
+  ReviewPayload,
+  TrainerInfo,
+  PublicBecomeTrainerPayload,
+  BecomeTrainerResult,
+} from "@/types";
 
 interface UsePublicReturn {
   GetProducts: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Product>>;
@@ -12,6 +21,7 @@ interface UsePublicReturn {
   GetProductReviews: (productId?: string | number) => UseQueryResult<ReviewStats>;
   SubmitProductReview: (productId?: string | number) => UseMutationResult<void, Error, ReviewPayload>;
   DeleteProductReview: (productId?: string | number) => UseMutationResult<void, Error, void>;
+  BecomeTrainer: () => UseMutationResult<BecomeTrainerResult, Error, PublicBecomeTrainerPayload>;
 }
 
 const usePublic = (): UsePublicReturn => {
@@ -61,10 +71,19 @@ const usePublic = (): UsePublicReturn => {
       },
     });
 
+  const BecomeTrainer = () =>
+    useMutation({
+      mutationFn: async (payload: PublicBecomeTrainerPayload) => {
+        const { data } = await api.post(endpoint.publicBecomeTrainer, payload);
+        return data as BecomeTrainerResult;
+      },
+    });
+
   return {
     GetProducts, GetProduct,
     GetCategories, GetTrainers,
     GetProductReviews, SubmitProductReview, DeleteProductReview,
+    BecomeTrainer,
   } as UsePublicReturn;
 };
 

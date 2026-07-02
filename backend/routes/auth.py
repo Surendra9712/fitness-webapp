@@ -33,7 +33,6 @@ class RegisterSchema(BaseModel):
     name: str = Field(min_length=1)
     email: EmailStr
     password: str = Field(min_length=6)
-    role: Literal['trainee', 'dietitian'] = 'trainee'
 
     @field_validator('name', mode='before')
     @classmethod
@@ -64,7 +63,8 @@ def register():
     except ValidationError as exc:
         return jsonify({'errors': pydantic_errors(exc)}), 422
 
-    name, email, password, role = body.name, body.email, body.password, body.role
+    name, email, password = body.name, body.email, body.password
+    role = 'trainee'
 
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 

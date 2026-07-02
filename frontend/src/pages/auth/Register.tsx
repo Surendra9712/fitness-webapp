@@ -9,15 +9,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/constant";
 import { ApiError } from "@/api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, User, Lock, EyeOff, Eye, Loader2 } from "lucide-react";
@@ -30,7 +22,6 @@ const registerSchema = z.object({
   name: z.string().min(1, "Full name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["trainee", "dietitian"]),
 });
 type RegisterValues = z.infer<typeof registerSchema>;
 
@@ -42,15 +33,15 @@ export const RegisterForm = () => {
 
   const form = useForm<RegisterValues>({
     // resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "", role: "trainee" },
+    defaultValues: { name: "", email: "", password: "" },
   });
   const { isSubmitting } = form.formState;
 
   async function onSubmit(data: RegisterValues) {
     setServerError("");
     try {
-      await registerUser(data.name, data.email, data.password, data.role);
-      navigate(getDashboardPath(data.role));
+      await registerUser(data.name, data.email, data.password);
+      navigate("/customer");
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors) {
         Object.entries(err.fieldErrors).forEach(([field, message]) => {
@@ -155,30 +146,6 @@ export const RegisterForm = () => {
                     </button>
                   </div>
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="role"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                  I am a…
-                </FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="trainee">Trainee</SelectItem>
-                    <SelectItem value="dietitian">Trainer</SelectItem>
-                  </SelectContent>
-                </Select>
                 <FormMessage />
               </FormItem>
             )}

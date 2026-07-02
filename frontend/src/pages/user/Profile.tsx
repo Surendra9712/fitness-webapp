@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Camera,
   Pencil,
@@ -17,6 +18,7 @@ import {
   Zap,
   Flame,
   Droplets,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -612,6 +614,19 @@ export default function Profile() {
                 <MapPin className="h-3.5 w-3.5" />
                 {[data.city, data.country].filter(Boolean).join(", ")}
               </span>
+            )}
+            {data?.role === "trainee" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-7 px-3 text-xs"
+                asChild
+              >
+                <Link to="/customer/become-trainer">
+                  <Award className="h-3.5 w-3.5" />
+                  Become a Trainer
+                </Link>
+              </Button>
             )}
           </div>
         </div>

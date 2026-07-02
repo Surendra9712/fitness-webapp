@@ -6,6 +6,7 @@ import { getDashboardPath } from "@/lib/constant";
 import { Toaster } from "@/components/ui/sonner";
 
 import Home from "@/pages/Home";
+import PublicBecomeTrainer from "@/pages/PublicBecomeTrainer";
 import Products from "@/pages/product/Products";
 import ProductDetail from "@/pages/product/ProductDetail";
 import PaymentReturn from "@/pages/product/PaymentReturn";
@@ -20,7 +21,7 @@ import OrderManagement from "@/pages/admin/OrderManagement";
 import CategoryManagement from "@/pages/admin/category/CategoryManagement";
 import TrainerAssignments from "@/pages/admin/TrainerAssignments";
 import TrainerVerification from "@/pages/admin/TrainerVerification";
-import SubscriptionManagement from "@/pages/admin/SubscriptionManagement";
+import SubscriptionManagement from "@/pages/admin/subscription/SubscriptionManagement";
 import PromoCodeManagement from "@/pages/admin/PromoCodeManagement";
 import DiscountManagement from "@/pages/admin/discount/DiscountManagement";
 import SubscriptionPaymentReturn from "@/pages/user/subscription/SubscriptionPaymentReturn";
@@ -34,6 +35,7 @@ import MyOrders from "@/pages/user/MyOrders";
 import RequestProduct from "@/pages/user/RequestProduct";
 import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
+import BecomeTrainer from "@/pages/user/BecomeTrainer";
 import MyTrainer from "@/pages/user/trainer/MyTrainer";
 import TrainerDetail from "@/pages/user/trainer/TrainerDetail";
 import Subscription from "@/pages/user/subscription/Subscription";
@@ -68,6 +70,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/become-trainer" element={<PublicBecomeTrainer />} />
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/payment/esewa/success" element={<PaymentReturn />} />
@@ -323,6 +326,16 @@ export default function App() {
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <MyTrainer />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/become-trainer"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <BecomeTrainer />
                 </Layout>
               </ProtectedRoute>
             }

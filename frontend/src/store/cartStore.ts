@@ -5,7 +5,7 @@ export interface CartItem {
   product_id: number;
   name: string;
   price: number;
-  discounted_price?: number | null;
+  discounted_price: number | null;
   quantity: number;
   stock_quantity: number;
 }

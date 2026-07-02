@@ -417,6 +417,7 @@ export type NotificationType =
   | 'product_request_rejected'
   | 'trainer_request'
   | 'trainer_request_to_admin'
+  | 'trainer_signup_request'
   | 'trainer_accepted'
   | 'trainer_approved'
   | 'trainer_rejected';
@@ -430,6 +431,49 @@ export interface Notification {
   reference_id?: number;
   is_read: boolean | number;
   created_at: string;
+}
+
+export interface BecomeTrainerPayload {
+  full_name?: string;
+  date_of_birth?: string;
+  bio?: string;
+  specialization?: string;
+  experience_years?: number;
+  phone_number?: string;
+  city?: string;
+  country?: string;
+  profile_image_url?: string;
+  available_time: AvailableSlot[];
+  certifications: {
+    name: string;
+    file_url?: string;
+    file_type: "image" | "pdf" | "url";
+  }[];
+}
+
+export interface PublicBecomeTrainerPayload {
+  name: string;
+  email: string;
+  password: string;
+  date_of_birth: string;
+  specialization: string;
+  experience_years: number;
+  bio?: string;
+  phone_number?: string;
+  city?: string;
+  country?: string;
+  profile_image_url?: string;
+  available_time: AvailableSlot[];
+  certifications: {
+    name: string;
+    file_url?: string;
+    file_type: "image" | "pdf" | "url";
+  }[];
+}
+
+export interface BecomeTrainerResult {
+  token: string;
+  user: { id: number; name: string; email: string; role: "dietitian" };
 }
 
 export interface UpdateProfilePayload {

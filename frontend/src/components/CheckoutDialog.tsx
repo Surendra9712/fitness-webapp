@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import type { GlobalDiscount } from "@/types";
-import { useCartStore } from "@/store/cartStore";
+import { CartItem, useCartStore } from "@/store/cartStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,12 +32,13 @@ export interface CheckoutItem {
   name: string;
   price: number;
   stock_quantity: number;
+  discounted_price: number;
 }
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  items: CheckoutItem[];
+  items: CartItem[];
   onSuccess: () => void;
 }
 
@@ -99,7 +100,7 @@ export default function CheckoutDialog({
   onSuccess,
 }: Props) {
   const { setQty, remove, clear, items } = useCartStore();
-  const [cartItems, setCartItems] = useState<CheckoutItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [shippingAddress, setShippingAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
 
@@ -115,7 +116,8 @@ export default function CheckoutDialog({
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [availablePoints, setAvailablePoints] = useState(0);
 
-  const { CreateOrder, ValidatePromo, GetPoints, GetGlobalDiscount } = useUser();
+  const { CreateOrder, ValidatePromo, GetPoints, GetGlobalDiscount } =
+    useUser();
   const createOrder = CreateOrder();
   const validatePromo = ValidatePromo();
 
@@ -141,25 +143,37 @@ export default function CheckoutDialog({
 
   // Use discounted_price if available, otherwise original price
   const cartTotal = cartItems.reduce(
-    (s, i) => s + (i.discounted_price != null ? i.discounted_price : i.price) * i.quantity,
+    (s, i) =>
+      s +
+      (i.discounted_price != null ? i.discounted_price : i.price) * i.quantity,
     0,
   );
   const itemDiscountTotal = cartItems.reduce(
-    (s, i) => s + (i.discounted_price != null ? (i.price - i.discounted_price) * i.quantity : 0),
+    (s, i) =>
+      s +
+      (i.discounted_price != null
+        ? (i.price - i.discounted_price) * i.quantity
+        : 0),
     0,
   );
 
   const globalDiscountAmount = (() => {
     if (!globalDiscount?.is_active || !globalDiscount.discount_value) return 0;
     if (globalDiscount.discount_type === "percentage") {
-      return Math.round((cartTotal * globalDiscount.discount_value) / 100 * 100) / 100;
+      return (
+        Math.round(((cartTotal * globalDiscount.discount_value) / 100) * 100) /
+        100
+      );
     }
     return Math.min(globalDiscount.discount_value, cartTotal);
   })();
 
   const promoDiscount = appliedPromo?.discount_amount ?? 0;
   const pointsDiscount = usePoints ? pointsToRedeem : 0;
-  const finalTotal = Math.max(0, cartTotal - globalDiscountAmount - promoDiscount - pointsDiscount);
+  const finalTotal = Math.max(
+    0,
+    cartTotal - globalDiscountAmount - promoDiscount - pointsDiscount,
+  );
 
   function updateQty(productId: number, delta: number) {
     setCartItems((prev) => {
@@ -308,8 +322,12 @@ export default function CheckoutDialog({
                       </p>
                       {item.discounted_price != null ? (
                         <p className="text-xs">
-                          <span className="text-primary-700 font-semibold">Rs. {item.discounted_price}</span>
-                          <span className="ml-1 line-through text-muted-foreground">Rs. {item.price}</span>
+                          <span className="text-primary-700 font-semibold">
+                            Rs. {item.discounted_price}
+                          </span>
+                          <span className="ml-1 line-through text-muted-foreground">
+                            Rs. {item.price}
+                          </span>
                         </p>
                       ) : (
                         <p className="text-xs text-muted-foreground">
@@ -331,7 +349,12 @@ export default function CheckoutDialog({
                     )}
 
                     <span className="w-20 text-right text-sm font-semibold shrink-0">
-                      Rs. {((item.discounted_price != null ? item.discounted_price : item.price) * item.quantity).toFixed(0)}
+                      Rs.{" "}
+                      {(
+                        (item.discounted_price != null
+                          ? item.discounted_price
+                          : item.price) * item.quantity
+                      ).toFixed(0)}
                     </span>
                     <button
                       type="button"

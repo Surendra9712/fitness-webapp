@@ -13,6 +13,7 @@ export const endpoint = {
 
   userTrainers: "user/trainers",
   userTrainerAssignment: "user/trainer-assignment",
+  userBecomeTrainer: "user/become-trainer",
   userOrders: "user/orders",
   userProductRequests: "user/product-requests",
   userExercises: "user/exercises",
@@ -21,6 +22,7 @@ export const endpoint = {
   publicProducts: "public/products",
   publicCategories: "public/categories",
   publicTrainers: "public/trainers",
+  publicBecomeTrainer: "public/become-trainer",
 
   dietitianProfile: "dietitian/profile",
   dietitianUsers: "dietitian/users",

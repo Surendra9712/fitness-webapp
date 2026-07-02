@@ -36,7 +36,7 @@ export default function Navbar() {
             {user ? (
               <>
                 {/* Cart button — only for customer role */}
-                {user.role === "trainee" && (
+                {user.role !== "admin" && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -83,7 +83,7 @@ export default function Navbar() {
       </header>
 
       {/* Global checkout drawer */}
-      {user && (
+      {user && user?.role !== "admin" && (
         <CheckoutDialog
           open={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}

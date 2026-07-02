@@ -30,7 +30,12 @@ export default function SubscriptionRejectDialog({
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onCancel();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Reject Subscription</DialogTitle>
