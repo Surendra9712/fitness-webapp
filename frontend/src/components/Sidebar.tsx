@@ -26,9 +26,11 @@ import {
   Percent,
   Gift,
   BadgePercent,
+  MessageCircle,
 } from "lucide-react";
 import type { Role } from "@/types";
 import useUser from "@/hooks/useUser";
+import useChat from "@/hooks/useChat";
 
 interface NavItem {
   to: string;
@@ -127,6 +129,11 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <User className="h-4 w-4" />,
     },
     {
+      to: "/trainer/chat",
+      label: "Chat",
+      icon: <MessageCircle className="h-4 w-4" />,
+    },
+    {
       to: "/trainer/notifications",
       label: "Notifications",
       icon: <Bell className="h-4 w-4" />,
@@ -150,8 +157,13 @@ const navLinks: Record<Role, NavItem[]> = {
     },
     {
       to: "/customer/trainer",
-      label: "My Trainer",
+      label: "Trainers",
       icon: <UserCheck className="h-4 w-4" />,
+    },
+    {
+      to: "/customer/chat",
+      label: "Chat",
+      icon: <MessageCircle className="h-4 w-4" />,
     },
     {
       to: "/customer/request-product",
@@ -205,6 +217,12 @@ export default function Sidebar() {
   const { data: unreadData } = GetUnreadCount();
   const unreadCount = unreadData?.count ?? 0;
 
+  const { GetChatUnreadCount } = useChat();
+  const { data: chatUnreadData } = GetChatUnreadCount(
+    user?.role === "trainee" || user?.role === "dietitian",
+  );
+  const chatUnreadCount = chatUnreadData?.count ?? 0;
+
   if (!user) return null;
 
   const links = navLinks[user.role] ?? [];
@@ -235,6 +253,7 @@ export default function Sidebar() {
         <ul className="space-y-0.5">
           {links.map((l) => {
             const isNotifLink = l.label === "Notifications";
+            const isChatLink = l.label === "Chat";
             return (
               <li key={l.to}>
                 <NavLink
@@ -255,6 +274,11 @@ export default function Sidebar() {
                   {isNotifLink && unreadCount > 0 && (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                       {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                  {isChatLink && chatUnreadCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                     </span>
                   )}
                 </NavLink>

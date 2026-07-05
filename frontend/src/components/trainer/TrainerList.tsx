@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { Search, Send, Users, Mail, Dumbbell } from "lucide-react";
+import { Search, Send, Users, Mail, Dumbbell, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AppPagination } from "@/components/ui/app-pagination";
@@ -24,12 +23,19 @@ function avatarGradient(name: string) {
   return AVATAR_GRADIENTS[name.charCodeAt(0) % AVATAR_GRADIENTS.length];
 }
 
+const PENDING_STATUS_LABEL: Record<string, string> = {
+  pending_trainer: "Awaiting Trainer",
+  pending_admin: "Awaiting Admin",
+};
+
 interface Props {
   trainers: TrainerInfo[];
   onRequest: (trainer: TrainerInfo) => void;
+  onCancel: (trainer: TrainerInfo) => void;
+  onViewDetail: (trainer: TrainerInfo) => void;
 }
 
-export function TrainerList({ trainers, onRequest }: Props) {
+export function TrainerList({ trainers, onRequest, onCancel, onViewDetail }: Props) {
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
 
@@ -83,6 +89,7 @@ export function TrainerList({ trainers, onRequest }: Props) {
         ) : (
           trainers.map((t) => {
             const available = !t.customer_count || t.customer_count === 0;
+            const isPending = !!t.my_pending_assignment_id;
             return (
               <div
                 key={t.id}
@@ -100,21 +107,33 @@ export function TrainerList({ trainers, onRequest }: Props) {
 
                 {/* Name + status */}
                 <div className="w-44 shrink-0">
-                  <Link
-                    to={`/customer/trainers/${t.id}`}
-                    className="font-bold text-foreground hover:text-primary transition-colors leading-snug line-clamp-1"
+                  <button
+                    type="button"
+                    onClick={() => onViewDetail(t)}
+                    className="font-bold text-foreground hover:text-primary transition-colors leading-snug line-clamp-1 text-left"
                   >
                     {t.name}
-                  </Link>
+                  </button>
                   <div className="mt-0.5 flex items-center gap-1.5">
-                    <span
-                      className={`h-2 w-2 rounded-full ${available ? "bg-emerald-500" : "bg-secondary-500"}`}
-                    />
-                    <span
-                      className={`text-xs font-semibold ${available ? "text-emerald-600" : "text-secondary-600"}`}
-                    >
-                      {available ? "Available" : "Active"}
-                    </span>
+                    {isPending ? (
+                      <>
+                        <Clock className="h-3 w-3 text-amber-500" />
+                        <span className="text-xs font-semibold text-amber-600">
+                          {PENDING_STATUS_LABEL[t.my_pending_status ?? ""] ?? "Requested"}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span
+                          className={`h-2 w-2 rounded-full ${available ? "bg-emerald-500" : "bg-secondary-500"}`}
+                        />
+                        <span
+                          className={`text-xs font-semibold ${available ? "text-emerald-600" : "text-secondary-600"}`}
+                        >
+                          {available ? "Available" : "Active"}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -149,21 +168,33 @@ export function TrainerList({ trainers, onRequest }: Props) {
                 {/* Actions */}
                 <div className="flex shrink-0 items-center gap-2">
                   <Button
-                    asChild
                     variant="outline"
                     size="sm"
                     className="rounded-full px-4 text-xs"
+                    onClick={() => onViewDetail(t)}
                   >
-                    <Link to={`/customer/trainers/${t.id}`}>View</Link>
+                    View
                   </Button>
-                  <Button
-                    size="sm"
-                    className="rounded-full gap-1.5 px-4 text-xs font-bold"
-                    onClick={() => onRequest(t)}
-                  >
-                    <Send className="h-3 w-3" />
-                    Request
-                  </Button>
+                  {isPending ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full gap-1.5 px-4 text-xs font-bold text-destructive border-destructive/40 hover:bg-red-50"
+                      onClick={() => onCancel(t)}
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel Request
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="rounded-full gap-1.5 px-4 text-xs font-bold"
+                      onClick={() => onRequest(t)}
+                    >
+                      <Send className="h-3 w-3" />
+                      Request
+                    </Button>
+                  )}
                 </div>
               </div>
             );

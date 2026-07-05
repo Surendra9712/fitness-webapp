@@ -1,20 +1,48 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
-import { Star, ArrowRight, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Star, Users } from "lucide-react";
 import { fadeUp, VP } from "./animations";
 import usePublic from "@/hooks/usePublic";
 
 const INTERVAL = 4000;
 
 const THEMES = [
-  { badgeCls: "bg-emerald-100 text-emerald-700", statCls: "text-emerald-400", ringCls: "ring-emerald-400", dotCls: "bg-emerald-500" },
-  { badgeCls: "bg-blue-100 text-blue-700",       statCls: "text-blue-400",    ringCls: "ring-blue-400",    dotCls: "bg-blue-500"    },
-  { badgeCls: "bg-purple-100 text-purple-700",   statCls: "text-purple-400",  ringCls: "ring-purple-400",  dotCls: "bg-purple-500"  },
-  { badgeCls: "bg-amber-100 text-amber-700",     statCls: "text-amber-400",   ringCls: "ring-amber-400",   dotCls: "bg-amber-500"   },
-  { badgeCls: "bg-rose-100 text-rose-700",       statCls: "text-rose-400",    ringCls: "ring-rose-400",    dotCls: "bg-rose-500"    },
-  { badgeCls: "bg-teal-100 text-teal-700",       statCls: "text-teal-400",    ringCls: "ring-teal-400",    dotCls: "bg-teal-500"    },
+  {
+    badgeCls: "bg-emerald-100 text-emerald-700",
+    statCls: "text-emerald-400",
+    ringCls: "ring-emerald-400",
+    dotCls: "bg-emerald-500",
+  },
+  {
+    badgeCls: "bg-blue-100 text-blue-700",
+    statCls: "text-blue-400",
+    ringCls: "ring-blue-400",
+    dotCls: "bg-blue-500",
+  },
+  {
+    badgeCls: "bg-purple-100 text-purple-700",
+    statCls: "text-purple-400",
+    ringCls: "ring-purple-400",
+    dotCls: "bg-purple-500",
+  },
+  {
+    badgeCls: "bg-amber-100 text-amber-700",
+    statCls: "text-amber-400",
+    ringCls: "ring-amber-400",
+    dotCls: "bg-amber-500",
+  },
+  {
+    badgeCls: "bg-rose-100 text-rose-700",
+    statCls: "text-rose-400",
+    ringCls: "ring-rose-400",
+    dotCls: "bg-rose-500",
+  },
+  {
+    badgeCls: "bg-teal-100 text-teal-700",
+    statCls: "text-teal-400",
+    ringCls: "ring-teal-400",
+    dotCls: "bg-teal-500",
+  },
 ];
 
 const FALLBACK_PHOTO =
@@ -25,19 +53,27 @@ export default function TrainersSection() {
   const [progress, setProgress] = useState(0);
 
   const { GetTrainers } = usePublic();
-  const { data: trainers = [] } = GetTrainers({ queryParams: { page_size: 5 } });
+  const { data: trainers = [] } = GetTrainers({
+    queryParams: { page_size: 5 },
+  });
 
   useEffect(() => {
     if (!trainers.length) return;
     setProgress(0);
     const tick = 50;
     const step = 100 / (INTERVAL / tick);
-    const prog = setInterval(() => setProgress((p) => Math.min(p + step, 100)), tick);
+    const prog = setInterval(
+      () => setProgress((p) => Math.min(p + step, 100)),
+      tick,
+    );
     const adv = setTimeout(
       () => setActive((a) => (a + 1) % trainers.length),
       INTERVAL,
     );
-    return () => { clearInterval(prog); clearTimeout(adv); };
+    return () => {
+      clearInterval(prog);
+      clearTimeout(adv);
+    };
   }, [active, trainers.length]);
 
   // reset active index if trainers list shrinks
@@ -95,12 +131,16 @@ export default function TrainersSection() {
                   transition={{ duration: 0.4, ease: "easeOut" }}
                 >
                   {t.specialization && (
-                    <span className={`mb-4 inline-block rounded-full px-3 py-1 text-xs font-semibold ${theme.badgeCls}`}>
+                    <span
+                      className={`mb-4 inline-block rounded-full px-3 py-1 text-xs font-semibold ${theme.badgeCls}`}
+                    >
                       {t.specialization}
                     </span>
                   )}
 
-                  <h3 className="mb-4 text-3xl font-extrabold text-white">{t.name}</h3>
+                  <h3 className="mb-4 text-3xl font-extrabold text-white">
+                    {t.name}
+                  </h3>
 
                   {/* Stars */}
                   <div className="mb-5 flex items-center gap-2">
@@ -116,33 +156,42 @@ export default function TrainersSection() {
                       {Number(rating) > 0 ? rating : "New"}
                     </span>
                     {(t.review_count ?? 0) > 0 && (
-                      <span className="text-xs text-gray-500">({t.review_count} reviews)</span>
+                      <span className="text-xs text-gray-500">
+                        ({t.review_count} reviews)
+                      </span>
                     )}
                   </div>
 
                   {/* Stat pills */}
                   <div className="mb-6 grid grid-cols-2 gap-3">
                     {[
-                      { label: "Clients", value: String(t.customer_count ?? 0) },
+                      {
+                        label: "Exp. Years",
+                        value: String(t?.experience_years ?? 0),
+                      },
                       { label: "Reviews", value: String(t.review_count ?? 0) },
                     ].map((s) => (
-                      <div key={s.label} className="rounded-xl bg-gray-800 px-3 py-3 text-center">
-                        <p className={`text-lg font-extrabold ${theme.statCls}`}>{s.value}</p>
-                        <p className="mt-0.5 text-[10px] text-gray-500">{s.label}</p>
+                      <div
+                        key={s.label}
+                        className="rounded-xl bg-gray-800 px-3 py-3 text-center"
+                      >
+                        <p
+                          className={`text-lg font-extrabold ${theme.statCls}`}
+                        >
+                          {s.value}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-gray-500">
+                          {s.label}
+                        </p>
                       </div>
                     ))}
                   </div>
 
                   {t.bio && (
-                    <p className="mb-8 text-sm leading-relaxed text-gray-400 line-clamp-3">{t.bio}</p>
+                    <p className="mb-8 text-sm leading-relaxed text-gray-400 line-clamp-3">
+                      {t.bio}
+                    </p>
                   )}
-
-                  <Button asChild className="w-fit">
-                    <Link to="/customer/trainer">
-                      Connect with {t.name.split(" ")[0]}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -168,7 +217,9 @@ export default function TrainersSection() {
               {(t.customer_count ?? 0) > 0 && (
                 <div className="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-sm">
                   <Users className="h-3.5 w-3.5 text-white/70" />
-                  <span className="text-xs font-semibold text-white">{t.customer_count} clients</span>
+                  <span className="text-xs font-semibold text-white">
+                    {t.customer_count} clients
+                  </span>
                 </div>
               )}
             </div>
@@ -206,7 +257,9 @@ export default function TrainersSection() {
                         {tr.name.charAt(0)}
                       </div>
                     )}
-                    <span className={`text-[10px] font-medium transition-colors ${i === active ? "text-white" : "text-gray-500"}`}>
+                    <span
+                      className={`text-[10px] font-medium transition-colors ${i === active ? "text-white" : "text-gray-500"}`}
+                    >
                       {tr.name.split(" ")[0]}
                     </span>
                     <div className="h-0.5 w-12 overflow-hidden rounded-full bg-gray-700">

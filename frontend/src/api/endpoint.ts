@@ -12,7 +12,7 @@ export const endpoint = {
   adminProductRequests: "admin/product-requests",
 
   userTrainers: "user/trainers",
-  userTrainerAssignment: "user/trainer-assignment",
+  userTrainerAssignments: "user/trainer-assignments",
   userBecomeTrainer: "user/become-trainer",
   userOrders: "user/orders",
   userProductRequests: "user/product-requests",
@@ -45,4 +45,7 @@ export const endpoint = {
 
   notifications: "notifications",
   notificationsUnreadCount: "notifications/unread-count",
+
+  chatThreads: "chat/threads",
+  chatUnreadCount: "chat/unread-count",
 };

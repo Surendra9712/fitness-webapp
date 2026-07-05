@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogBody,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -238,18 +239,20 @@ export default function TrainerAssignments() {
           <DialogHeader>
             <DialogTitle>Approve Assignment</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Assigning <strong>{approveTarget?.customer_name}</strong> to trainer{" "}
-            <strong>{approveTarget?.trainer_name}</strong>.
-          </p>
-          <div className="space-y-1.5">
-            <Label>Admin note (optional)</Label>
-            <Input
-              placeholder="e.g. Approved — good match"
-              value={adminNote}
-              onChange={(e) => setAdminNote(e.target.value)}
-            />
-          </div>
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">
+              Assigning <strong>{approveTarget?.customer_name}</strong> to
+              trainer <strong>{approveTarget?.trainer_name}</strong>.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Admin note (optional)</Label>
+              <Input
+                placeholder="e.g. Approved — good match"
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+              />
+            </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveTarget(null)}>
               Cancel
@@ -266,19 +269,21 @@ export default function TrainerAssignments() {
           <DialogHeader>
             <DialogTitle>Reject Assignment</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Rejecting assignment of{" "}
-            <strong>{rejectTarget?.customer_name}</strong> to{" "}
-            <strong>{rejectTarget?.trainer_name}</strong>.
-          </p>
-          <div className="space-y-1.5">
-            <Label>Reason (optional)</Label>
-            <Input
-              placeholder="e.g. Trainer at capacity"
-              value={adminNote}
-              onChange={(e) => setAdminNote(e.target.value)}
-            />
-          </div>
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">
+              Rejecting assignment of{" "}
+              <strong>{rejectTarget?.customer_name}</strong> to{" "}
+              <strong>{rejectTarget?.trainer_name}</strong>.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Reason (optional)</Label>
+              <Input
+                placeholder="e.g. Trainer at capacity"
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+              />
+            </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectTarget(null)}>
               Cancel

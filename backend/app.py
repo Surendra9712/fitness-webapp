@@ -3,6 +3,7 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 
+from extensions import socketio
 from routes.auth import auth_bp
 from routes.admin import admin_bp
 from routes.dietitian import dietitian_bp
@@ -12,11 +13,14 @@ from routes.onboarding import onboarding_bp
 from routes.payment import payment_bp
 from routes.upload import upload_bp
 from routes.notifications import notifications_bp
+from routes.chat import chat_bp
+import sockets.chat_events  # noqa: F401 - registers socketio event handlers
 
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
 
 app.register_blueprint(auth_bp,       url_prefix='/api/auth')
 app.register_blueprint(admin_bp,      url_prefix='/api/admin')
@@ -27,6 +31,7 @@ app.register_blueprint(onboarding_bp, url_prefix='/api/onboarding')
 app.register_blueprint(payment_bp,    url_prefix='/api/payments')
 app.register_blueprint(upload_bp,          url_prefix='/api/upload')
 app.register_blueprint(notifications_bp,  url_prefix='/api/notifications')
+app.register_blueprint(chat_bp,       url_prefix='/api/chat')
 
 
 @app.route('/api/health')
@@ -36,4 +41,4 @@ def health():
 
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5000))
-    app.run(debug=True, port=port)
+    socketio.run(app, debug=True, port=port, allow_unsafe_werkzeug=True)

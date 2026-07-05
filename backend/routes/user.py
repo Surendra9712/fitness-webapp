@@ -881,19 +881,39 @@ def list_trainers():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        base_where = "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.is_verified = 1 AND u.deleted_at IS NULL"
-        params = []
+        search_clause = ""
+        search_params = []
         if search:
-            base_where += " AND u.name LIKE %s"
-            params.append(f"%{search}%")
-        cursor.execute(f"SELECT COUNT(*) AS total FROM users u {base_where}", params)
+            search_clause = " AND u.name LIKE %s"
+            search_params = [f"%{search}%"]
+
+        base_where = (
+            "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.is_verified = 1 "
+            "AND u.deleted_at IS NULL "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM trainer_assignments ta2 WHERE ta2.trainer_id = u.id "
+            "  AND ta2.customer_id = %s AND ta2.status = 'approved' AND ta2.deleted_at IS NULL"
+            ")" + search_clause
+        )
+
+        cursor.execute(
+            f"SELECT COUNT(*) AS total FROM users u {base_where}",
+            [request.user_id] + search_params,
+        )
         total = cursor.fetchone()['total']
+
         cursor.execute(
             f"SELECT u.id, u.name, u.email, u.profile_image_url, "
-            f"(SELECT COUNT(*) FROM trainer_assignments ta "
-            f" WHERE ta.trainer_id = u.id AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count "
+            f"(SELECT COUNT(*) FROM trainer_assignments ta WHERE ta.trainer_id = u.id "
+            f" AND ta.status = 'approved' AND ta.deleted_at IS NULL) AS customer_count, "
+            f"(SELECT ta.id FROM trainer_assignments ta WHERE ta.trainer_id = u.id "
+            f" AND ta.customer_id = %s AND ta.status IN ('pending_trainer','pending_admin') "
+            f" AND ta.deleted_at IS NULL ORDER BY ta.created_at DESC LIMIT 1) AS my_pending_assignment_id, "
+            f"(SELECT ta.status FROM trainer_assignments ta WHERE ta.trainer_id = u.id "
+            f" AND ta.customer_id = %s AND ta.status IN ('pending_trainer','pending_admin') "
+            f" AND ta.deleted_at IS NULL ORDER BY ta.created_at DESC LIMIT 1) AS my_pending_status "
             f"FROM users u {base_where} ORDER BY u.name LIMIT %s OFFSET %s",
-            params + [page_size, offset]
+            [request.user_id, request.user_id, request.user_id] + search_params + [page_size, offset],
         )
         return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
@@ -919,6 +939,10 @@ def get_trainer(trainer_id):
                 up.specialization,
                 up.experience_years,
                 up.available_time,
+                up.phone_number,
+                up.city,
+                up.country,
+                up.date_of_birth,
                 (
                     SELECT COUNT(*)
                     FROM trainer_assignments ta
@@ -977,9 +1001,9 @@ def get_trainer(trainer_id):
         conn.close()
 
 
-@user_bp.route('/trainer-assignment', methods=['GET'])
+@user_bp.route('/trainer-assignments', methods=['GET'])
 @role_required('trainee')
-def get_trainer_assignment():
+def get_trainer_assignments():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -988,16 +1012,16 @@ def get_trainer_assignment():
             "FROM trainer_assignments ta "
             "JOIN users u ON ta.trainer_id = u.id "
             "WHERE ta.customer_id = %s AND ta.deleted_at IS NULL "
-            "ORDER BY ta.created_at DESC LIMIT 1",
+            "ORDER BY ta.created_at DESC",
             (request.user_id,),
         )
-        return jsonify(cursor.fetchone())
+        return jsonify(cursor.fetchall())
     finally:
         cursor.close()
         conn.close()
 
 
-@user_bp.route('/trainer-assignment', methods=['POST'])
+@user_bp.route('/trainer-assignments', methods=['POST'])
 @role_required('trainee')
 def request_trainer():
     try:
@@ -1010,12 +1034,12 @@ def request_trainer():
     try:
         cursor.execute(
             "SELECT id, status FROM trainer_assignments "
-            "WHERE customer_id = %s AND status != 'rejected' AND deleted_at IS NULL LIMIT 1",
-            (request.user_id,),
+            "WHERE customer_id = %s AND trainer_id = %s AND status != 'rejected' AND deleted_at IS NULL LIMIT 1",
+            (request.user_id, body.trainer_id),
         )
         existing = cursor.fetchone()
         if existing:
-            return jsonify({'error': f"You already have an active assignment (status: {existing['status']})"}), 409
+            return jsonify({'error': f"You already have a request with this trainer (status: {existing['status']})"}), 409
 
         cursor.execute(
             "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND status = 'active' AND is_verified = 1 AND deleted_at IS NULL",
@@ -1050,17 +1074,17 @@ def request_trainer():
         conn.close()
 
 
-@user_bp.route('/trainer-assignment', methods=['DELETE'])
+@user_bp.route('/trainer-assignments/<int:assignment_id>', methods=['DELETE'])
 @role_required('trainee')
-def cancel_trainer_assignment():
+def cancel_trainer_assignment(assignment_id):
     """Cancel a pending_trainer request (before trainer reviews it)."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT id, status FROM trainer_assignments "
-            "WHERE customer_id = %s AND status = 'pending_trainer' AND deleted_at IS NULL LIMIT 1",
-            (request.user_id,),
+            "WHERE id = %s AND customer_id = %s AND status = 'pending_trainer' AND deleted_at IS NULL",
+            (assignment_id, request.user_id),
         )
         row = cursor.fetchone()
         if not row:

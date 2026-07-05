@@ -56,8 +56,13 @@ export interface TrainerInfo {
   specialization?: string;
   experience_years?: number;
   date_of_birth?: string;
+  phone_number?: string;
+  city?: string;
+  country?: string;
   available_time?: AvailableSlot[];
   certifications?: TrainerCertification[];
+  my_pending_assignment_id?: number | null;
+  my_pending_status?: AssignmentStatus | null;
 }
 
 export interface TrainerAssignment {
@@ -76,6 +81,7 @@ export interface TrainerAssignment {
   admin_reviewed_at?: string;
   reviewed_by_name?: string;
   created_at: string;
+  isApprovedByTrainer?: boolean;
 }
 export type ProductStatus = "active" | "inactive";
 export type RequestStatus = "pending" | "approved" | "rejected";
@@ -407,20 +413,20 @@ export interface RequestTrainerPayload {
 }
 
 export type NotificationType =
-  | 'order_received'
-  | 'order_status'
-  | 'subscription_request'
-  | 'subscription_approved'
-  | 'subscription_rejected'
-  | 'product_request'
-  | 'product_request_approved'
-  | 'product_request_rejected'
-  | 'trainer_request'
-  | 'trainer_request_to_admin'
-  | 'trainer_signup_request'
-  | 'trainer_accepted'
-  | 'trainer_approved'
-  | 'trainer_rejected';
+  | "order_received"
+  | "order_status"
+  | "subscription_request"
+  | "subscription_approved"
+  | "subscription_rejected"
+  | "product_request"
+  | "product_request_approved"
+  | "product_request_rejected"
+  | "trainer_request"
+  | "trainer_request_to_admin"
+  | "trainer_signup_request"
+  | "trainer_accepted"
+  | "trainer_approved"
+  | "trainer_rejected";
 
 export interface Notification {
   id: number;
@@ -431,6 +437,26 @@ export interface Notification {
   reference_id?: number;
   is_read: boolean | number;
   created_at: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  assignment_id: number;
+  sender_id: number;
+  content: string;
+  is_read: boolean | number;
+  created_at: string;
+}
+
+export interface ChatThread {
+  assignment_id: number;
+  peer_id: number;
+  peer_name: string;
+  peer_email: string;
+  peer_image_url?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  unread_count: number;
 }
 
 export interface BecomeTrainerPayload {

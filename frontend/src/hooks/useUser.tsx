@@ -41,11 +41,11 @@ interface UseUserReturn {
     args?: QueryArgs,
   ) => UseQueryResult<PaginatedResponse<TrainerInfo>>;
   GetTrainer: (id?: string | number) => UseQueryResult<TrainerInfo>;
-  GetTrainerAssignment: (
+  GetTrainerAssignments: (
     args?: QueryArgs,
-  ) => UseQueryResult<TrainerAssignment | null>;
+  ) => UseQueryResult<TrainerAssignment[]>;
   RequestTrainer: () => UseMutationResult<void, Error, RequestTrainerPayload>;
-  CancelTrainerAssignment: () => UseMutationResult<void, Error, void>;
+  CancelTrainerAssignment: () => UseMutationResult<void, Error, number>;
   BecomeTrainer: () => UseMutationResult<
     BecomeTrainerResult,
     Error,
@@ -117,9 +117,9 @@ const useUser = (): UseUserReturn => {
     queryKey: "authProfile",
   });
 
-  const { get: GetTrainerAssignment, post: RequestTrainer } = useApi({
-    endpoint: endpoint.userTrainerAssignment,
-    queryKey: "trainerAssignment",
+  const { get: GetTrainerAssignments, post: RequestTrainer } = useApi({
+    endpoint: endpoint.userTrainerAssignments,
+    queryKey: "trainerAssignments",
   });
 
   const {
@@ -199,8 +199,8 @@ const useUser = (): UseUserReturn => {
 
   const CancelTrainerAssignment = () =>
     useMutation({
-      mutationFn: async () => {
-        const { data } = await api.delete(endpoint.userTrainerAssignment);
+      mutationFn: async (assignmentId: number) => {
+        const { data } = await api.delete(`${endpoint.userTrainerAssignments}/${assignmentId}`);
         return data;
       },
     });
@@ -326,7 +326,7 @@ const useUser = (): UseUserReturn => {
   return {
     GetTrainers,
     GetTrainer,
-    GetTrainerAssignment,
+    GetTrainerAssignments,
     RequestTrainer,
     CancelTrainerAssignment,
     BecomeTrainer,

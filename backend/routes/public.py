@@ -168,7 +168,7 @@ def list_trainers():
     try:
         cursor.execute(
             "SELECT u.id, u.name, u.profile_image_url, "
-            "p.bio, p.specialization, "
+            "p.bio, p.specialization, p.experience_years,"
             "COALESCE(AVG(r.rating), 0) AS avg_rating, "
             "COUNT(DISTINCT r.id) AS review_count, "
             "COUNT(DISTINCT ta.id) AS customer_count "

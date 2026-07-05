@@ -29,6 +29,7 @@ import SubscriptionPaymentReturn from "@/pages/user/subscription/SubscriptionPay
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
 import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
 import TrainerProfile from "@/pages/dietitian/TrainerProfile";
+import TrainerChat from "@/pages/dietitian/TrainerChat";
 
 import UserDashboard from "@/pages/user/UserDashboard";
 import MyOrders from "@/pages/user/MyOrders";
@@ -37,7 +38,7 @@ import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
 import BecomeTrainer from "@/pages/user/BecomeTrainer";
 import MyTrainer from "@/pages/user/trainer/MyTrainer";
-import TrainerDetail from "@/pages/user/trainer/TrainerDetail";
+import ChatWithTrainer from "@/pages/user/trainer/ChatWithTrainer";
 import Subscription from "@/pages/user/subscription/Subscription";
 import AiRecommendation from "@/pages/user/AiRecommendation";
 import Rewards from "@/pages/user/Rewards";
@@ -294,6 +295,16 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/trainer/chat"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <TrainerChat />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
           {/* Customer */}
           <Route
@@ -331,6 +342,16 @@ export default function App() {
             }
           />
           <Route
+            path="/customer/chat"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <ChatWithTrainer />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/customer/become-trainer"
             element={
               <ProtectedRoute roles={["trainee"]}>
@@ -341,14 +362,12 @@ export default function App() {
             }
           />
           <Route
+            path="/customer/trainers"
+            element={<Navigate to="/customer/trainer?tab=find" replace />}
+          />
+          <Route
             path="/customer/trainers/:id"
-            element={
-              <ProtectedRoute roles={["trainee"]}>
-                <Layout>
-                  <TrainerDetail />
-                </Layout>
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/customer/trainer?tab=find" replace />}
           />
           <Route
             path="/customer/request-product"
