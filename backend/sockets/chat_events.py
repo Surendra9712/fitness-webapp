@@ -77,8 +77,11 @@ def handle_send_message(payload):
 
     assignment_id = (payload or {}).get('assignment_id')
     content = ((payload or {}).get('content') or '').strip()
-    if not assignment_id or not content:
-        emit('error', {'error': 'assignment_id and content are required'})
+    attachment_url = (payload or {}).get('attachment_url') or None
+    attachment_type = (payload or {}).get('attachment_type') or None
+    attachment_name = (payload or {}).get('attachment_name') or None
+    if not assignment_id or (not content and not attachment_url):
+        emit('error', {'error': 'assignment_id and content or attachment are required'})
         return
 
     conn = get_connection()
@@ -90,14 +93,16 @@ def handle_send_message(payload):
             return
 
         cursor.execute(
-            "INSERT INTO chat_messages (assignment_id, sender_id, content) VALUES (%s, %s, %s)",
-            (assignment_id, user['user_id'], content),
+            "INSERT INTO chat_messages (assignment_id, sender_id, content, attachment_url, attachment_type, attachment_name) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (assignment_id, user['user_id'], content, attachment_url, attachment_type, attachment_name),
         )
         message_id = cursor.lastrowid
         conn.commit()
 
         cursor.execute(
-            "SELECT id, assignment_id, sender_id, content, is_read, created_at "
+            "SELECT id, assignment_id, sender_id, content, is_read, created_at, "
+            "attachment_url, attachment_type, attachment_name "
             "FROM chat_messages WHERE id = %s",
             (message_id,),
         )

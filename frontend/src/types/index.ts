@@ -439,6 +439,8 @@ export interface Notification {
   created_at: string;
 }
 
+export type ChatAttachmentType = "image" | "file";
+
 export interface ChatMessage {
   id: number;
   assignment_id: number;
@@ -446,6 +448,9 @@ export interface ChatMessage {
   content: string;
   is_read: boolean | number;
   created_at: string;
+  attachment_url?: string | null;
+  attachment_type?: ChatAttachmentType | null;
+  attachment_name?: string | null;
 }
 
 export interface ChatThread {

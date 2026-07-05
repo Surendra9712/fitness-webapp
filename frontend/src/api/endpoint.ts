@@ -41,6 +41,7 @@ export const endpoint = {
 
   uploadImage: "upload/image",
   uploadCert: "upload/cert",
+  uploadChatFile: "upload/chat-file",
   authProfile: "auth/me",
 
   notifications: "notifications",

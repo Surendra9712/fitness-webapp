@@ -5,7 +5,11 @@ import moment from "moment";
  * Returns relative time (e.g. "2 days ago", "in 3 hours")
  */
 export const timeAgo = (date: string | Date): string => {
-  const dateStr = formatDate({ date });
+  const dateStr = formatDate({ date, format: "YYYY-MM-DD h:mm A" });
+  const diff = Math.abs(moment(date).diff(moment(), "hours"));
+  if (diff >= 23) {
+    return dateStr;
+  }
   return moment(dateStr).fromNow();
 };
 

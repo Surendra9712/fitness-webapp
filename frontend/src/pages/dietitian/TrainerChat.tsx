@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { Send, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import useChat from "@/hooks/useChat";
 import { useChatThread } from "@/hooks/useChatThread";
 import { useChatStore } from "@/store/chatStore";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import ChatMessages from "@/components/chat/ChatMessages";
+import ChatComposer from "@/components/chat/ChatComposer";
 import { cn } from "@/lib/utils";
-import { timeAgo } from "@/lib/date-utils";
 
 export default function TrainerChat() {
   const { user } = useAuth();
@@ -29,6 +29,12 @@ export default function TrainerChat() {
     loadingOlder,
     hasMore,
     sendMessage,
+    deleteTarget,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+    uploading,
+    sendAttachment,
   } = useChatThread(activeId);
 
   useEffect(() => {
@@ -67,7 +73,9 @@ export default function TrainerChat() {
             <p className="p-4 text-sm text-muted-foreground">Loading…</p>
           )}
           {threads?.length === 0 && (
-            <p className="p-4 text-sm text-muted-foreground">No approved clients yet.</p>
+            <p className="p-4 text-sm text-muted-foreground">
+              No approved clients yet.
+            </p>
           )}
           {threads?.map((t) => (
             <button
@@ -80,11 +88,15 @@ export default function TrainerChat() {
             >
               <Avatar>
                 <AvatarImage src={t.peer_image_url ?? undefined} />
-                <AvatarFallback className="text-sm">{t.peer_name.charAt(0).toUpperCase()}</AvatarFallback>
+                <AvatarFallback className="text-sm">
+                  {t.peer_name.charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium">{t.peer_name}</span>
+                  <span className="truncate text-sm font-medium">
+                    {t.peer_name}
+                  </span>
                   {t.unread_count > 0 && (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                       {t.unread_count > 99 ? "99+" : t.unread_count}
@@ -116,67 +128,46 @@ export default function TrainerChat() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-sm font-medium">{activeThread.peer_name}</p>
-                  <p className="text-xs text-muted-foreground">{activeThread.peer_email}</p>
+                  <p className="text-sm font-medium">
+                    {activeThread.peer_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeThread.peer_email}
+                  </p>
                 </div>
               </div>
 
-              <div
-                ref={scrollContainerRef}
+              <ChatMessages
+                messages={messages}
+                currentUserId={user?.id}
+                loadingOlder={loadingOlder}
+                hasMore={hasMore}
+                scrollContainerRef={scrollContainerRef}
+                bottomRef={bottomRef}
                 onScroll={handleScroll}
-                className="flex-1 space-y-3 overflow-y-auto p-4"
-              >
-                {loadingOlder && (
-                  <div className="flex justify-center py-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-                  </div>
-                )}
-                {!hasMore && messages.length > 0 && (
-                  <p className="pb-1 text-center text-xs text-muted-foreground">
-                    Beginning of conversation
-                  </p>
-                )}
-                {messages.map((m) => {
-                  const mine = m.sender_id === user?.id;
-                  return (
-                    <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
-                      <div
-                        className={cn(
-                          "max-w-[70%] rounded-2xl px-3.5 py-2 text-sm",
-                          mine ? "bg-primary text-primary-foreground" : "bg-muted",
-                        )}
-                      >
-                        <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                        <p
-                          className={cn(
-                            "mt-1 text-[10px] opacity-70",
-                            mine ? "text-primary-foreground" : "text-muted-foreground",
-                          )}
-                        >
-                          {timeAgo(m.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={bottomRef} />
-              </div>
+                onDeleteMessage={requestDelete}
+              />
 
-              <form onSubmit={handleSend} className="flex items-center gap-2 border-t p-3">
-                <Input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Type a message…"
-                  className="flex-1"
-                />
-                <Button type="submit" size="icon" disabled={!draft.trim()}>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
+              <ChatComposer
+                draft={draft}
+                onDraftChange={setDraft}
+                onSend={handleSend}
+                onAttach={sendAttachment}
+                uploading={uploading}
+              />
             </>
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && cancelDelete()}
+        title="Delete message?"
+        description="This message will be removed for both you and the other person."
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

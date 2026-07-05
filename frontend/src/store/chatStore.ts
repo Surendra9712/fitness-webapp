@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { queryClient } from "@/lib/queryClient";
-import type { ChatMessage } from "@/types";
+import type { ChatAttachmentType, ChatMessage } from "@/types";
+
+export interface ChatAttachment {
+  url: string;
+  type: ChatAttachmentType;
+  name?: string;
+}
 
 // Stable reference so selectors falling back to "no messages yet" don't
 // produce a new array identity on every render (which would trigger an
@@ -14,10 +20,11 @@ interface ChatState {
   connect: () => void;
   disconnect: () => void;
   joinThread: (assignmentId: number) => void;
-  sendMessage: (assignmentId: number, content: string) => void;
+  sendMessage: (assignmentId: number, content: string, attachment?: ChatAttachment) => void;
   mergeMessages: (assignmentId: number, incoming: ChatMessage[]) => void;
   prependMessages: (assignmentId: number, olderMessages: ChatMessage[]) => void;
   appendMessage: (message: ChatMessage) => void;
+  removeMessage: (assignmentId: number, messageId: number) => void;
 }
 
 let listenersBound = false;
@@ -41,6 +48,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         queryClient.invalidateQueries({ queryKey: ["chatThreads"] });
         queryClient.invalidateQueries({ queryKey: ["chatUnreadCount"] });
       });
+      socket.on("message_deleted", ({ id, assignment_id }: { id: number; assignment_id: number }) => {
+        get().removeMessage(assignment_id, id);
+        queryClient.invalidateQueries({ queryKey: ["chatThreads"] });
+      });
       listenersBound = true;
     }
   },
@@ -54,8 +65,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     getSocket().emit("join_thread", { assignment_id: assignmentId });
   },
 
-  sendMessage: (assignmentId, content) => {
-    getSocket().emit("send_message", { assignment_id: assignmentId, content });
+  sendMessage: (assignmentId, content, attachment) => {
+    getSocket().emit("send_message", {
+      assignment_id: assignmentId,
+      content,
+      ...(attachment && {
+        attachment_url: attachment.url,
+        attachment_type: attachment.type,
+        attachment_name: attachment.name,
+      }),
+    });
   },
 
   // Merges a REST response into the store instead of replacing it outright.
@@ -97,6 +116,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesByAssignment: {
           ...state.messagesByAssignment,
           [message.assignment_id]: [...existing, message],
+        },
+      };
+    }),
+
+  removeMessage: (assignmentId, messageId) =>
+    set((state) => {
+      const existing = state.messagesByAssignment[assignmentId];
+      if (!existing || !existing.some((m) => m.id === messageId)) return state;
+      return {
+        messagesByAssignment: {
+          ...state.messagesByAssignment,
+          [assignmentId]: existing.filter((m) => m.id !== messageId),
         },
       };
     }),

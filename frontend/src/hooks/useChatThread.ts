@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import useChat, { CHAT_PAGE_SIZE } from "./useChat";
 import { useChatStore, EMPTY_MESSAGES } from "@/store/chatStore";
-import type { ChatThread } from "@/types";
+import type { ChatMessage, ChatThread } from "@/types";
 
 const NEAR_BOTTOM_PX = 120;
 const LOAD_MORE_PX = 80;
@@ -14,7 +15,7 @@ const LOAD_MORE_PX = 80;
 // - only auto-scrolls (smoothly) for new incoming messages if already near the bottom
 export function useChatThread(activeId: number | null) {
   const queryClient = useQueryClient();
-  const { GetMessages, LoadOlderMessages, MarkThreadRead } = useChat();
+  const { GetMessages, LoadOlderMessages, MarkThreadRead, DeleteMessage, UploadChatFile } = useChat();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -23,17 +24,22 @@ export function useChatThread(activeId: number | null) {
   const pendingScrollAdjust = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(null);
 
   const [hasMore, setHasMore] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const joinThread = useChatStore((s) => s.joinThread);
   const mergeMessages = useChatStore((s) => s.mergeMessages);
   const prependMessages = useChatStore((s) => s.prependMessages);
   const sendMessage = useChatStore((s) => s.sendMessage);
+  const removeMessage = useChatStore((s) => s.removeMessage);
   const messagesRaw = useChatStore((s) => (activeId ? s.messagesByAssignment[activeId] : undefined));
   const messages = messagesRaw ?? EMPTY_MESSAGES;
 
   const { data: history } = GetMessages(activeId ?? undefined);
   const markRead = MarkThreadRead();
   const loadOlder = LoadOlderMessages();
+  const deleteMessage = DeleteMessage();
+  const uploadChatFile = UploadChatFile();
 
   // Reset scroll/pagination bookkeeping before the scroll-effect below runs for
   // the newly selected thread (declared first so its layout effect commits first).
@@ -131,6 +137,49 @@ export function useChatThread(activeId: number | null) {
     }
   }
 
+  function requestDelete(message: ChatMessage) {
+    setDeleteTarget(message);
+  }
+
+  function cancelDelete() {
+    setDeleteTarget(null);
+  }
+
+  function confirmDelete() {
+    if (!activeId || !deleteTarget) return;
+    const messageId = deleteTarget.id;
+    setDeleteTarget(null);
+    deleteMessage.mutate(
+      { assignmentId: activeId, messageId },
+      {
+        onSuccess: () => {
+          removeMessage(activeId, messageId);
+          queryClient.invalidateQueries({ queryKey: ["chatThreads"] });
+        },
+        onError: () => {
+          toast.error("Failed to delete message");
+        },
+      },
+    );
+  }
+
+  async function sendAttachment(file: File) {
+    if (!activeId) return;
+    setUploading(true);
+    try {
+      const result = await uploadChatFile.mutateAsync(file);
+      sendMessage(activeId, "", {
+        url: result.url,
+        type: result.file_type,
+        name: result.original_name,
+      });
+    } catch {
+      toast.error("Failed to upload attachment");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return {
     messages,
     scrollContainerRef,
@@ -139,5 +188,11 @@ export function useChatThread(activeId: number | null) {
     loadingOlder: loadOlder.isPending,
     hasMore,
     sendMessage,
+    deleteTarget,
+    requestDelete,
+    cancelDelete,
+    confirmDelete,
+    uploading,
+    sendAttachment,
   };
 }

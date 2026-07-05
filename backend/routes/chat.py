@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from database.connection import get_connection
 from middleware.auth import role_required
 from utils.pagination import parse_page_params
+from extensions import socketio
 
 chat_bp = Blueprint('chat', __name__)
 
@@ -36,7 +37,12 @@ def list_threads():
         cursor.execute(
             f"SELECT ta.id AS assignment_id, u.id AS peer_id, u.name AS peer_name, "
             f"u.email AS peer_email, u.profile_image_url AS peer_image_url, "
-            f"(SELECT content FROM chat_messages cm WHERE cm.assignment_id = ta.id "
+            f"(SELECT CASE "
+            f"     WHEN cm.content != '' THEN cm.content "
+            f"     WHEN cm.attachment_type = 'image' THEN 'Photo' "
+            f"     WHEN cm.attachment_type = 'file' THEN CONCAT('File: ', cm.attachment_name) "
+            f"     ELSE cm.content END "
+            f" FROM chat_messages cm WHERE cm.assignment_id = ta.id "
             f"   AND cm.deleted_at IS NULL ORDER BY cm.id DESC LIMIT 1) AS last_message, "
             f"(SELECT created_at FROM chat_messages cm WHERE cm.assignment_id = ta.id "
             f"   AND cm.deleted_at IS NULL ORDER BY cm.id DESC LIMIT 1) AS last_message_at, "
@@ -76,7 +82,8 @@ def get_messages(assignment_id):
         params.append(page_size)
 
         cursor.execute(
-            f"SELECT id, assignment_id, sender_id, content, is_read, created_at "
+            f"SELECT id, assignment_id, sender_id, content, is_read, created_at, "
+            f"attachment_url, attachment_type, attachment_name "
             f"FROM chat_messages WHERE assignment_id = %s AND deleted_at IS NULL {where_before} "
             f"ORDER BY id DESC LIMIT %s",
             params,
@@ -86,6 +93,48 @@ def get_messages(assignment_id):
         for m in messages:
             m['created_at'] = m['created_at'].isoformat()
         return jsonify(messages)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@chat_bp.route('/<int:assignment_id>/messages/<int:message_id>', methods=['DELETE'])
+@role_required('trainee', 'dietitian')
+def delete_message(assignment_id, message_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        assignment = _get_assignment(cursor, assignment_id)
+        if not _is_member(assignment, request.user_id):
+            return jsonify({'error': 'Thread not found'}), 404
+
+        cursor.execute(
+            "SELECT id, sender_id FROM chat_messages "
+            "WHERE id = %s AND assignment_id = %s AND deleted_at IS NULL",
+            (message_id, assignment_id),
+        )
+        message = cursor.fetchone()
+        if not message:
+            return jsonify({'error': 'Message not found'}), 404
+        if message['sender_id'] != request.user_id:
+            return jsonify({'error': 'You can only delete your own messages'}), 403
+
+        cursor.execute("UPDATE chat_messages SET deleted_at = NOW() WHERE id = %s", (message_id,))
+        conn.commit()
+
+        recipient_id = (
+            assignment['trainer_id']
+            if request.user_id == assignment['customer_id']
+            else assignment['customer_id']
+        )
+        payload = {'id': message_id, 'assignment_id': assignment_id}
+        socketio.emit('message_deleted', payload, room=f"user:{request.user_id}")
+        socketio.emit('message_deleted', payload, room=f"user:{recipient_id}")
+
+        return jsonify({'message': 'Deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
