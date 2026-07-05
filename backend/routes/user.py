@@ -419,7 +419,7 @@ def list_products():
 
 
 @user_bp.route('/orders', methods=['POST'])
-@role_required('trainee')
+@role_required('trainee', 'dietitian')
 def place_order():
     try:
         body = PlaceOrderSchema.model_validate(request.get_json() or {})
@@ -628,7 +628,7 @@ def place_order():
 
 
 @user_bp.route('/promo/available', methods=['GET'])
-@role_required('trainee')
+@role_required('trainee', 'dietitian')
 def available_promos():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -658,7 +658,7 @@ def available_promos():
 
 
 @user_bp.route('/promo/validate', methods=['POST'])
-@role_required('trainee')
+@role_required('trainee', 'dietitian')
 def validate_promo():
     body = request.get_json() or {}
     code = (body.get('code') or '').strip().upper()
@@ -709,7 +709,7 @@ def validate_promo():
 
 
 @user_bp.route('/points', methods=['GET'])
-@role_required('trainee')
+@role_required('trainee', 'dietitian')
 def get_points():
     page, page_size, offset = parse_page_params(default_size=20)
     conn = get_connection()
@@ -744,7 +744,7 @@ def get_points():
 
 
 @user_bp.route('/orders', methods=['GET'])
-@role_required('trainee')
+@role_required('trainee', 'dietitian')
 def get_orders():
     page, page_size, offset = parse_page_params(default_size=10, max_size=50)
     conn = get_connection()
@@ -775,7 +775,7 @@ def get_orders():
 
 
 @user_bp.route('/orders/<int:order_id>', methods=['DELETE'])
-@role_required('trainee')
+@role_required('trainee', 'dietitian')
 def cancel_order(order_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)

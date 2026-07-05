@@ -296,6 +296,26 @@ export default function App() {
             }
           />
           <Route
+            path="/trainer/orders"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <MyOrders />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trainer/rewards"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <Rewards />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/trainer/chat"
             element={
               <ProtectedRoute roles={["dietitian"]}>

@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/CheckoutDialog";
-import { getDashboardPath } from "@/lib/constant";
+import { getDashboardPath, getOrdersPath } from "@/lib/constant";
 import { toast } from "sonner";
 
 export default function Navbar() {
@@ -91,7 +91,7 @@ export default function Navbar() {
           onSuccess={() => {
             clear();
             toast.success("Order placed! Check My Orders to track it.");
-            navigate("/customer/orders");
+            if (user) navigate(getOrdersPath(user.role));
           }}
         />
       )}

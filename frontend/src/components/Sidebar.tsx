@@ -1,13 +1,19 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/constant";
-import { Button } from "@/components/ui/button";
+import { getDashboardPath, getProfilePath } from "@/lib/constant";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard,
   Users,
-  Dumbbell,
   ShoppingBag,
   Package,
   Tag,
@@ -27,6 +33,7 @@ import {
   Gift,
   BadgePercent,
   MessageCircle,
+  ChevronsUpDown,
 } from "lucide-react";
 import type { Role } from "@/types";
 import useUser from "@/hooks/useUser";
@@ -124,9 +131,19 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <UserCheck className="h-4 w-4" />,
     },
     {
-      to: "/trainer/profile",
-      label: "My Profile",
-      icon: <User className="h-4 w-4" />,
+      to: "/products",
+      label: "Shop",
+      icon: <ShoppingCart className="h-4 w-4" />,
+    },
+    {
+      to: "/trainer/orders",
+      label: "My Orders",
+      icon: <ShoppingBag className="h-4 w-4" />,
+    },
+    {
+      to: "/trainer/rewards",
+      label: "Rewards",
+      icon: <Gift className="h-4 w-4" />,
     },
     {
       to: "/trainer/chat",
@@ -176,11 +193,6 @@ const navLinks: Record<Role, NavItem[]> = {
     //   icon: <Dumbbell className="h-4 w-4" />,
     // },
     {
-      to: "/customer/profile",
-      label: "Profile",
-      icon: <User className="h-4 w-4" />,
-    },
-    {
       to: "/customer/subscription",
       label: "Subscription",
       icon: <Crown className="h-4 w-4" />,
@@ -227,6 +239,7 @@ export default function Sidebar() {
 
   const links = navLinks[user.role] ?? [];
   const dashboardPath = getDashboardPath(user.role);
+  const profilePath = getProfilePath(user.role);
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -292,30 +305,54 @@ export default function Sidebar() {
 
       {/* User + logout */}
       <div className="p-3">
-        <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/30 text-xs font-bold text-emerald-300">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-white">
-              {user.name}
-            </div>
-            <div className="truncate text-[11px] text-emerald-300/70">
-              {user.email ?? ""}
-            </div>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2 text-emerald-200/80 hover:bg-white/8 hover:text-white"
-          onClick={() => {
-            logout();
-            navigate("/");
-          }}
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex w-full items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5 text-left transition-colors hover:bg-white/10">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/30 text-xs font-bold text-emerald-300">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-white">
+                  {user.name}
+                </div>
+                <div className="truncate text-[11px] text-emerald-300/70">
+                  {user.email ?? ""}
+                </div>
+              </div>
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-emerald-300/70" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="truncate text-sm font-medium">{user.name}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {roleLabel[user.role]}
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {profilePath && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setOpen(false);
+                  navigate(profilePath);
+                }}
+              >
+                <User className="h-4 w-4" />
+                Profile
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(false);
+                logout();
+                navigate("/");
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
