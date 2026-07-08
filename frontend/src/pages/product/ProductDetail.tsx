@@ -91,7 +91,10 @@ export default function ProductDetail() {
   const lowStock = !outOfStock && product.stock_quantity <= 5;
   const cartQty = cartItems[product.id]?.quantity ?? 0;
   const remaining = Math.max(0, product.stock_quantity - cartQty);
-  const effectivePrice = product.discounted_price != null ? Number(product.discounted_price) : Number(product.price);
+  const effectivePrice =
+    product.discounted_price != null
+      ? Number(product.discounted_price)
+      : Number(product.price);
   const orderTotal = effectivePrice * quantity;
 
   function handleAddToCart() {
@@ -106,7 +109,10 @@ export default function ProductDetail() {
         product_id: product.id,
         name: product.name,
         price: Number(product.price),
-        discounted_price: product.discounted_price != null ? Number(product.discounted_price) : undefined,
+        discounted_price:
+          product.discounted_price != null
+            ? Number(product.discounted_price)
+            : null,
         stock_quantity: product.stock_quantity,
       },
       toAdd,
@@ -196,7 +202,7 @@ export default function ProductDetail() {
                     RS. {Number(product.price).toFixed(2)}
                   </span>
                   <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white">
-                    {product.discount_type === 'percentage'
+                    {product.discount_type === "percentage"
                       ? `${Number(product.discount_value).toFixed(0)}% OFF`
                       : `RS. ${Number(product.discount_value).toFixed(0)} OFF`}
                   </span>
@@ -222,7 +228,6 @@ export default function ProductDetail() {
                 )}
               </div>
             </div>
-
 
             <Separator />
 

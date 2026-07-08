@@ -19,6 +19,17 @@ export function getDashboardPath(role: Role): string {
   return "/customer";
 }
 
+export function getOrdersPath(role: Role): string {
+  if (role === "dietitian") return "/trainer/orders";
+  return "/customer/orders";
+}
+
+export function getProfilePath(role: Role): string | null {
+  if (role === "dietitian") return "/trainer/profile";
+  if (role === "trainee") return "/customer/profile";
+  return null;
+}
+
 export function calcCalorieTarget(
   age?: number,
   weight_kg?: number,

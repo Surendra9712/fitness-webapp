@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/constant";
-import { Button } from "@/components/ui/button";
+import { getDashboardPath, getProfilePath } from "@/lib/constant";
+import { useChatStore } from "@/store/chatStore";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard,
   Users,
-  Dumbbell,
   ShoppingBag,
   Package,
   Tag,
@@ -26,9 +33,12 @@ import {
   Percent,
   Gift,
   BadgePercent,
+  MessageCircle,
+  ChevronsUpDown,
 } from "lucide-react";
 import type { Role } from "@/types";
 import useUser from "@/hooks/useUser";
+import useChat from "@/hooks/useChat";
 
 interface NavItem {
   to: string;
@@ -74,11 +84,6 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Orders",
       icon: <ShoppingBag className="h-4 w-4" />,
     },
-    // {
-    //   to: "/admin/exercises",
-    //   label: "Exercises",
-    //   icon: <Dumbbell className="h-4 w-4" />,
-    // },
     {
       to: "/admin/trainer-assignments",
       label: "Trainer Assign.",
@@ -122,9 +127,24 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <UserCheck className="h-4 w-4" />,
     },
     {
-      to: "/trainer/profile",
-      label: "My Profile",
-      icon: <User className="h-4 w-4" />,
+      to: "/products",
+      label: "Shop",
+      icon: <ShoppingCart className="h-4 w-4" />,
+    },
+    {
+      to: "/trainer/orders",
+      label: "My Orders",
+      icon: <ShoppingBag className="h-4 w-4" />,
+    },
+    {
+      to: "/trainer/rewards",
+      label: "Rewards",
+      icon: <Gift className="h-4 w-4" />,
+    },
+    {
+      to: "/trainer/chat",
+      label: "Chat",
+      icon: <MessageCircle className="h-4 w-4" />,
     },
     {
       to: "/trainer/notifications",
@@ -150,24 +170,20 @@ const navLinks: Record<Role, NavItem[]> = {
     },
     {
       to: "/customer/trainer",
-      label: "My Trainer",
+      label: "Trainers",
       icon: <UserCheck className="h-4 w-4" />,
+    },
+    {
+      to: "/customer/chat",
+      label: "Chat",
+      icon: <MessageCircle className="h-4 w-4" />,
     },
     {
       to: "/customer/request-product",
       label: "Request",
       icon: <Bell className="h-4 w-4" />,
     },
-    // {
-    //   to: "/customer/log-exercise",
-    //   label: "Exercise",
-    //   icon: <Dumbbell className="h-4 w-4" />,
-    // },
-    {
-      to: "/customer/profile",
-      label: "Profile",
-      icon: <User className="h-4 w-4" />,
-    },
+
     {
       to: "/customer/subscription",
       label: "Subscription",
@@ -205,26 +221,51 @@ export default function Sidebar() {
   const { data: unreadData } = GetUnreadCount();
   const unreadCount = unreadData?.count ?? 0;
 
+  const isChatRole = user?.role === "trainee" || user?.role === "dietitian";
+  const { GetChatUnreadCount } = useChat();
+  const { data: chatUnreadData } = GetChatUnreadCount(isChatRole);
+  const chatUnreadCount = chatUnreadData?.count ?? 0;
+
+  const connect = useChatStore((s) => s.connect);
+  const disconnect = useChatStore((s) => s.disconnect);
+
+  // Connect once for the whole authenticated session (Sidebar persists across
+  // page navigation and only unmounts on logout) rather than per-page, so
+  // real-time chat delivery and incoming calls work app-wide, not just while
+  // the Chat page happens to be open.
+  useEffect(() => {
+    if (!isChatRole) return;
+    connect();
+    return () => disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isChatRole]);
+
   if (!user) return null;
 
   const links = navLinks[user.role] ?? [];
   const dashboardPath = getDashboardPath(user.role);
+  const profilePath = getProfilePath(user.role);
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Brand */}
-      <div className="flex h-14 items-center gap-2.5 px-4">
+      <div className="flex items-center gap-2.5 px-4">
         <NavLink
           to="/"
           className="flex items-center gap-2 text-white"
           onClick={() => setOpen(false)}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+          <img
+            src={import.meta.env.VITE_APP_LOGO}
+            alt={import.meta.env.VITE_APP_NAME}
+            className="h-14 w-auto"
+          />
+          {/* <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
             <Leaf className="h-4 w-4 text-emerald-400" />
-          </div>
-          <span className="text-base font-bold tracking-tight">
-            SmartDiet Pro
-          </span>
+          </div> */}
+          {/* <span className="text-base font-bold tracking-tight">
+            {import.meta.env.VITE_APP_NAME} Pro
+          </span> */}
         </NavLink>
       </div>
 
@@ -235,6 +276,7 @@ export default function Sidebar() {
         <ul className="space-y-0.5">
           {links.map((l) => {
             const isNotifLink = l.label === "Notifications";
+            const isChatLink = l.label === "Chat";
             return (
               <li key={l.to}>
                 <NavLink
@@ -257,6 +299,11 @@ export default function Sidebar() {
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
+                  {isChatLink && chatUnreadCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                      {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                    </span>
+                  )}
                 </NavLink>
               </li>
             );
@@ -268,30 +315,54 @@ export default function Sidebar() {
 
       {/* User + logout */}
       <div className="p-3">
-        <div className="mb-2 flex items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/30 text-xs font-bold text-emerald-300">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-white">
-              {user.name}
-            </div>
-            <div className="truncate text-[11px] text-emerald-300/70">
-              {user.email ?? ""}
-            </div>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2 text-emerald-200/80 hover:bg-white/8 hover:text-white"
-          onClick={() => {
-            logout();
-            navigate("/");
-          }}
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex w-full items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5 text-left transition-colors hover:bg-white/10">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/30 text-xs font-bold text-emerald-300">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-white">
+                  {user.name}
+                </div>
+                <div className="truncate text-[11px] text-emerald-300/70">
+                  {user.email ?? ""}
+                </div>
+              </div>
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-emerald-300/70" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="truncate text-sm font-medium">{user.name}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {roleLabel[user.role]}
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {profilePath && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setOpen(false);
+                  navigate(profilePath);
+                }}
+              >
+                <User className="h-4 w-4" />
+                Profile
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(false);
+                logout();
+                navigate("/");
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

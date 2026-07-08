@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/CheckoutDialog";
-import { getDashboardPath } from "@/lib/constant";
+import { getDashboardPath, getOrdersPath } from "@/lib/constant";
 import { toast } from "sonner";
 
 export default function Navbar() {
@@ -22,10 +22,11 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <Leaf className="h-5 w-5 text-emerald-600" />
-            <span className="text-lg font-bold tracking-tight text-emerald-900">
-              SmartDiet Pro
-            </span>
+            <img
+              src={import.meta.env.VITE_APP_LOGO_LIGHT}
+              alt={import.meta.env.VITE_APP_NAME}
+              className="h-14 w-auto"
+            />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -36,7 +37,7 @@ export default function Navbar() {
             {user ? (
               <>
                 {/* Cart button — only for customer role */}
-                {user.role === "trainee" && (
+                {user.role !== "admin" && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -83,7 +84,7 @@ export default function Navbar() {
       </header>
 
       {/* Global checkout drawer */}
-      {user && (
+      {user && user?.role !== "admin" && (
         <CheckoutDialog
           open={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}
@@ -91,7 +92,7 @@ export default function Navbar() {
           onSuccess={() => {
             clear();
             toast.success("Order placed! Check My Orders to track it.");
-            navigate("/customer/orders");
+            if (user) navigate(getOrdersPath(user.role));
           }}
         />
       )}

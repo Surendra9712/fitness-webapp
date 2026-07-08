@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Leaf, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Leaf, ArrowRight, CheckCircle2, Award } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getDashboardPath } from "@/lib/constant";
 import { Button } from "@/components/ui/button";
@@ -43,17 +43,26 @@ export default function CtaSection() {
             Join hundreds of members already moving more and hitting their goals
             — starting today.
           </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             {user ? (
-              <Button
-                size="lg"
-                className="bg-primary px-10 text-base font-semibold text-white hover:bg-primary-400 shadow-lg"
-                asChild
-              >
-                <Link to={getDashboardPath(user.role)}>
-                  Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
+              <>
+                <Button
+                  size="lg"
+                  className="bg-primary px-10 text-base font-semibold text-white hover:bg-primary-400 shadow-lg"
+                  asChild
+                >
+                  <Link to={getDashboardPath(user.role)}>
+                    Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                {user.role === "trainee" && (
+                  <Button size="lg" variant="accent" asChild>
+                    <Link to="/customer/become-trainer">
+                      <Award className="mr-2 h-5 w-5" /> Become a Trainer
+                    </Link>
+                  </Button>
+                )}
+              </>
             ) : (
               <>
                 <Button
@@ -67,6 +76,11 @@ export default function CtaSection() {
                 </Button>
                 <Button size="lg" variant="accent" asChild>
                   <Link to="/products">Browse Products</Link>
+                </Button>
+                <Button size="lg" variant="outline" asChild>
+                  <Link to="/become-trainer">
+                    <Award className="mr-2 h-5 w-5" /> Become a Trainer
+                  </Link>
                 </Button>
               </>
             )}

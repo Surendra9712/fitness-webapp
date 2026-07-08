@@ -61,13 +61,6 @@ class UpdateUserSchema(BaseModel):
     status: Optional[Literal['inactive', 'active', 'pending']] = None
 
 
-class CreateExerciseSchema(BaseModel):
-    name: str = Field(min_length=1)
-    category: str = Field(min_length=1)
-    calories_burned_per_hour: int = Field(default=0, ge=0)
-    description: Optional[str] = None
-
-
 class CreateProductSchema(BaseModel):
     name: str = Field(min_length=1)
     price: float = Field(gt=0)
@@ -511,81 +504,6 @@ def reject_subscription(uid):
         cursor.close()
         conn.close()
 
-
-# ── Exercises ────────────────────────────────────────────────────────────────
-
-@admin_bp.route('/exercises', methods=['GET'])
-@role_required('admin', 'dietitian', 'trainee')
-def list_exercises():
-    page, page_size, offset = parse_page_params(default_size=20, max_size=200)
-    search   = request.args.get('search', '').strip()
-    category = request.args.get('category', '').strip()
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        conditions = ["deleted_at IS NULL"]
-        params = []
-        if search:
-            conditions.append("name LIKE %s")
-            params.append(f"%{search}%")
-        if category:
-            conditions.append("category = %s")
-            params.append(category)
-        where = "WHERE " + " AND ".join(conditions)
-        cursor.execute(f"SELECT COUNT(*) AS total FROM exercises {where}", params)
-        total = cursor.fetchone()['total']
-        cursor.execute(
-            f"SELECT * FROM exercises {where} ORDER BY category, name LIMIT %s OFFSET %s",
-            params + [page_size, offset]
-        )
-        return paginated_response(cursor.fetchall(), total, page, page_size)
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@admin_bp.route('/exercises', methods=['POST'])
-@role_required('admin')
-def create_exercise():
-    try:
-        body = CreateExerciseSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO exercises (name, category, calories_burned_per_hour, description) VALUES (%s,%s,%s,%s)",
-            (body.name, body.category, body.calories_burned_per_hour, body.description),
-        )
-        conn.commit()
-        return jsonify({'id': cursor.lastrowid, 'message': 'Exercise created'}), 201
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@admin_bp.route('/exercises/<int:eid>', methods=['DELETE'])
-@role_required('admin')
-def delete_exercise(eid):
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE exercises SET deleted_at = NOW() WHERE id = %s", (eid,))
-        conn.commit()
-        return jsonify({'message': 'Exercise deleted'})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
 # ── Products ─────────────────────────────────────────────────────────────────
 
 def _resolve_category_id(cursor, slug):
@@ -911,8 +829,16 @@ def update_order_status(oid):
         if not order:
             return jsonify({'error': 'Order not found'}), 404
 
-        cursor.execute("UPDATE orders SET status = %s WHERE id = %s", (body.status, oid))
-
+        if body.status == "delivered":
+            cursor.execute(
+                "UPDATE orders SET status = %s, payment_status = 'paid' WHERE id = %s",
+                (body.status, oid),
+            )
+        else:
+            cursor.execute(
+                "UPDATE orders SET status = %s WHERE id = %s",
+                (body.status, oid),
+            )
         # Award reward points only when order is first marked shipped
         if body.status == 'shipped' and order['status'] != 'shipped':
             points_earned = int(float(order['total_amount'] or 0) // 50)

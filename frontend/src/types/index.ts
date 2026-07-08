@@ -56,8 +56,13 @@ export interface TrainerInfo {
   specialization?: string;
   experience_years?: number;
   date_of_birth?: string;
+  phone_number?: string;
+  city?: string;
+  country?: string;
   available_time?: AvailableSlot[];
   certifications?: TrainerCertification[];
+  my_pending_assignment_id?: number | null;
+  my_pending_status?: AssignmentStatus | null;
 }
 
 export interface TrainerAssignment {
@@ -76,6 +81,7 @@ export interface TrainerAssignment {
   admin_reviewed_at?: string;
   reviewed_by_name?: string;
   created_at: string;
+  isApprovedByTrainer?: boolean;
 }
 export type ProductStatus = "active" | "inactive";
 export type RequestStatus = "pending" | "approved" | "rejected";
@@ -294,6 +300,8 @@ export interface DietitianProfile {
 export interface DietitianStats {
   client_count: number;
   pending_assignments: number;
+  pending_requests: number;
+  customers: number;
 }
 
 // ─── Mutation payloads ───────────────────────────────────────────────
@@ -407,19 +415,20 @@ export interface RequestTrainerPayload {
 }
 
 export type NotificationType =
-  | 'order_received'
-  | 'order_status'
-  | 'subscription_request'
-  | 'subscription_approved'
-  | 'subscription_rejected'
-  | 'product_request'
-  | 'product_request_approved'
-  | 'product_request_rejected'
-  | 'trainer_request'
-  | 'trainer_request_to_admin'
-  | 'trainer_accepted'
-  | 'trainer_approved'
-  | 'trainer_rejected';
+  | "order_received"
+  | "order_status"
+  | "subscription_request"
+  | "subscription_approved"
+  | "subscription_rejected"
+  | "product_request"
+  | "product_request_approved"
+  | "product_request_rejected"
+  | "trainer_request"
+  | "trainer_request_to_admin"
+  | "trainer_signup_request"
+  | "trainer_accepted"
+  | "trainer_approved"
+  | "trainer_rejected";
 
 export interface Notification {
   id: number;
@@ -430,6 +439,86 @@ export interface Notification {
   reference_id?: number;
   is_read: boolean | number;
   created_at: string;
+}
+
+export type ChatAttachmentType = "image" | "file";
+
+export interface ChatMessage {
+  id: number;
+  assignment_id: number;
+  sender_id: number;
+  content: string;
+  is_read: boolean | number;
+  created_at: string;
+  attachment_url?: string | null;
+  attachment_type?: ChatAttachmentType | null;
+  attachment_name?: string | null;
+}
+
+export interface ChatThread {
+  assignment_id: number;
+  peer_id: number;
+  peer_name: string;
+  peer_email: string;
+  peer_image_url?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  unread_count: number;
+}
+
+export type CallType = "audio" | "video";
+export type CallStatus = "idle" | "outgoing" | "incoming" | "connected";
+
+export interface IncomingCallInfo {
+  assignment_id: number;
+  from_user_id: number;
+  from_name: string;
+  from_image?: string | null;
+  call_type: CallType;
+  sdp: RTCSessionDescriptionInit;
+}
+
+export interface BecomeTrainerPayload {
+  full_name?: string;
+  date_of_birth?: string;
+  bio?: string;
+  specialization?: string;
+  experience_years?: number;
+  phone_number?: string;
+  city?: string;
+  country?: string;
+  profile_image_url?: string;
+  available_time: AvailableSlot[];
+  certifications: {
+    name: string;
+    file_url?: string;
+    file_type: "image" | "pdf" | "url";
+  }[];
+}
+
+export interface PublicBecomeTrainerPayload {
+  name: string;
+  email: string;
+  password: string;
+  date_of_birth: string;
+  specialization: string;
+  experience_years: number;
+  bio?: string;
+  phone_number?: string;
+  city?: string;
+  country?: string;
+  profile_image_url?: string;
+  available_time: AvailableSlot[];
+  certifications: {
+    name: string;
+    file_url?: string;
+    file_type: "image" | "pdf" | "url";
+  }[];
+}
+
+export interface BecomeTrainerResult {
+  token: string;
+  user: { id: number; name: string; email: string; role: "dietitian" };
 }
 
 export interface UpdateProfilePayload {

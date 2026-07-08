@@ -4,8 +4,11 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
 import { getDashboardPath } from "@/lib/constant";
 import { Toaster } from "@/components/ui/sonner";
+import IncomingCallDialog from "@/components/call/IncomingCallDialog";
+import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 
 import Home from "@/pages/Home";
+import PublicBecomeTrainer from "@/pages/PublicBecomeTrainer";
 import Products from "@/pages/product/Products";
 import ProductDetail from "@/pages/product/ProductDetail";
 import PaymentReturn from "@/pages/product/PaymentReturn";
@@ -13,14 +16,13 @@ import PaymentReturn from "@/pages/product/PaymentReturn";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UserManagement from "@/pages/admin/user/UserManagement";
 import UserDetail from "@/pages/admin/user/UserDetail";
-import ExerciseLibrary from "@/pages/admin/exercise/ExerciseLibrary";
 import ProductManagement from "@/pages/admin/product/ProductManagement";
 import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
 import CategoryManagement from "@/pages/admin/category/CategoryManagement";
 import TrainerAssignments from "@/pages/admin/TrainerAssignments";
 import TrainerVerification from "@/pages/admin/TrainerVerification";
-import SubscriptionManagement from "@/pages/admin/SubscriptionManagement";
+import SubscriptionManagement from "@/pages/admin/subscription/SubscriptionManagement";
 import PromoCodeManagement from "@/pages/admin/PromoCodeManagement";
 import DiscountManagement from "@/pages/admin/discount/DiscountManagement";
 import SubscriptionPaymentReturn from "@/pages/user/subscription/SubscriptionPaymentReturn";
@@ -28,14 +30,15 @@ import SubscriptionPaymentReturn from "@/pages/user/subscription/SubscriptionPay
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
 import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
 import TrainerProfile from "@/pages/dietitian/TrainerProfile";
+import TrainerChat from "@/pages/dietitian/TrainerChat";
 
 import UserDashboard from "@/pages/user/UserDashboard";
 import MyOrders from "@/pages/user/MyOrders";
 import RequestProduct from "@/pages/user/RequestProduct";
-import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
+import BecomeTrainer from "@/pages/user/BecomeTrainer";
 import MyTrainer from "@/pages/user/trainer/MyTrainer";
-import TrainerDetail from "@/pages/user/trainer/TrainerDetail";
+import ChatWithTrainer from "@/pages/user/trainer/ChatWithTrainer";
 import Subscription from "@/pages/user/subscription/Subscription";
 import AiRecommendation from "@/pages/user/AiRecommendation";
 import WeeklyReport from "@/pages/user/WeeklyReport";
@@ -58,6 +61,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <IncomingCallDialog />
+      <ActiveCallOverlay />
     </div>
   );
 }
@@ -69,6 +74,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/become-trainer" element={<PublicBecomeTrainer />} />
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/payment/esewa/success" element={<PaymentReturn />} />
@@ -292,6 +298,36 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/trainer/orders"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <MyOrders />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trainer/rewards"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <Rewards />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trainer/chat"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <TrainerChat />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
           {/* Customer */}
           <Route
@@ -329,14 +365,32 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/trainers/:id"
+            path="/customer/chat"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
-                  <TrainerDetail />
+                  <ChatWithTrainer />
                 </Layout>
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/customer/become-trainer"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <BecomeTrainer />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/trainers"
+            element={<Navigate to="/customer/trainer?tab=find" replace />}
+          />
+          <Route
+            path="/customer/trainers/:id"
+            element={<Navigate to="/customer/trainer?tab=find" replace />}
           />
           <Route
             path="/customer/request-product"

@@ -1,11 +1,10 @@
-import { Clock, CheckCircle2, XCircle, X, ExternalLink } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Clock, CheckCircle2, XCircle, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { TrainerAssignment } from '@/types'
 
-const STATUS_META: Record<string, {
+export const STATUS_META: Record<string, {
   label: string
   color: string
   icon: React.ReactNode
@@ -63,16 +62,7 @@ export function AssignmentStatusCard({ assignment, onCancel }: Props) {
         <div className="rounded-lg bg-white/60 p-3 space-y-1.5 text-sm">
           <div className="flex gap-2">
             <span className="font-medium w-24 shrink-0">Trainer</span>
-            <span className="flex items-center gap-1.5">
-              {assignment.trainer_name}
-              <Link
-                to={`/customer/trainers/${assignment.trainer_id}`}
-                className="text-primary-600 hover:underline inline-flex items-center gap-0.5 text-xs"
-              >
-                <ExternalLink className="h-3 w-3" />
-                View profile
-              </Link>
-            </span>
+            <span>{assignment.trainer_name}</span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium w-24 shrink-0">Email</span>

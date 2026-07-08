@@ -11,9 +11,9 @@ type Status = "verifying" | "success" | "failed";
 export default function SubscriptionPaymentReturn() {
   const location = useLocation();
   const { refreshUser } = useAuth();
-  const [status, setStatus]   = useState<Status>("verifying");
+  const [status, setStatus] = useState<Status>("verifying");
   const [heading, setHeading] = useState("");
-  const [detail, setDetail]   = useState("");
+  const [detail, setDetail] = useState("");
   const called = useRef(false);
 
   useEffect(() => {
@@ -21,13 +21,15 @@ export default function SubscriptionPaymentReturn() {
     called.current = true;
 
     const params = new URLSearchParams(location.search);
-    const path   = location.pathname;
+    const path = location.pathname;
 
     if (path.includes("/failure")) {
       const errMsg = params.get("message") ?? params.get("error_message");
       setStatus("failed");
       setHeading("Payment Failed");
-      setDetail(errMsg ?? "The payment was cancelled or rejected. No charge was made.");
+      setDetail(
+        errMsg ?? "The payment was cancelled or rejected. No charge was made.",
+      );
       return;
     }
 
@@ -41,12 +43,16 @@ export default function SubscriptionPaymentReturn() {
       }
 
       api
-        .post<{ message: string }>("/payments/subscription/esewa/verify", { data })
+        .post<{ message: string }>("/payments/subscription/esewa/verify", {
+          data,
+        })
         .then(async () => {
           await refreshUser();
           setStatus("success");
           setHeading("Pro Plan Activated!");
-          setDetail("Your payment was verified. You now have full access to Pro features.");
+          setDetail(
+            "Your payment was verified. You now have full access to Pro features.",
+          );
         })
         .catch((e: Error) => {
           setStatus("failed");
@@ -59,12 +65,13 @@ export default function SubscriptionPaymentReturn() {
   return (
     <PublicLayout>
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 py-16 text-center">
-
         {status === "verifying" && (
           <>
             <Loader2 className="mb-5 h-14 w-14 animate-spin text-primary" />
             <h2 className="text-xl font-bold">Verifying payment…</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Please wait while we confirm your payment.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please wait while we confirm your payment.
+            </p>
           </>
         )}
 
@@ -74,7 +81,9 @@ export default function SubscriptionPaymentReturn() {
               <Crown className="h-10 w-10 text-primary" />
             </div>
             <h2 className="text-2xl font-black tracking-tight">{heading}</h2>
-            <p className="mt-2 max-w-sm text-sm text-muted-foreground">{detail}</p>
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+              {detail}
+            </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild>
                 <Link to="/customer/trainer">Find a Trainer</Link>
@@ -93,7 +102,9 @@ export default function SubscriptionPaymentReturn() {
             </div>
             <h2 className="text-2xl font-black tracking-tight">{heading}</h2>
             {detail && (
-              <p className="mt-3 max-w-md rounded-lg bg-destructive/5 px-4 py-2.5 text-sm text-destructive">{detail}</p>
+              <p className="mt-3 max-w-md rounded-lg bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+                {detail}
+              </p>
             )}
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild>
@@ -102,7 +113,6 @@ export default function SubscriptionPaymentReturn() {
             </div>
           </>
         )}
-
       </div>
     </PublicLayout>
   );

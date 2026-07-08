@@ -1,5 +1,11 @@
 import { useFormContext } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Pill, Tag } from "./ui";
 import { togArr } from "./utils";
 import { DIETS, DIETARY_FLAGS, ALLERGENS, CUISINES } from "./constants";
@@ -11,7 +17,9 @@ export function Step3Diet() {
   return (
     <>
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Diet Type & Allergens</h2>
+        <h2 className="text-xl font-bold text-gray-900">
+          Diet Type & Allergens
+        </h2>
         <p className="mt-1 text-sm text-gray-500">
           We'll filter out foods that don't work for you
         </p>
@@ -26,7 +34,11 @@ export function Step3Diet() {
             <FormControl>
               <div className="flex flex-wrap gap-2">
                 {DIETS.map(([k, l]) => (
-                  <Pill key={k} active={field.value === k} onClick={() => field.onChange(k)}>
+                  <Pill
+                    key={k}
+                    active={field.value === k}
+                    onClick={() => field.onChange(k)}
+                  >
                     {l}
                   </Pill>
                 ))}
@@ -51,7 +63,9 @@ export function Step3Diet() {
                   <Pill
                     key={k}
                     active={(field.value as string[]).includes(k)}
-                    onClick={() => field.onChange(togArr(field.value as string[], k))}
+                    onClick={() =>
+                      field.onChange(togArr(field.value as string[], k))
+                    }
                   >
                     {l}
                   </Pill>
@@ -77,7 +91,9 @@ export function Step3Diet() {
                   <Tag
                     key={a}
                     active={(field.value as string[]).includes(a)}
-                    onClick={() => field.onChange(togArr(field.value as string[], a))}
+                    onClick={() =>
+                      field.onChange(togArr(field.value as string[], a))
+                    }
                   >
                     {a}
                   </Tag>
@@ -103,7 +119,9 @@ export function Step3Diet() {
                   <Tag
                     key={c}
                     active={(field.value as string[]).includes(c)}
-                    onClick={() => field.onChange(togArr(field.value as string[], c))}
+                    onClick={() =>
+                      field.onChange(togArr(field.value as string[], c))
+                    }
                   >
                     {c}
                   </Tag>

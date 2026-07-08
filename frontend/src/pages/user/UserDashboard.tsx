@@ -1,5 +1,16 @@
 import { useEffect, useState, useRef } from "react";
-import { Zap, Clock, ShoppingBag, Bell, Plus, Trash2, Search, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import {
+  Zap,
+  Clock,
+  ShoppingBag,
+  Bell,
+  Plus,
+  Trash2,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+} from "lucide-react";
 import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -26,8 +37,19 @@ interface MealLog {
   fat_g: number;
 }
 
-interface Totals { calories: number; protein_g: number; carbs_g: number; fat_g: number; fiber_g: number; }
-interface Targets { calories: number; protein_g: number; carbs_g: number; fat_g: number; }
+interface Totals {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+}
+interface Targets {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+}
 
 interface TodayMeals {
   date: string;
@@ -53,25 +75,58 @@ interface FoodSearchResult {
 
 // ── Meal types config ─────────────────────────────────────────────────────────
 const MEAL_TYPES = [
-  { key: "breakfast", label: "Breakfast", emoji: "🌅", class: "Light < 350 kcal" },
-  { key: "lunch",     label: "Lunch",     emoji: "☀️", class: "Heavy 350–700 kcal" },
-  { key: "snack",     label: "Snack",     emoji: "🍎", class: "Light < 220 kcal" },
-  { key: "dinner",    label: "Dinner",    emoji: "🌙", class: "Heavy 280–600 kcal" },
+  {
+    key: "breakfast",
+    label: "Breakfast",
+    emoji: "🌅",
+    class: "Light < 350 kcal",
+  },
+  { key: "lunch", label: "Lunch", emoji: "☀️", class: "Heavy 350–700 kcal" },
+  { key: "snack", label: "Snack", emoji: "🍎", class: "Light < 220 kcal" },
+  { key: "dinner", label: "Dinner", emoji: "🌙", class: "Heavy 280–600 kcal" },
 ] as const;
 
-const UNITS = ["serving", "g", "pieces", "cup", "bowl", "plate", "glass", "tbsp", "ml"];
+const UNITS = [
+  "serving",
+  "g",
+  "pieces",
+  "cup",
+  "bowl",
+  "plate",
+  "glass",
+  "tbsp",
+  "ml",
+];
 
 // ── NutritionBar ──────────────────────────────────────────────────────────────
-function NutritionBar({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
-  const pct = Math.min(100, target > 0 ? Math.round((value / target) * 100) : 0);
+function NutritionBar({
+  label,
+  value,
+  target,
+  color,
+}: {
+  label: string;
+  value: number;
+  target: number;
+  color: string;
+}) {
+  const pct = Math.min(
+    100,
+    target > 0 ? Math.round((value / target) * 100) : 0,
+  );
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs text-muted-foreground">
         <span className="font-medium">{label}</span>
-        <span>{Math.round(value)} / {Math.round(target)}</span>
+        <span>
+          {Math.round(value)} / {Math.round(target)}
+        </span>
       </div>
       <div className="w-full bg-secondary rounded-full h-1.5">
-        <div className={`h-1.5 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-1.5 rounded-full transition-all ${color}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -79,10 +134,25 @@ function NutritionBar({ label, value, target, color }: { label: string; value: n
 
 // ── MealSection ───────────────────────────────────────────────────────────────
 function MealSection({
-  mealType, emoji, label, classLabel, logs, onLog, onDelete,
+  mealType,
+  emoji,
+  label,
+  classLabel,
+  logs,
+  onLog,
+  onDelete,
 }: {
-  mealType: string; emoji: string; label: string; classLabel: string;
-  logs: MealLog[]; onLog: (meal: string, food: FoodSearchResult, qty: number, unit: string) => Promise<void>;
+  mealType: string;
+  emoji: string;
+  label: string;
+  classLabel: string;
+  logs: MealLog[];
+  onLog: (
+    meal: string,
+    food: FoodSearchResult,
+    qty: number,
+    unit: string,
+  ) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 }) {
   const [open, setOpen] = useState(mealType === "breakfast");
@@ -101,13 +171,21 @@ function MealSection({
     setQuery(q);
     setSelected(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.trim().length < 2) { setResults([]); return; }
+    if (q.trim().length < 2) {
+      setResults([]);
+      return;
+    }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await api.get<{ results: FoodSearchResult[] }>(`/ai/food/search?q=${encodeURIComponent(q)}`);
+        const res = await api.get<{ results: FoodSearchResult[] }>(
+          `/ai/food/search?q=${encodeURIComponent(q)}`,
+        );
         setResults(res.results);
-      } catch {} finally { setSearching(false); }
+      } catch {
+      } finally {
+        setSearching(false);
+      }
     }, 350);
   };
 
@@ -123,8 +201,15 @@ function MealSection({
     if (!selected) return;
     const q = parseFloat(qty) || 1;
     setLogging(true);
-    try { await onLog(mealType, selected, q, unit); setSelected(null); setQuery(""); setQty("1"); }
-    catch {} finally { setLogging(false); }
+    try {
+      await onLog(mealType, selected, q, unit);
+      setSelected(null);
+      setQuery("");
+      setQty("1");
+    } catch {
+    } finally {
+      setLogging(false);
+    }
   };
 
   return (
@@ -132,7 +217,7 @@ function MealSection({
       {/* Header */}
       <button
         className="w-full flex items-center justify-between px-4 py-3 bg-card hover:bg-muted/50 transition-colors"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center gap-3">
           <span className="text-xl">{emoji}</span>
@@ -142,8 +227,14 @@ function MealSection({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-muted-foreground">{Math.round(mealCalories)} kcal · {logs.length} items</span>
-          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          <span className="text-sm font-medium text-muted-foreground">
+            {Math.round(mealCalories)} kcal · {logs.length} items
+          </span>
+          {open ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </button>
 
@@ -152,15 +243,27 @@ function MealSection({
           {/* Logged items */}
           {logs.length > 0 && (
             <div className="space-y-1 pt-3">
-              {logs.map(log => (
-                <div key={log.id} className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/40">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-muted/40"
+                >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{log.food_name}</p>
+                    <p className="text-sm font-medium truncate">
+                      {log.food_name}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {log.quantity} {log.unit} · {Math.round(Number(log.calories))} kcal · P{Math.round(Number(log.protein_g))}g · C{Math.round(Number(log.carbs_g))}g · F{Math.round(Number(log.fat_g))}g
+                      {log.quantity} {log.unit} ·{" "}
+                      {Math.round(Number(log.calories))} kcal · P
+                      {Math.round(Number(log.protein_g))}g · C
+                      {Math.round(Number(log.carbs_g))}g · F
+                      {Math.round(Number(log.fat_g))}g
                     </p>
                   </div>
-                  <button onClick={() => onDelete(log.id)} className="ml-2 shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors">
+                  <button
+                    onClick={() => onDelete(log.id)}
+                    className="ml-2 shrink-0 p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -176,11 +279,15 @@ function MealSection({
                 className="pl-8 text-sm h-8"
                 placeholder="Search food (Nepali, global, any language)..."
                 value={query}
-                onChange={e => handleSearch(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
               />
             </div>
 
-            {searching && <p className="text-xs text-muted-foreground pl-1">Searching USDA, Nutritionix...</p>}
+            {searching && (
+              <p className="text-xs text-muted-foreground pl-1">
+                Searching USDA, Nutritionix...
+              </p>
+            )}
 
             {results.length > 0 && !selected && (
               <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
@@ -192,9 +299,15 @@ function MealSection({
                   >
                     <p className="text-sm font-medium">{f.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {f.calories} kcal · P{f.protein_g}g · C{f.carbs_g}g · F{f.fat_g}g
-                      {f.serving_size && ` · per ${f.serving_size}${f.serving_unit || 'g'}`}
-                      {f.source && <span className="ml-1 opacity-60 capitalize">({f.source})</span>}
+                      {f.calories} kcal · P{f.protein_g}g · C{f.carbs_g}g · F
+                      {f.fat_g}g
+                      {f.serving_size &&
+                        ` · per ${f.serving_size}${f.serving_unit || "g"}`}
+                      {f.source && (
+                        <span className="ml-1 opacity-60 capitalize">
+                          ({f.source})
+                        </span>
+                      )}
                     </p>
                   </button>
                 ))}
@@ -203,38 +316,78 @@ function MealSection({
 
             {selected && (
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-                <p className="text-sm font-semibold text-primary">✓ {selected.name}</p>
+                <p className="text-sm font-semibold text-primary">
+                  ✓ {selected.name}
+                </p>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-xs text-muted-foreground mb-1 block">Quantity</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Quantity
+                    </label>
                     <Input
-                      type="number" min="0.1" step="0.1" value={qty}
-                      onChange={e => setQty(e.target.value)}
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={qty}
+                      onChange={(e) => setQty(e.target.value)}
                       className="h-8 text-sm"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs text-muted-foreground mb-1 block">Unit</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Unit
+                    </label>
                     <select
-                      value={unit} onChange={e => setUnit(e.target.value)}
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
                       className="w-full h-8 text-sm border rounded-md px-2 bg-background"
                     >
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      {UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
                 {/* Estimated nutrition preview */}
                 <div className="flex flex-wrap gap-1 text-xs">
                   {[
-                    ['🔥', Math.round(selected.calories * parseFloat(qty || '1')), 'kcal'],
-                    ['💪', (selected.protein_g * parseFloat(qty || '1')).toFixed(1), 'g protein'],
-                    ['🌾', (selected.carbs_g * parseFloat(qty || '1')).toFixed(1), 'g carbs'],
-                    ['🥑', (selected.fat_g * parseFloat(qty || '1')).toFixed(1), 'g fat'],
+                    [
+                      "🔥",
+                      Math.round(selected.calories * parseFloat(qty || "1")),
+                      "kcal",
+                    ],
+                    [
+                      "💪",
+                      (selected.protein_g * parseFloat(qty || "1")).toFixed(1),
+                      "g protein",
+                    ],
+                    [
+                      "🌾",
+                      (selected.carbs_g * parseFloat(qty || "1")).toFixed(1),
+                      "g carbs",
+                    ],
+                    [
+                      "🥑",
+                      (selected.fat_g * parseFloat(qty || "1")).toFixed(1),
+                      "g fat",
+                    ],
                   ].map(([icon, val, label]) => (
-                    <span key={label as string} className="bg-muted px-2 py-0.5 rounded-full">{icon} {val} {label}</span>
+                    <span
+                      key={label as string}
+                      className="bg-muted px-2 py-0.5 rounded-full"
+                    >
+                      {icon} {val} {label}
+                    </span>
                   ))}
                 </div>
-                <Button size="sm" className="w-full h-8" onClick={handleLog} disabled={logging}>
+                <Button
+                  size="sm"
+                  className="w-full h-8"
+                  onClick={handleLog}
+                  disabled={logging}
+                >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   {logging ? "Adding..." : `Add to ${label}`}
                 </Button>
@@ -281,7 +434,12 @@ export default function UserDashboard() {
     setRefreshing(false);
   };
 
-  const handleLogMeal = async (mealType: string, food: FoodSearchResult, qty: number, unit: string) => {
+  const handleLogMeal = async (
+    mealType: string,
+    food: FoodSearchResult,
+    qty: number,
+    unit: string,
+  ) => {
     await api.post("/ai/meals/log", {
       meal_type: mealType,
       food_name: food.name,
@@ -314,7 +472,14 @@ export default function UserDashboard() {
   }
 
   if (!hasProfile) {
-    return <ProfileSetup inline onDone={() => { refreshUser(); }} />;
+    return (
+      <ProfileSetup
+        inline
+        onDone={() => {
+          refreshUser();
+        }}
+      />
+    );
   }
 
   const totals = todayMeals?.totals;
@@ -324,26 +489,47 @@ export default function UserDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={refreshing}
+        >
+          <RefreshCw
+            className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+          />
           Refresh
         </Button>
       </div>
 
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats cards */}
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Calories Burned", value: stats.calories_out, icon: <Zap className="h-4 w-4 text-yellow-500" />, sub: "kcal today" },
-            { label: "Exercise This Week", value: `${stats.exercise_mins_this_week}m`, icon: <Clock className="h-4 w-4 text-emerald-500" />, sub: "minutes active" },
-            { label: "My Orders", value: stats.orders_count, icon: <ShoppingBag className="h-4 w-4 text-blue-500" />, sub: "total orders" },
-            { label: "Pending Requests", value: stats.pending_requests, icon: <Bell className="h-4 w-4 text-orange-500" />, sub: "awaiting review" },
-          ].map(s => (
+            {
+              label: "My Orders",
+              value: stats.orders_count,
+              icon: <ShoppingBag className="h-4 w-4 text-blue-500" />,
+              sub: "total orders",
+            },
+            {
+              label: "Pending Requests",
+              value: stats.pending_requests,
+              icon: <Bell className="h-4 w-4 text-orange-500" />,
+              sub: "awaiting review",
+            },
+          ].map((s) => (
             <Card key={s.label}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{s.label}</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {s.label}
+                </CardTitle>
                 {s.icon}
               </CardHeader>
               <CardContent>
@@ -362,15 +548,37 @@ export default function UserDashboard() {
             <CardTitle className="text-base flex items-center justify-between">
               <span>Today's Nutrition</span>
               <Badge variant="secondary" className="font-normal">
-                {totals.calories > 0 ? `${Math.round((totals.calories / targets.calories) * 100)}% of daily goal` : "Not started"}
+                {totals.calories > 0
+                  ? `${Math.round((totals.calories / targets.calories) * 100)}% of daily goal`
+                  : "Not started"}
               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <NutritionBar label="Calories" value={totals.calories} target={targets.calories} color="bg-orange-400" />
-            <NutritionBar label="Protein" value={totals.protein_g} target={targets.protein_g} color="bg-blue-400" />
-            <NutritionBar label="Carbs" value={totals.carbs_g} target={targets.carbs_g} color="bg-green-400" />
-            <NutritionBar label="Fat" value={totals.fat_g} target={targets.fat_g} color="bg-yellow-400" />
+            <NutritionBar
+              label="Calories"
+              value={totals.calories}
+              target={targets.calories}
+              color="bg-orange-400"
+            />
+            <NutritionBar
+              label="Protein"
+              value={totals.protein_g}
+              target={targets.protein_g}
+              color="bg-blue-400"
+            />
+            <NutritionBar
+              label="Carbs"
+              value={totals.carbs_g}
+              target={targets.carbs_g}
+              color="bg-green-400"
+            />
+            <NutritionBar
+              label="Fat"
+              value={totals.fat_g}
+              target={targets.fat_g}
+              color="bg-yellow-400"
+            />
           </CardContent>
         </Card>
       )}
@@ -379,7 +587,7 @@ export default function UserDashboard() {
       <div className="space-y-3">
         <h2 className="text-base font-semibold">Today's Meals</h2>
         <div className="space-y-2">
-          {MEAL_TYPES.map(mt => (
+          {MEAL_TYPES.map((mt) => (
             <MealSection
               key={mt.key}
               mealType={mt.key}
@@ -403,11 +611,27 @@ export default function UserDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               {[
-                { label: "BMI", value: stats.metrics.bmi, sub: stats.metrics.bmi_category },
-                { label: "BMR", value: stats.metrics.bmr, sub: "kcal/day at rest" },
-                { label: "TDEE", value: stats.metrics.tdee, sub: "kcal/day total" },
-                { label: "Daily Target", value: stats.metrics.daily_calories, sub: "kcal goal" },
-              ].map(m => (
+                {
+                  label: "BMI",
+                  value: stats.metrics.bmi,
+                  sub: stats.metrics.bmi_category,
+                },
+                {
+                  label: "BMR",
+                  value: stats.metrics.bmr,
+                  sub: "kcal/day at rest",
+                },
+                {
+                  label: "TDEE",
+                  value: stats.metrics.tdee,
+                  sub: "kcal/day total",
+                },
+                {
+                  label: "Daily Target",
+                  value: stats.metrics.daily_calories,
+                  sub: "kcal goal",
+                },
+              ].map((m) => (
                 <div key={m.label} className="space-y-1">
                   <p className="text-2xl font-bold text-primary">{m.value}</p>
                   <p className="text-xs font-medium">{m.label}</p>

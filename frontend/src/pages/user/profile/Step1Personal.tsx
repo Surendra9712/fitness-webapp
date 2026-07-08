@@ -2,10 +2,18 @@ import { useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
-  FormControl, FormField, FormItem, FormLabel, FormMessage,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Pill } from "./ui";
 import { ACTIVITIES } from "./constants";
@@ -17,7 +25,9 @@ export function Step1Personal() {
   return (
     <>
       <div>
-        <h2 className="text-xl font-bold text-gray-900">Personal Information</h2>
+        <h2 className="text-xl font-bold text-gray-900">
+          Personal Information
+        </h2>
         <p className="mt-1 text-sm text-gray-500">
           Tell us about yourself so we can personalise your plan
         </p>
@@ -29,8 +39,12 @@ export function Step1Personal() {
           name="full_name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Name <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Jane Doe" {...field} /></FormControl>
+              <FormLabel>
+                Full Name <span className="text-destructive">*</span>
+              </FormLabel>
+              <FormControl>
+                <Input placeholder="Jane Doe" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -40,7 +54,9 @@ export function Step1Personal() {
           name="date_of_birth"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Date of Birth <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>
+                Date of Birth <span className="text-destructive">*</span>
+              </FormLabel>
               <FormControl>
                 <DatePicker
                   value={field.value}
@@ -67,13 +83,17 @@ export function Step1Personal() {
               <FormLabel>Gender</FormLabel>
               <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
                   <SelectItem value="female">Female</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
-                  <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                  <SelectItem value="prefer_not_to_say">
+                    Prefer not to say
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -86,7 +106,9 @@ export function Step1Personal() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Phone</FormLabel>
-              <FormControl><Input placeholder="+977 98XXXXXXXX" {...field} /></FormControl>
+              <FormControl>
+                <Input placeholder="+977 98XXXXXXXX" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -99,8 +121,12 @@ export function Step1Personal() {
           name="height_cm"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Height (cm) <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input type="number" placeholder="170" {...field} /></FormControl>
+              <FormLabel>
+                Height (cm) <span className="text-destructive">*</span>
+              </FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="170" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -110,8 +136,12 @@ export function Step1Personal() {
           name="current_weight_kg"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Weight (kg) <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input type="number" placeholder="65" {...field} /></FormControl>
+              <FormLabel>
+                Weight (kg) <span className="text-destructive">*</span>
+              </FormLabel>
+              <FormControl>
+                <Input type="number" placeholder="65" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -125,7 +155,9 @@ export function Step1Personal() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>City</FormLabel>
-              <FormControl><Input placeholder="Kathmandu" {...field} /></FormControl>
+              <FormControl>
+                <Input placeholder="Kathmandu" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -136,7 +168,9 @@ export function Step1Personal() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Occupation</FormLabel>
-              <FormControl><Input placeholder="Student" {...field} /></FormControl>
+              <FormControl>
+                <Input placeholder="Student" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -152,7 +186,11 @@ export function Step1Personal() {
             <FormControl>
               <div className="flex flex-wrap gap-2">
                 {ACTIVITIES.map(([k, l]) => (
-                  <Pill key={k} active={field.value === k} onClick={() => field.onChange(k)}>
+                  <Pill
+                    key={k}
+                    active={field.value === k}
+                    onClick={() => field.onChange(k)}
+                  >
                     {l}
                   </Pill>
                 ))}

@@ -1,5 +1,11 @@
 import { useFormContext } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Pill } from "./ui";
 import { CONDITIONS } from "./constants";
 import type { ProfileValues } from "./schema";
@@ -14,7 +20,8 @@ export function Step5Health() {
       <div>
         <h2 className="text-xl font-bold text-gray-900">Health Conditions</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Optional — helps us avoid recommending foods that may affect your health
+          Optional — helps us avoid recommending foods that may affect your
+          health
         </p>
       </div>
 
@@ -36,7 +43,14 @@ export function Step5Health() {
                         field.onChange(
                           arr.some((x) => x.type === c.key)
                             ? arr.filter((x) => x.type !== c.key)
-                            : [...arr, { name: c.name, type: c.key, affects_diet: true }],
+                            : [
+                                ...arr,
+                                {
+                                  name: c.name,
+                                  type: c.key,
+                                  affects_diet: true,
+                                },
+                              ],
                         )
                       }
                     >

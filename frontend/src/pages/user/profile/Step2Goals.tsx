@@ -1,6 +1,12 @@
 import { useFormContext } from "react-hook-form";
 import { cn } from "@/lib/utils";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Pill, Stepper } from "./ui";
 import { GOALS, FITNESS } from "./constants";
 import type { ProfileValues } from "./schema";
@@ -37,7 +43,9 @@ export function Step2Goals() {
                     )}
                   >
                     <span className="text-2xl">{g.icon}</span>
-                    <span className="text-sm font-semibold text-gray-800">{g.title}</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {g.title}
+                    </span>
                     <span className="text-xs text-gray-500">{g.desc}</span>
                   </button>
                 ))}
@@ -57,7 +65,11 @@ export function Step2Goals() {
             <FormControl>
               <div className="flex flex-wrap gap-2">
                 {FITNESS.map(([k, l]) => (
-                  <Pill key={k} active={field.value === k} onClick={() => field.onChange(k)}>
+                  <Pill
+                    key={k}
+                    active={field.value === k}
+                    onClick={() => field.onChange(k)}
+                  >
                     {l}
                   </Pill>
                 ))}

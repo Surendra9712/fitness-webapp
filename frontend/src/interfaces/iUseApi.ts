@@ -22,4 +22,5 @@ export interface IUseApi {
 export interface QueryArgs {
   queryParams?: Record<string, any>; // Object holding any query parameters
   id?: number; // Object holding any query parameters
+  enabled?: boolean | ((args: any) => boolean);
 }

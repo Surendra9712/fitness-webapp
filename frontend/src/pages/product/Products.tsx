@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, ShoppingCart, ArrowRight, Package, Zap } from "lucide-react";
+import { ShoppingCart, ArrowRight, Package, Zap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import usePublic from "@/hooks/usePublic";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
 import type { Product } from "@/types";
+import { SearchInput } from "@/components/ui/search-input";
 
 type CatMeta = { gradient: string; badgeClass: string; glyph: string };
 
@@ -55,9 +56,6 @@ export default function Products() {
   });
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { GetProducts, GetCategories } = usePublic();
   const { data, isLoading } = GetProducts({
@@ -65,7 +63,7 @@ export default function Products() {
       page,
       page_size: pageSize,
       category: category !== "all" ? category : undefined,
-      q: debouncedSearch || undefined,
+      q: search || undefined,
     },
   });
   const products = data?.items ?? [];
@@ -76,19 +74,13 @@ export default function Products() {
 
   function handleSearch(value: string) {
     setSearch(value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setDebouncedSearch(value);
-      resetPage();
-    }, 300);
+    resetPage();
   }
 
   function handleCategory(key: string) {
     setCategory(key);
     resetPage();
   }
-
-  console.log({ pageSize });
 
   const tabs = [
     { key: "all", label: "All Equipment" },
@@ -98,19 +90,11 @@ export default function Products() {
   return (
     <PublicLayout>
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-primary-950 px-6 pt-18 pb-20">
+      <section className="relative overflow-hidden bg-black px-6 pt-18 pb-20">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 flex items-center justify-center select-none"
-          style={{ transform: "rotate(-9deg)" }}
-        >
-          <span
-            className="whitespace-nowrap text-[clamp(72px,18vw,200px)] font-black leading-none tracking-tighter"
-            style={{ color: "rgba(34,197,94,0.055)" }}
-          >
-            EQUIPMENT
-          </span>
-        </div>
+          className="pointer-events-none absolute inset-0 flex items-center justify-center select-none bg-[url('https://static.vecteezy.com/system/resources/thumbnails/073/783/710/small/person-lifting-barbell-in-gym-free-photo.jpg')] bg-cover bg-center bg-no-repeat opacity-30"
+        ></div>
         <div
           aria-hidden
           className="pointer-events-none absolute -top-1/5 left-1/2 h-3/5 w-3/5 -translate-x-1/2"
@@ -138,14 +122,20 @@ export default function Products() {
           </p>
 
           <div className="relative mx-auto max-w-md">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" />
+            <SearchInput
+              value={search}
+              onSearch={handleSearch}
+              placeholder="Search equipment…"
+              className="border-white/10 bg-white/7  text-white placeholder:text-primary-400 focus-visible:border-primary/50"
+            />
+            {/* <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-400" />
             <Input
               ref={searchRef}
               placeholder="Search equipment…"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               className="border-white/10 bg-white/7 pl-11 text-white placeholder:text-primary-400 focus-visible:border-primary/50 focus-visible:ring-0"
-            />
+            /> */}
           </div>
         </div>
       </section>
@@ -209,7 +199,10 @@ export default function Products() {
                         product_id: p.id,
                         name: p.name,
                         price: Number(p.price),
-                        discounted_price: p.discounted_price != null ? Number(p.discounted_price) : undefined,
+                        discounted_price:
+                          p.discounted_price != null
+                            ? Number(p.discounted_price)
+                            : null,
                         stock_quantity: p.stock_quantity,
                       });
                       toast.success(`${p.name} added to cart`);
@@ -316,7 +309,7 @@ function ProductCard({
           )}
           {product.discounted_price != null && (
             <div className="absolute left-2.5 top-2.5 rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-              {product.discount_type === 'percentage'
+              {product.discount_type === "percentage"
                 ? `${Number(product.discount_value).toFixed(0)}% OFF`
                 : `RS. ${Number(product.discount_value).toFixed(0)} OFF`}
             </div>

@@ -1,14 +1,20 @@
 import { useFormContext } from "react-hook-form";
 import { Input } from "@/components/ui/input";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Pill, Stepper } from "./ui";
 import { COOKING, STRESS } from "./constants";
 import type { ProfileValues } from "./schema";
 
 const BOOL_FIELDS: [keyof ProfileValues, string][] = [
   ["snacks_between_meals", "Snacks between meals"],
-  ["track_hydration",      "Track hydration"],
-  ["emotional_eater",      "Emotional eater"],
+  ["track_hydration", "Track hydration"],
+  ["emotional_eater", "Emotional eater"],
 ];
 
 export function Step4Habits() {
@@ -18,7 +24,9 @@ export function Step4Habits() {
     <>
       <div>
         <h2 className="text-xl font-bold text-gray-900">Eating Habits</h2>
-        <p className="mt-1 text-sm text-gray-500">Help us understand your daily routine</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Help us understand your daily routine
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -28,7 +36,9 @@ export function Step4Habits() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Breakfast</FormLabel>
-              <FormControl><Input type="time" {...field} /></FormControl>
+              <FormControl>
+                <Input type="time" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -39,7 +49,9 @@ export function Step4Habits() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Lunch</FormLabel>
-              <FormControl><Input type="time" {...field} /></FormControl>
+              <FormControl>
+                <Input type="time" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -53,7 +65,9 @@ export function Step4Habits() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Dinner</FormLabel>
-              <FormControl><Input type="time" {...field} /></FormControl>
+              <FormControl>
+                <Input type="time" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -65,7 +79,14 @@ export function Step4Habits() {
             <FormItem>
               <FormLabel>Avg Sleep (hours)</FormLabel>
               <FormControl>
-                <Input type="number" min="3" max="12" step="0.5" placeholder="7" {...field} />
+                <Input
+                  type="number"
+                  min="3"
+                  max="12"
+                  step="0.5"
+                  placeholder="7"
+                  {...field}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -81,7 +102,12 @@ export function Step4Habits() {
             <FormItem>
               <FormLabel>Meals per Day</FormLabel>
               <FormControl>
-                <Stepper value={Number(field.value)} min={1} max={8} onChange={field.onChange} />
+                <Stepper
+                  value={Number(field.value)}
+                  min={1}
+                  max={8}
+                  onChange={field.onChange}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -94,7 +120,12 @@ export function Step4Habits() {
             <FormItem>
               <FormLabel>Eating Out (days/week)</FormLabel>
               <FormControl>
-                <Stepper value={Number(field.value)} min={0} max={7} onChange={field.onChange} />
+                <Stepper
+                  value={Number(field.value)}
+                  min={0}
+                  max={7}
+                  onChange={field.onChange}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -111,7 +142,11 @@ export function Step4Habits() {
             <FormControl>
               <div className="flex flex-wrap gap-2">
                 {COOKING.map(([k, l]) => (
-                  <Pill key={k} active={field.value === k} onClick={() => field.onChange(k)}>
+                  <Pill
+                    key={k}
+                    active={field.value === k}
+                    onClick={() => field.onChange(k)}
+                  >
                     {l}
                   </Pill>
                 ))}
@@ -131,7 +166,11 @@ export function Step4Habits() {
             <FormControl>
               <div className="flex flex-wrap gap-2">
                 {STRESS.map(([k, l]) => (
-                  <Pill key={k} active={field.value === k} onClick={() => field.onChange(k)}>
+                  <Pill
+                    key={k}
+                    active={field.value === k}
+                    onClick={() => field.onChange(k)}
+                  >
                     {l}
                   </Pill>
                 ))}
@@ -158,7 +197,9 @@ export function Step4Habits() {
                     className="h-4 w-4 rounded border-gray-300 accent-emerald-600"
                   />
                 </FormControl>
-                <FormLabel className="font-normal cursor-pointer">{l}</FormLabel>
+                <FormLabel className="font-normal cursor-pointer">
+                  {l}
+                </FormLabel>
               </FormItem>
             )}
           />

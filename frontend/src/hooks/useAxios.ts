@@ -18,7 +18,7 @@ export class ApiError extends Error {
 
 /* ----------------------------- AXIOS INSTANCE ----------------------------- */
 
-const BASE_URL = "http://localhost:5175/api/";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -38,6 +38,7 @@ api.interceptors.response.use(
         p === "/" ||
         p === "/login" ||
         p === "/register" ||
+        p === "/become-trainer" ||
         p.startsWith("/products") ||
         p.startsWith("/payment");
 

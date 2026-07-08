@@ -14,9 +14,6 @@ payment_bp = Blueprint('payment', __name__)
 
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
 ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
-KHALTI_SECRET      = os.getenv('KHALTI_SECRET_KEY', 'test_secret_key_dc74e0fd57cb46cd93832aee0a390234')
-KHALTI_LOOKUP_URL  = os.getenv('KHALTI_LOOKUP_URL', 'https://a.khalti.com/api/v2/epayment/lookup/')
-
 
 def _order_id_from_ref(ref: str) -> Optional[int]:
     # format: "order-{id}-{timestamp_ms}"
@@ -122,35 +119,6 @@ def esewa_verify():
         return jsonify({'error': 'Invalid transaction reference'}), 400
 
     return _mark_paid(order_id, payload.get('transaction_code', ''))
-
-
-# ── Khalti verify ─────────────────────────────────────────────────────────────
-
-@payment_bp.route('/khalti/verify', methods=['POST'])
-@role_required('trainee')
-def khalti_verify():
-    pidx = (request.get_json() or {}).get('pidx', '')
-    if not pidx:
-        return jsonify({'error': 'pidx is required'}), 400
-
-    headers = {'Authorization': f'Key {KHALTI_SECRET}'}
-    try:
-        resp = http_req.post(KHALTI_LOOKUP_URL, json={'pidx': pidx}, headers=headers, timeout=10)
-    except http_req.RequestException as e:
-        return jsonify({'error': f'Khalti lookup failed: {str(e)}'}), 502
-
-    if not resp.ok:
-        return jsonify({'error': 'Khalti verification failed', 'detail': resp.text}), 400
-
-    data = resp.json()
-    if data.get('status') != 'Completed':
-        return jsonify({'error': f"Payment status: {data.get('status', 'unknown')}"}), 400
-
-    order_id = _order_id_from_ref(data.get('purchase_order_id', ''))
-    if order_id is None:
-        return jsonify({'error': 'Invalid order reference'}), 400
-
-    return _mark_paid(order_id, data.get('transaction_id', pidx))
 
 
 # ── Shared helper ─────────────────────────────────────────────────────────────

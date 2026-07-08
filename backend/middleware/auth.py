@@ -19,9 +19,9 @@ def generate_token(user_id: int, role: str) -> str:
     return jwt.encode(payload, _SECRET, algorithm='HS256')
 
 
-def _decode_token():
-    auth_header = request.headers.get('Authorization', '')
-    token = auth_header.replace('Bearer ', '').strip()
+def decode_token_string(token: str):
+    """Decode a raw JWT string. No Flask request context required —
+    used for the Socket.IO connect handshake as well as normal HTTP requests."""
     if not token:
         return None, 'Token missing'
     try:
@@ -31,6 +31,12 @@ def _decode_token():
         return None, 'Token expired'
     except jwt.InvalidTokenError:
         return None, 'Invalid token'
+
+
+def _decode_token():
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '').strip()
+    return decode_token_string(token)
 
 
 def token_required(f):

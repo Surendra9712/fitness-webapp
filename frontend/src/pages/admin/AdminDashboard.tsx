@@ -8,7 +8,6 @@ import {
   ShoppingBag,
   Bell,
   ClipboardList,
-  DollarSign,
   UserPlus,
   CalendarDays,
   ExternalLink,
@@ -39,12 +38,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DatePicker } from "@/components/ui/date-picker";
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-// const roleBadge: Record<Role, 'destructive' | 'info' | 'success'> = {
-//   admin: 'destructive', dietitian: 'info', trainee: 'success',
-// }
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#f59e0b",

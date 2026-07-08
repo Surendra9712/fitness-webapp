@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   Plus,
   Package,
-  Search,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -13,7 +12,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -36,25 +34,25 @@ import { ProductFormDialog } from "@/pages/admin/product/ProductFormDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { Product } from "@/types";
+import { SearchInput } from "@/components/ui/search-input";
 
 export default function ProductManagement() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const { page, goToPage, resetPage, setPageSize, pageSize } = usePagination();
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
 
-  const { GetProducts, GetCategories, UpdateProduct, DeleteProduct } = useAdmin();
+  const { GetProducts, GetCategories, UpdateProduct, DeleteProduct } =
+    useAdmin();
   const { data, isPlaceholderData } = GetProducts({
     queryParams: {
       page,
       page_size: pageSize,
-      search: debouncedSearch || undefined,
+      search: search || undefined,
     },
   });
 
@@ -71,11 +69,7 @@ export default function ProductManagement() {
 
   function handleSearch(value: string) {
     setSearch(value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => {
-      setDebouncedSearch(value);
-      resetPage();
-    }, 300);
+    resetPage();
   }
 
   function openAdd() {
@@ -132,12 +126,10 @@ export default function ProductManagement() {
 
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search products…"
+          <SearchInput
             value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-9"
+            onSearch={handleSearch}
+            placeholder="Search products…"
           />
         </div>
         <p className="shrink-0 text-sm text-muted-foreground">

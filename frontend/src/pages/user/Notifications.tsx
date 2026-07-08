@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PromoCode, Notification, NotificationType } from "@/types";
-import moment from "moment";
 import { daysLeft, timeAgo } from "@/lib/date-utils";
 
 function PromoCard({ promo }: { promo: PromoCode }) {
@@ -202,6 +201,10 @@ const notificationMeta: Record<
     icon: <UserCheck className="h-4 w-4" />,
     color: "bg-purple-100 text-purple-600",
   },
+  trainer_signup_request: {
+    icon: <UserCheck className="h-4 w-4" />,
+    color: "bg-purple-100 text-purple-600",
+  },
   trainer_accepted: {
     icon: <UserCheck className="h-4 w-4" />,
     color: "bg-teal-100 text-teal-600",
@@ -290,7 +293,7 @@ type Tab = "notifications" | "promos";
 
 export default function Notifications() {
   const { user } = useAuth();
-  const isTrainee = user?.role === "trainee";
+  const isAdmin = user?.role === "admin";
   const [tab, setTab] = useState<Tab>("notifications");
   const qc = useQueryClient();
 
@@ -302,12 +305,9 @@ export default function Notifications() {
     DeleteNotification,
   } = useUser();
 
-  const { data: promoData, isLoading: promosLoading } = GetAvailablePromos({
-    enabled: isTrainee,
+  const { data: promos = [], isLoading: promosLoading } = GetAvailablePromos({
+    enabled: !isAdmin,
   });
-  const promos: PromoCode[] = isTrainee
-    ? ((promoData as PromoCode[] | undefined) ?? [])
-    : [];
 
   const { data: notifData, isLoading: notifsLoading } = GetNotifications({});
   const notifications: Notification[] = (notifData as any)?.items ?? [];
@@ -319,15 +319,18 @@ export default function Notifications() {
 
   function handleMarkRead(id: number) {
     markRead.mutate(id, {
-      onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+      onSuccess: () => invalidateQueries(),
     });
+  }
+
+  function invalidateQueries() {
+    qc.invalidateQueries({ queryKey: ["notifications"] });
+    qc.invalidateQueries({ queryKey: ["notificationsUnreadCount"] });
   }
 
   function handleMarkAllRead() {
     markAllRead.mutate(undefined, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["notifications"] });
-        qc.invalidateQueries({ queryKey: ["notificationsUnreadCount"] });
         toast.success("All notifications marked as read");
       },
     });
@@ -336,8 +339,7 @@ export default function Notifications() {
   function handleDelete(id: number) {
     deleteNotif.mutate(id, {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["notifications"] });
-        qc.invalidateQueries({ queryKey: ["notificationsUnreadCount"] });
+        invalidateQueries();
       },
     });
   }
@@ -380,7 +382,7 @@ export default function Notifications() {
             </Badge>
           )}
         </button>
-        {isTrainee && (
+        {!isAdmin && (
           <button
             onClick={() => setTab("promos")}
             className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${

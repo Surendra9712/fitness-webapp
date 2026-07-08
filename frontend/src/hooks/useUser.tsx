@@ -25,10 +25,14 @@ import type {
   LogExercisePayload,
   ReviewPayload,
   RequestTrainerPayload,
+  BecomeTrainerPayload,
+  BecomeTrainerResult,
 } from "@/types";
 
 interface UseUserReturn {
-  GetNotifications: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Notification>>;
+  GetNotifications: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<Notification>>;
   GetUnreadCount: () => UseQueryResult<{ count: number }>;
   MarkRead: () => UseMutationResult<void, Error, number>;
   MarkAllRead: () => UseMutationResult<void, Error, void>;
@@ -37,11 +41,16 @@ interface UseUserReturn {
     args?: QueryArgs,
   ) => UseQueryResult<PaginatedResponse<TrainerInfo>>;
   GetTrainer: (id?: string | number) => UseQueryResult<TrainerInfo>;
-  GetTrainerAssignment: (
+  GetTrainerAssignments: (
     args?: QueryArgs,
-  ) => UseQueryResult<TrainerAssignment | null>;
+  ) => UseQueryResult<TrainerAssignment[]>;
   RequestTrainer: () => UseMutationResult<void, Error, RequestTrainerPayload>;
-  CancelTrainerAssignment: () => UseMutationResult<void, Error, void>;
+  CancelTrainerAssignment: () => UseMutationResult<void, Error, number>;
+  BecomeTrainer: () => UseMutationResult<
+    BecomeTrainerResult,
+    Error,
+    BecomeTrainerPayload
+  >;
   GetTrainerReviews: (trainerId?: number) => UseQueryResult<ReviewStats>;
   SubmitTrainerReview: (
     trainerId?: number,
@@ -68,15 +77,33 @@ interface UseUserReturn {
   DeleteExerciseLog: () => UseMutationResult<void, Error, number>;
   GetAuthProfile: (args?: QueryArgs) => UseQueryResult<import("@/types").User>;
   UpdateAvatar: () => UseMutationResult<void, Error, string>;
-  GetSubscription: (args?: QueryArgs) => UseQueryResult<{ subscription_plan: import("@/types").SubscriptionPlan; subscription_status: import("@/types").SubscriptionStatus }>;
+  GetSubscription: (args?: QueryArgs) => UseQueryResult<{
+    subscription_plan: import("@/types").SubscriptionPlan;
+    subscription_status: import("@/types").SubscriptionStatus;
+  }>;
   UpdateSubscription: () => UseMutationResult<
-    { subscription_plan?: import("@/types").SubscriptionPlan; subscription_status?: import("@/types").SubscriptionStatus; payment_method?: string; esewa_url?: string; esewa_params?: import("@/types").EsewaParams },
+    {
+      subscription_plan?: import("@/types").SubscriptionPlan;
+      subscription_status?: import("@/types").SubscriptionStatus;
+      payment_method?: string;
+      esewa_url?: string;
+      esewa_params?: import("@/types").EsewaParams;
+    },
     Error,
-    { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }
+    {
+      plan: import("@/types").SubscriptionPlan;
+      method?: import("@/types").SubscriptionPaymentMethod;
+    }
   >;
-  ValidatePromo: () => UseMutationResult<PromoValidateResult, Error, { code: string; order_total: number }>;
+  ValidatePromo: () => UseMutationResult<
+    PromoValidateResult,
+    Error,
+    { code: string; order_total: number }
+  >;
   GetPoints: (args?: QueryArgs) => UseQueryResult<PointsData>;
-  GetAvailablePromos: (args?: QueryArgs) => UseQueryResult<import("@/types").PromoCode[]>;
+  GetAvailablePromos: (
+    args?: QueryArgs,
+  ) => UseQueryResult<import("@/types").PromoCode[]>;
   GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
 }
 
@@ -90,9 +117,9 @@ const useUser = (): UseUserReturn => {
     queryKey: "authProfile",
   });
 
-  const { get: GetTrainerAssignment, post: RequestTrainer } = useApi({
-    endpoint: endpoint.userTrainerAssignment,
-    queryKey: "trainerAssignment",
+  const { get: GetTrainerAssignments, post: RequestTrainer } = useApi({
+    endpoint: endpoint.userTrainerAssignments,
+    queryKey: "trainerAssignments",
   });
 
   const {
@@ -172,9 +199,17 @@ const useUser = (): UseUserReturn => {
 
   const CancelTrainerAssignment = () =>
     useMutation({
-      mutationFn: async () => {
-        const { data } = await api.delete(endpoint.userTrainerAssignment);
+      mutationFn: async (assignmentId: number) => {
+        const { data } = await api.delete(`${endpoint.userTrainerAssignments}/${assignmentId}`);
         return data;
+      },
+    });
+
+  const BecomeTrainer = () =>
+    useMutation({
+      mutationFn: async (payload: BecomeTrainerPayload) => {
+        const { data } = await api.post(endpoint.userBecomeTrainer, payload);
+        return data as BecomeTrainerResult;
       },
     });
 
@@ -195,16 +230,34 @@ const useUser = (): UseUserReturn => {
 
   const UpdateSubscription = () =>
     useMutation({
-      mutationFn: async ({ plan, method }: { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }) => {
-        const { data } = await api.put(endpoint.userSubscription, { plan, method });
+      mutationFn: async ({
+        plan,
+        method,
+      }: {
+        plan: import("@/types").SubscriptionPlan;
+        method?: import("@/types").SubscriptionPaymentMethod;
+      }) => {
+        const { data } = await api.put(endpoint.userSubscription, {
+          plan,
+          method,
+        });
         return data;
       },
     });
 
   const ValidatePromo = () =>
     useMutation({
-      mutationFn: async ({ code, order_total }: { code: string; order_total: number }) => {
-        const { data } = await api.post(endpoint.userPromoValidate, { code, order_total });
+      mutationFn: async ({
+        code,
+        order_total,
+      }: {
+        code: string;
+        order_total: number;
+      }) => {
+        const { data } = await api.post(endpoint.userPromoValidate, {
+          code,
+          order_total,
+        });
         return data as PromoValidateResult;
       },
     });
@@ -217,6 +270,7 @@ const useUser = (): UseUserReturn => {
   const { get: GetAvailablePromos } = useApi({
     endpoint: endpoint.userPromoAvailable,
     queryKey: "userAvailablePromos",
+    enabled: (args) => args?.enabled,
   });
 
   const { get: GetGlobalDiscount } = useApi({
@@ -242,7 +296,10 @@ const useUser = (): UseUserReturn => {
   const MarkRead = () =>
     useMutation({
       mutationFn: async (id: number) => {
-        const { data } = await api.put(`${endpoint.notifications}/${id}/read`, {});
+        const { data } = await api.put(
+          `${endpoint.notifications}/${id}/read`,
+          {},
+        );
         return data;
       },
     });
@@ -250,7 +307,10 @@ const useUser = (): UseUserReturn => {
   const MarkAllRead = () =>
     useMutation({
       mutationFn: async () => {
-        const { data } = await api.put(`${endpoint.notifications}/read-all`, {});
+        const { data } = await api.put(
+          `${endpoint.notifications}/read-all`,
+          {},
+        );
         return data;
       },
     });
@@ -266,9 +326,10 @@ const useUser = (): UseUserReturn => {
   return {
     GetTrainers,
     GetTrainer,
-    GetTrainerAssignment,
+    GetTrainerAssignments,
     RequestTrainer,
     CancelTrainerAssignment,
+    BecomeTrainer,
     GetTrainerReviews,
     SubmitTrainerReview,
     DeleteTrainerReview,

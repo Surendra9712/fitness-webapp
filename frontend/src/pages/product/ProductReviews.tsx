@@ -15,7 +15,6 @@ export const ProductReviews = ({
   product,
 }: {
   product: Product;
-
   reviewStats?: ReviewStats;
 }) => {
   const queryClient = useQueryClient();

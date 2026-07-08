@@ -37,6 +37,7 @@ import { UserModal } from "./UserModal";
 import { toast } from "sonner";
 import type { User, Role } from "@/types";
 import { ROLE_LABELS } from "@/lib/constant";
+import { SearchInput } from "@/components/ui/search-input";
 
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
@@ -63,6 +64,7 @@ interface Props {
 export default function UserManagement({ role }: Props) {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
   const [modal, setModal] = useState<{ open: boolean; user?: User }>({
     open: false,
   });
@@ -87,6 +89,7 @@ export default function UserManagement({ role }: Props) {
       page_size: pageSize,
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
       ...(role ? { role } : {}),
+      ...(search ? { search } : {}),
     },
   });
   const users = data?.items ?? [];
@@ -136,6 +139,11 @@ export default function UserManagement({ role }: Props) {
       setDeleteConfirm({ open: false, id: null });
     }
   }
+
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    goToPage(1);
+  };
 
   const tableContent = (
     <Card className={isPlaceholderData ? "opacity-70" : ""}>
@@ -264,6 +272,14 @@ export default function UserManagement({ role }: Props) {
           <TabsTrigger value="inactive">Inactive</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
         </TabsList>
+        <div className="py-4 max-w-md">
+          <SearchInput
+            value={search}
+            onSearch={handleSearch}
+            placeholder="Search users..."
+          />
+        </div>
+
         <TabsContent value={statusFilter}>{tableContent}</TabsContent>
       </Tabs>
 

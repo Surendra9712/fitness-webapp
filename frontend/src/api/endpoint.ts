@@ -12,7 +12,8 @@ export const endpoint = {
   adminProductRequests: "admin/product-requests",
 
   userTrainers: "user/trainers",
-  userTrainerAssignment: "user/trainer-assignment",
+  userTrainerAssignments: "user/trainer-assignments",
+  userBecomeTrainer: "user/become-trainer",
   userOrders: "user/orders",
   userProductRequests: "user/product-requests",
   userExercises: "user/exercises",
@@ -21,6 +22,7 @@ export const endpoint = {
   publicProducts: "public/products",
   publicCategories: "public/categories",
   publicTrainers: "public/trainers",
+  publicBecomeTrainer: "public/become-trainer",
 
   dietitianProfile: "dietitian/profile",
   dietitianUsers: "dietitian/users",
@@ -56,8 +58,12 @@ export const endpoint = {
 
   uploadImage: "upload/image",
   uploadCert: "upload/cert",
+  uploadChatFile: "upload/chat-file",
   authProfile: "auth/me",
 
   notifications: "notifications",
   notificationsUnreadCount: "notifications/unread-count",
+
+  chatThreads: "chat/threads",
+  chatUnreadCount: "chat/unread-count",
 };
