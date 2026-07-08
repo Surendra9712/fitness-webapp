@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Leaf, Flame, TrendingUp, ArrowRight, ChevronDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { Button } from "@/components/ui/button";
 
 export default function HeroSection() {
@@ -41,12 +41,12 @@ export default function HeroSection() {
       </div>
 
       <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24 text-center">
-        <div className="hero-tag mb-6 flex justify-center">
+        {/* <div className="hero-tag mb-6 flex justify-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-5 py-2 text-sm font-medium text-emerald-300 backdrop-blur">
             <Leaf className="h-3.5 w-3.5" /> Nepal's Smart Fitness & Nutrition
             Platform
           </span>
-        </div>
+        </div> */}
         <h1 className="hero-h1 text-5xl font-extrabold leading-tight tracking-tight text-white sm:text-6xl lg:text-7xl">
           Transform Your Health
           <br />
@@ -79,7 +79,7 @@ export default function HeroSection() {
         </div>
         <div className="hero-stats mt-14 flex flex-wrap items-center justify-center gap-10 border-t border-white/10 pt-10">
           {[
-            { v: "500+", l: "Members" },
+            { v: "1000+", l: "Members" },
             { v: "50+", l: "Trainers" },
             { v: "10k+", l: "Workouts" },
             { v: "98%", l: "Satisfaction" },

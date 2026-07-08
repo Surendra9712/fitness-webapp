@@ -50,7 +50,9 @@ export default function Products() {
   const { user } = useAuth();
   const { items, add, setQty } = useCartStore();
 
-  const { page, goToPage, resetPage } = usePagination();
+  const { page, goToPage, resetPage, pageSize, setPageSize } = usePagination({
+    initialPageSize: 50,
+  });
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -61,7 +63,7 @@ export default function Products() {
   const { data, isLoading } = GetProducts({
     queryParams: {
       page,
-      page_size: 50,
+      page_size: pageSize,
       category: category !== "all" ? category : undefined,
       q: debouncedSearch || undefined,
     },
@@ -71,8 +73,6 @@ export default function Products() {
   const { data: categoriesData = [] } = GetCategories({
     queryParams: { page_size: 100 },
   });
-
-  console.log({ data, categoriesData });
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -87,6 +87,8 @@ export default function Products() {
     setCategory(key);
     resetPage();
   }
+
+  console.log({ pageSize });
 
   const tabs = [
     { key: "all", label: "All Equipment" },
@@ -207,6 +209,8 @@ export default function Products() {
                         product_id: p.id,
                         name: p.name,
                         price: Number(p.price),
+                        discounted_price: p.discounted_price != null ? Number(p.discounted_price) : undefined,
+                        stock_quantity: p.stock_quantity,
                       });
                       toast.success(`${p.name} added to cart`);
                     }}
@@ -219,8 +223,9 @@ export default function Products() {
                 <AppPagination
                   page={page}
                   total={total}
-                  pageSize={12}
+                  pageSize={pageSize}
                   onPageChange={goToPage}
+                  onPageSizeChange={setPageSize}
                 />
               </div>
             </>
@@ -283,7 +288,8 @@ function ProductCard({
   onDec,
 }: ProductCardProps) {
   const meta = CAT_META[product.category] ?? fallbackMeta;
-  const outOfStock = product.stock_quantity === 0;
+  const qtyLeft = product.stock_quantity - cartQty;
+  const outOfStock = qtyLeft === 0;
 
   return (
     <Card className="group flex flex-col overflow-hidden p-0 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
@@ -308,41 +314,58 @@ function ProductCard({
               </span>
             </div>
           )}
+          {product.discounted_price != null && (
+            <div className="absolute left-2.5 top-2.5 rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+              {product.discount_type === 'percentage'
+                ? `${Number(product.discount_value).toFixed(0)}% OFF`
+                : `RS. ${Number(product.discount_value).toFixed(0)} OFF`}
+            </div>
+          )}
           {!outOfStock && product.stock_quantity <= 5 && (
             <div className="absolute right-2.5 top-2.5 rounded-full bg-black/55 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
-              Only {product.stock_quantity} left
+              Only {qtyLeft} left
             </div>
           )}
         </div>
-      </Link>
-
-      <CardContent className="flex flex-1 flex-col gap-2 px-5 pb-0 pt-4">
-        <Badge
-          className={`self-start text-[10px] font-extrabold uppercase tracking-widest ${meta.badgeClass}`}
-        >
-          {product.category_name ?? product.category}
-        </Badge>
-        <Link to={`/products/${product.id}`}>
+        <CardContent className="flex flex-1 flex-col gap-2 px-5 pb-0 pt-4">
+          <Badge
+            className={`self-start text-[10px] font-extrabold uppercase tracking-widest ${meta.badgeClass}`}
+          >
+            {product.category_name ?? product.category}
+          </Badge>
+          {/* <Link to={`/products/${product.id}`}> */}
           <h3 className="text-base font-bold leading-snug text-foreground hover:text-primary-700 transition-colors">
             {product.name}
           </h3>
-        </Link>
-        {product.description && (
-          <div
-            dangerouslySetInnerHTML={{ __html: product.description }}
-            className="line-clamp-2 text-sm leading-relaxed text-muted-foreground"
-          />
-        )}
-      </CardContent>
+          {/* </Link> */}
+          {product.description && (
+            <div
+              dangerouslySetInnerHTML={{ __html: product.description }}
+              className="line-clamp-2 text-sm leading-relaxed text-muted-foreground"
+            />
+          )}
+        </CardContent>
+      </Link>
 
       <CardFooter className="mt-auto flex items-center justify-between px-5 py-4">
         <div>
-          <span className="text-2xl font-black tracking-tight text-foreground">
-            RS. {product.price}
-          </span>
+          {product.discounted_price != null ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xl font-black tracking-tight text-primary-700">
+                RS. {Number(product.discounted_price).toFixed(0)}
+              </span>
+              <span className="text-sm line-through text-muted-foreground">
+                RS. {Number(product.price).toFixed(0)}
+              </span>
+            </div>
+          ) : (
+            <span className="text-2xl font-black tracking-tight text-foreground">
+              RS. {product.price}
+            </span>
+          )}
           {!outOfStock && (
             <div className="text-[11px] text-muted-foreground">
-              {product.stock_quantity} in stock
+              {qtyLeft} in stock
             </div>
           )}
         </div>
@@ -354,7 +377,7 @@ function ProductCard({
             </Link>
           </Button>
         ) : isLoggedIn ? (
-          cartQty > 0 ? (
+          cartQty === product.stock_quantity ? null : cartQty > 0 ? (
             <QuantityStepper
               size="sm"
               value={cartQty}

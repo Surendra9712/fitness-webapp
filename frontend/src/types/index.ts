@@ -7,6 +7,7 @@ export interface PaginatedResponse<T> {
 }
 
 export type Role = "admin" | "dietitian" | "trainee";
+export type Gender = "male" | "female" | "other";
 export type Goal = "lose_weight" | "maintain" | "gain_muscle";
 export type ExerciseCategory =
   | "cardio"
@@ -26,6 +27,23 @@ export type AssignmentStatus =
   | "approved"
   | "rejected";
 
+export interface TrainerCertification {
+  id: number;
+  user_id?: number;
+  name: string;
+  issued_by?: string;
+  issued_date?: string;
+  file_url?: string;
+  file_type: "image" | "pdf" | "url";
+  created_at?: string;
+}
+
+export interface AvailableSlot {
+  day: string;
+  from: string;
+  to: string;
+}
+
 export interface TrainerInfo {
   id: number;
   name: string;
@@ -36,6 +54,10 @@ export interface TrainerInfo {
   profile_image_url: string;
   bio?: string;
   specialization?: string;
+  experience_years?: number;
+  date_of_birth?: string;
+  available_time?: AvailableSlot[];
+  certifications?: TrainerCertification[];
 }
 
 export interface TrainerAssignment {
@@ -65,12 +87,35 @@ export interface Category {
   description?: string;
 }
 
+export type SubscriptionPlan = "free" | "pro";
+export type SubscriptionStatus = "active" | "pending" | "rejected";
+export type SubscriptionPaymentMethod = "cash" | "esewa";
+
+export interface EsewaParams {
+  amount: string;
+  tax_amount: string;
+  total_amount: string;
+  transaction_uuid: string;
+  product_code: string;
+  product_service_charge: string;
+  product_delivery_charge: string;
+  success_url: string;
+  failure_url: string;
+  signed_field_names: string;
+  signature: string;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   role: Role;
   status: UserStatus;
+  is_verified?: number;
+  subscription_plan?: SubscriptionPlan;
+  subscription_status?: SubscriptionStatus;
+  subscription_payment_method?: SubscriptionPaymentMethod;
+  reward_points?: number;
   created_at?: string;
   age?: number;
   weight_kg?: number;
@@ -100,13 +145,15 @@ export interface ExerciseLog {
   notes?: string;
 }
 
+export type DiscountType = "percentage" | "fixed";
+
 export interface Product {
   id: number;
   name: string;
-  description?: string;
+  description: string;
   price: number;
   stock_quantity: number;
-  category_id?: number;
+  category_id: number;
   category: string; // slug from JOIN e.g. 'cardio'
   category_name?: string; // display name from JOIN e.g. 'Cardio'
   image_url?: string;
@@ -114,6 +161,19 @@ export interface Product {
   created_by?: number;
   created_by_name?: string;
   created_at?: string;
+  discount_type?: DiscountType | null;
+  discount_value?: number | null;
+  discount_valid_from?: string | null;
+  discount_valid_to?: string | null;
+  discounted_price?: number | null;
+}
+
+export interface GlobalDiscount {
+  discount_type: DiscountType;
+  discount_value: number;
+  is_active: boolean;
+  valid_from?: string | null;
+  valid_to?: string | null;
 }
 
 export interface OrderItem {
@@ -145,6 +205,7 @@ export interface ProductRequest {
   product_name: string;
   description?: string;
   reason?: string;
+  image_url?: string;
   status: RequestStatus;
   admin_note?: string;
   created_at: string;
@@ -206,7 +267,7 @@ export interface AdminStats {
 export interface AdminStatsTrends {
   user_growth: { date: string; users: number }[];
   order_trend: { date: string; orders: number; revenue: number }[];
-  group_by: 'day' | 'month';
+  group_by: "day" | "month";
   date_from: string;
   date_to: string;
 }
@@ -215,10 +276,19 @@ export interface AdminStatsTrends {
 export interface DietitianProfile {
   id: number;
   name: string;
+  full_name?: string;
   email: string;
   bio?: string;
   specialization?: string;
+  experience_years?: number;
+  date_of_birth?: string;
+  phone_number?: string;
+  city?: string;
+  country?: string;
+  status?: string;
   profile_image_url?: string;
+  available_time?: AvailableSlot[];
+  certifications?: TrainerCertification[];
 }
 
 export interface DietitianStats {
@@ -268,12 +338,55 @@ export interface ApproveProductRequestPayload {
 export interface CreateOrderPayload {
   items: { product_id: number; quantity: number }[];
   shipping_address: string;
+  payment_method: string;
+  promo_code?: string;
+  points_to_redeem?: number;
+}
+
+export interface PromoCode {
+  id: number;
+  code: string;
+  description?: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  min_order_amount: number;
+  max_uses?: number;
+  current_uses: number;
+  valid_from?: string;
+  valid_to?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface PromoValidateResult {
+  promo_id: number;
+  code: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  discount_amount: number;
+  min_order_amount: number;
+}
+
+export interface PointTransaction {
+  id: number;
+  points: number;
+  type: "earned" | "redeemed";
+  reference_id?: number;
+  description?: string;
+  created_at: string;
+}
+
+export interface PointsData {
+  reward_points: number;
+  transactions: PointTransaction[];
+  total: number;
 }
 
 export interface CreateProductRequestPayload {
   product_name: string;
   description?: string;
   reason?: string;
+  image_url?: string;
 }
 
 export interface LogExercisePayload {
@@ -291,6 +404,32 @@ export interface ReviewPayload {
 export interface RequestTrainerPayload {
   trainer_id: number;
   customer_note?: string;
+}
+
+export type NotificationType =
+  | 'order_received'
+  | 'order_status'
+  | 'subscription_request'
+  | 'subscription_approved'
+  | 'subscription_rejected'
+  | 'product_request'
+  | 'product_request_approved'
+  | 'product_request_rejected'
+  | 'trainer_request'
+  | 'trainer_request_to_admin'
+  | 'trainer_accepted'
+  | 'trainer_approved'
+  | 'trainer_rejected';
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: NotificationType;
+  title: string;
+  message?: string;
+  reference_id?: number;
+  is_read: boolean | number;
+  created_at: string;
 }
 
 export interface UpdateProfilePayload {

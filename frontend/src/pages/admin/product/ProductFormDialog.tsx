@@ -133,7 +133,7 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>name<span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>

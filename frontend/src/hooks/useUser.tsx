@@ -1,4 +1,9 @@
-import { useQuery, useMutation, UseQueryResult, UseMutationResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  UseQueryResult,
+  UseMutationResult,
+} from "@tanstack/react-query";
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
 import type { QueryArgs } from "@/interfaces/iUseApi";
@@ -10,7 +15,11 @@ import type {
   Exercise,
   ExerciseLog,
   ReviewStats,
+  PromoValidateResult,
+  PointsData,
+  GlobalDiscount,
   PaginatedResponse,
+  Notification,
   CreateOrderPayload,
   CreateProductRequestPayload,
   LogExercisePayload,
@@ -19,25 +28,56 @@ import type {
 } from "@/types";
 
 interface UseUserReturn {
-  GetTrainers: (args?: QueryArgs) => UseQueryResult<TrainerInfo[]>;
+  GetNotifications: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Notification>>;
+  GetUnreadCount: () => UseQueryResult<{ count: number }>;
+  MarkRead: () => UseMutationResult<void, Error, number>;
+  MarkAllRead: () => UseMutationResult<void, Error, void>;
+  DeleteNotification: () => UseMutationResult<void, Error, number>;
+  GetTrainers: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<TrainerInfo>>;
   GetTrainer: (id?: string | number) => UseQueryResult<TrainerInfo>;
-  GetTrainerAssignment: (args?: QueryArgs) => UseQueryResult<TrainerAssignment | null>;
+  GetTrainerAssignment: (
+    args?: QueryArgs,
+  ) => UseQueryResult<TrainerAssignment | null>;
   RequestTrainer: () => UseMutationResult<void, Error, RequestTrainerPayload>;
   CancelTrainerAssignment: () => UseMutationResult<void, Error, void>;
   GetTrainerReviews: (trainerId?: number) => UseQueryResult<ReviewStats>;
-  SubmitTrainerReview: (trainerId?: number) => UseMutationResult<void, Error, ReviewPayload>;
-  DeleteTrainerReview: (trainerId?: number) => UseMutationResult<void, Error, void>;
+  SubmitTrainerReview: (
+    trainerId?: number,
+  ) => UseMutationResult<void, Error, ReviewPayload>;
+  DeleteTrainerReview: (
+    trainerId?: number,
+  ) => UseMutationResult<void, Error, void>;
   GetOrders: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Order>>;
   CreateOrder: () => UseMutationResult<Order, Error, CreateOrderPayload>;
   CancelOrder: () => UseMutationResult<void, Error, number>;
-  GetProductRequests: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<ProductRequest>>;
-  CreateProductRequest: () => UseMutationResult<ProductRequest, Error, CreateProductRequestPayload>;
+  GetProductRequests: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<ProductRequest>>;
+  CreateProductRequest: () => UseMutationResult<
+    ProductRequest,
+    Error,
+    CreateProductRequestPayload
+  >;
   GetExercises: (args?: QueryArgs) => UseQueryResult<Exercise[]>;
-  GetExerciseLogs: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<ExerciseLog>>;
+  GetExerciseLogs: (
+    args?: QueryArgs,
+  ) => UseQueryResult<PaginatedResponse<ExerciseLog>>;
   LogExercise: () => UseMutationResult<ExerciseLog, Error, LogExercisePayload>;
   DeleteExerciseLog: () => UseMutationResult<void, Error, number>;
   GetAuthProfile: (args?: QueryArgs) => UseQueryResult<import("@/types").User>;
   UpdateAvatar: () => UseMutationResult<void, Error, string>;
+  GetSubscription: (args?: QueryArgs) => UseQueryResult<{ subscription_plan: import("@/types").SubscriptionPlan; subscription_status: import("@/types").SubscriptionStatus }>;
+  UpdateSubscription: () => UseMutationResult<
+    { subscription_plan?: import("@/types").SubscriptionPlan; subscription_status?: import("@/types").SubscriptionStatus; payment_method?: string; esewa_url?: string; esewa_params?: import("@/types").EsewaParams },
+    Error,
+    { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }
+  >;
+  ValidatePromo: () => UseMutationResult<PromoValidateResult, Error, { code: string; order_total: number }>;
+  GetPoints: (args?: QueryArgs) => UseQueryResult<PointsData>;
+  GetAvailablePromos: (args?: QueryArgs) => UseQueryResult<import("@/types").PromoCode[]>;
+  GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
 }
 
 const useUser = (): UseUserReturn => {
@@ -148,6 +188,81 @@ const useUser = (): UseUserReturn => {
       },
     });
 
+  const { get: GetSubscription } = useApi({
+    endpoint: endpoint.userSubscription,
+    queryKey: "userSubscription",
+  });
+
+  const UpdateSubscription = () =>
+    useMutation({
+      mutationFn: async ({ plan, method }: { plan: import("@/types").SubscriptionPlan; method?: import("@/types").SubscriptionPaymentMethod }) => {
+        const { data } = await api.put(endpoint.userSubscription, { plan, method });
+        return data;
+      },
+    });
+
+  const ValidatePromo = () =>
+    useMutation({
+      mutationFn: async ({ code, order_total }: { code: string; order_total: number }) => {
+        const { data } = await api.post(endpoint.userPromoValidate, { code, order_total });
+        return data as PromoValidateResult;
+      },
+    });
+
+  const { get: GetPoints } = useApi({
+    endpoint: endpoint.userPoints,
+    queryKey: "userPoints",
+  });
+
+  const { get: GetAvailablePromos } = useApi({
+    endpoint: endpoint.userPromoAvailable,
+    queryKey: "userAvailablePromos",
+  });
+
+  const { get: GetGlobalDiscount } = useApi({
+    endpoint: endpoint.publicGlobalDiscount,
+    queryKey: "publicGlobalDiscount",
+  });
+
+  const { get: GetNotifications } = useApi({
+    endpoint: endpoint.notifications,
+    queryKey: "notifications",
+  });
+
+  const GetUnreadCount = () =>
+    useQuery({
+      queryKey: ["notificationsUnreadCount"],
+      queryFn: async () => {
+        const { data } = await api.get(endpoint.notificationsUnreadCount);
+        return data as { count: number };
+      },
+      refetchInterval: 30000,
+    });
+
+  const MarkRead = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        const { data } = await api.put(`${endpoint.notifications}/${id}/read`, {});
+        return data;
+      },
+    });
+
+  const MarkAllRead = () =>
+    useMutation({
+      mutationFn: async () => {
+        const { data } = await api.put(`${endpoint.notifications}/read-all`, {});
+        return data;
+      },
+    });
+
+  const DeleteNotification = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        const { data } = await api.delete(`${endpoint.notifications}/${id}`);
+        return data;
+      },
+    });
+
   return {
     GetTrainers,
     GetTrainer,
@@ -168,6 +283,17 @@ const useUser = (): UseUserReturn => {
     DeleteExerciseLog,
     GetAuthProfile,
     UpdateAvatar,
+    GetSubscription,
+    UpdateSubscription,
+    ValidatePromo,
+    GetPoints,
+    GetAvailablePromos,
+    GetGlobalDiscount,
+    GetNotifications,
+    GetUnreadCount,
+    MarkRead,
+    MarkAllRead,
+    DeleteNotification,
   } as UseUserReturn;
 };
 

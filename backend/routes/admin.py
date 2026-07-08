@@ -7,6 +7,7 @@ from database.connection import get_connection
 from middleware.auth import role_required
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
+from utils.notify import push, push_to_non_admins
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -75,6 +76,8 @@ class CreateProductSchema(BaseModel):
     category: str = 'strength'
     image_url: Optional[str] = None
     status: Literal['active', 'inactive'] = 'active'
+    discount_type: Optional[Literal['percentage', 'fixed']] = None
+    discount_value: Optional[float] = Field(default=None, gt=0)
 
 
 class UpdateProductSchema(BaseModel):
@@ -86,6 +89,23 @@ class UpdateProductSchema(BaseModel):
     image_url: Optional[str] = None
     status: Optional[Literal['active', 'inactive']] = None
     category: Optional[str] = None
+    discount_type: Optional[Literal['percentage', 'fixed']] = None
+    discount_value: Optional[float] = None
+
+
+class SetProductDiscountSchema(BaseModel):
+    discount_type: Literal['percentage', 'fixed']
+    discount_value: float = Field(gt=0)
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+
+
+class GlobalDiscountSchema(BaseModel):
+    discount_type: Literal['percentage', 'fixed'] = 'percentage'
+    discount_value: float = Field(default=0, ge=0)
+    is_active: bool = False
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
 
 
 class ApproveProductRequestSchema(BaseModel):
@@ -214,8 +234,9 @@ def delete_category(cid):
 def list_users():
     page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     search = request.args.get('search', '').strip()
-    status_filter = request.args.get('status', '').strip()
-    role_filter = request.args.get('role', '').strip()
+    status_filter    = request.args.get('status', '').strip()
+    role_filter      = request.args.get('role', '').strip()
+    verified_filter  = request.args.get('is_verified', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -231,13 +252,17 @@ def list_users():
         if role_filter:
             base_where += " AND u.role = %s"
             params_count = params_count + [role_filter]
+        if verified_filter in ('0', '1'):
+            base_where += " AND u.is_verified = %s"
+            params_count = params_count + [int(verified_filter)]
         cursor.execute(
             f"SELECT COUNT(*) AS total FROM users u {base_where}", params_count
         )
         total = cursor.fetchone()['total']
         cursor.execute(
-            f"SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
-            f"p.goal, p.weight_kg, p.height_cm "
+            f"SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
+            f"p.specialization, p.bio, "
+            f"(SELECT COUNT(*) FROM trainer_certifications tc WHERE tc.user_id = u.id) AS cert_count "
             f"FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             f"{base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
             params_count + [page_size, offset]
@@ -255,9 +280,10 @@ def get_user(uid):
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.role, u.status, u.created_at, "
+            "SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
             "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
-            "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country "
+            "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country, "
+            "p.experience_years, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s AND u.deleted_at IS NULL",
             (uid,)
@@ -265,6 +291,19 @@ def get_user(uid):
         user = cursor.fetchone()
         if not user:
             return jsonify({'error': 'User not found'}), 404
+        if user.get('available_time') and isinstance(user['available_time'], str):
+            import json as _json
+            try:
+                user['available_time'] = _json.loads(user['available_time'])
+            except Exception:
+                user['available_time'] = []
+        if user.get('role') == 'dietitian':
+            cursor.execute(
+                "SELECT id, name, file_url, file_type, created_at "
+                "FROM trainer_certifications WHERE user_id = %s ORDER BY created_at",
+                (uid,)
+            )
+            user['certifications'] = cursor.fetchall()
         return jsonify(user)
     finally:
         cursor.close()
@@ -339,6 +378,132 @@ def delete_user(uid):
         cursor.execute("UPDATE users SET deleted_at = NOW() WHERE id = %s", (uid,))
         conn.commit()
         return jsonify({'message': 'User deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/users/<int:uid>/verify', methods=['PUT'])
+@role_required('admin')
+def verify_trainer(uid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT role, is_verified FROM users WHERE id = %s AND deleted_at IS NULL", (uid,))
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        if user['role'] != 'dietitian':
+            return jsonify({'error': 'Only trainers can be verified'}), 400
+        new_val = 0 if user['is_verified'] else 1
+        cursor.execute("UPDATE users SET is_verified = %s WHERE id = %s", (new_val, uid))
+        conn.commit()
+        return jsonify({'is_verified': bool(new_val)})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Subscriptions ────────────────────────────────────────────────────────────
+
+@admin_bp.route('/subscriptions', methods=['GET'])
+@role_required('admin')
+def list_subscriptions():
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', 'pending').strip()
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        base_where = "WHERE u.role = 'trainee' AND u.deleted_at IS NULL"
+        params = []
+        if status_filter in ('pending', 'active', 'rejected'):
+            base_where += " AND u.subscription_status = %s"
+            params.append(status_filter)
+        if search:
+            base_where += " AND (u.name LIKE %s OR u.email LIKE %s)"
+            params += [f"%{search}%", f"%{search}%"]
+        cursor.execute(f"SELECT COUNT(*) AS total FROM users u {base_where}", params)
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            f"SELECT u.id, u.name, u.email, u.subscription_plan, u.subscription_status, "
+            f"u.subscription_payment_method, u.created_at "
+            f"FROM users u {base_where} ORDER BY u.created_at DESC LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        return paginated_response(cursor.fetchall(), total, page, page_size)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/subscriptions/<int:uid>/approve', methods=['PUT'])
+@role_required('admin')
+def approve_subscription(uid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT subscription_plan, subscription_status FROM users WHERE id = %s AND deleted_at IS NULL",
+            (uid,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'error': 'User not found'}), 404
+        if row['subscription_status'] != 'pending':
+            return jsonify({'error': 'No pending subscription request'}), 400
+        cursor.execute(
+            "UPDATE users SET subscription_status='active' WHERE id = %s", (uid,)
+        )
+        push(cursor, uid, 'subscription_approved',
+             'Subscription Approved',
+             'Your Pro subscription has been approved. Enjoy all Pro features!')
+        conn.commit()
+        return jsonify({'message': 'Subscription approved'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/subscriptions/<int:uid>/reject', methods=['PUT'])
+@role_required('admin')
+def reject_subscription(uid):
+    try:
+        body = RejectRequestSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT subscription_status FROM users WHERE id = %s AND deleted_at IS NULL",
+            (uid,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'error': 'User not found'}), 404
+        if row['subscription_status'] != 'pending':
+            return jsonify({'error': 'No pending subscription request'}), 400
+        cursor.execute(
+            "UPDATE users SET subscription_plan='free', subscription_status='rejected' WHERE id = %s",
+            (uid,),
+        )
+        note_suffix = f' Reason: {body.admin_note}' if body.admin_note else ''
+        push(cursor, uid, 'subscription_rejected',
+             'Subscription Request Declined',
+             f'Your Pro subscription request was not approved. You remain on the Free plan.{note_suffix}')
+        conn.commit()
+        return jsonify({'message': 'Subscription rejected — user reverted to Free'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -437,7 +602,9 @@ def _resolve_category_id(cursor, slug):
 PRODUCT_SELECT = (
     "SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
     "c.slug AS category, c.name AS category_name, "
-    "p.image_url, p.status, p.created_at, u.name AS created_by_name "
+    "p.image_url, p.status, p.created_at, u.name AS created_by_name, "
+    "p.discount_type, p.discount_value, "
+    "p.discount_valid_from, p.discount_valid_to "
     "FROM products p "
     "JOIN categories c ON p.category_id = c.id "
     "LEFT JOIN users u ON p.created_by = u.id "
@@ -632,6 +799,10 @@ def approve_product_request(rid):
             "reviewed_by=%s, reviewed_at=NOW() WHERE id = %s",
             (body.admin_note, request.user_id, rid),
         )
+        push(cursor, req['user_id'], 'product_request_approved',
+             'Product Request Approved',
+             f"Your request for '{req['product_name']}' has been approved and added to the store!",
+             rid)
         conn.commit()
         return jsonify({'message': 'Request approved and product added', 'product_id': product_id})
     except ValueError as e:
@@ -655,7 +826,7 @@ def reject_product_request(rid):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT id, status FROM product_requests WHERE id = %s", (rid,))
+        cursor.execute("SELECT id, status, user_id, product_name FROM product_requests WHERE id = %s", (rid,))
         req = cursor.fetchone()
         if not req:
             return jsonify({'error': 'Request not found'}), 404
@@ -667,6 +838,11 @@ def reject_product_request(rid):
             "reviewed_by=%s, reviewed_at=NOW() WHERE id = %s",
             (body.admin_note, request.user_id, rid),
         )
+        note_suffix = f' Reason: {body.admin_note}' if body.admin_note else ''
+        push(cursor, req['user_id'], 'product_request_rejected',
+             'Product Request Declined',
+             f"Your request for '{req['product_name']}' was not approved at this time.{note_suffix}",
+             rid)
         conn.commit()
         return jsonify({'message': 'Request rejected'})
     except Exception as e:
@@ -725,9 +901,43 @@ def update_order_status(oid):
         return jsonify({'errors': pydantic_errors(exc)}), 422
 
     conn = get_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
     try:
+        cursor.execute(
+            "SELECT id, user_id, status, total_amount FROM orders WHERE id = %s AND deleted_at IS NULL",
+            (oid,),
+        )
+        order = cursor.fetchone()
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
         cursor.execute("UPDATE orders SET status = %s WHERE id = %s", (body.status, oid))
+
+        # Award reward points only when order is first marked shipped
+        if body.status == 'shipped' and order['status'] != 'shipped':
+            points_earned = int(float(order['total_amount'] or 0) // 50)
+            if points_earned > 0:
+                cursor.execute(
+                    "UPDATE users SET reward_points = reward_points + %s WHERE id = %s",
+                    (points_earned, order['user_id']),
+                )
+                cursor.execute(
+                    "INSERT INTO point_transactions (user_id, points, type, reference_id, description) "
+                    "VALUES (%s, %s, 'earned', %s, %s)",
+                    (order['user_id'], points_earned, oid, f"Points earned for order #{oid}"),
+                )
+
+        status_messages = {
+            'confirmed':  'Your order has been confirmed and is being prepared.',
+            'shipped':    'Great news — your order is on its way!',
+            'delivered':  'Your order has been delivered. Enjoy!',
+            'cancelled':  'Your order has been cancelled.',
+        }
+        msg = status_messages.get(body.status, f"Your order status changed to '{body.status}'.")
+        push(cursor, order['user_id'], 'order_status',
+             f"Order #{oid} — {body.status.capitalize()}",
+             msg, oid)
+
         conn.commit()
         return jsonify({'message': 'Order status updated'})
     except Exception as e:
@@ -837,6 +1047,14 @@ def approve_trainer_assignment(aid):
             "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
             (body.admin_note, request.user_id, aid),
         )
+        push(cursor, row['customer_id'], 'trainer_approved',
+             'Trainer Assignment Approved',
+             'Your trainer assignment has been fully approved. You can now connect with your trainer!',
+             aid)
+        push(cursor, row['trainer_id'], 'trainer_approved',
+             'Assignment Approved by Admin',
+             'The admin has approved your new client assignment.',
+             aid)
         conn.commit()
         return jsonify({'message': 'Trainer assignment approved'})
     except Exception as e:
@@ -870,6 +1088,14 @@ def reject_trainer_assignment(aid):
             "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
             (body.admin_note, request.user_id, aid),
         )
+        push(cursor, row['customer_id'], 'trainer_rejected',
+             'Trainer Assignment Declined',
+             'Your trainer assignment request was not approved by the admin.',
+             aid)
+        push(cursor, row['trainer_id'], 'trainer_rejected',
+             'Assignment Declined by Admin',
+             'The admin has declined the client assignment request.',
+             aid)
         conn.commit()
         return jsonify({'message': 'Trainer assignment rejected'})
     except Exception as e:
@@ -893,7 +1119,7 @@ def stats():
         users_count = cursor.fetchone()['total']
         cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND deleted_at IS NULL")
         dietitians_count = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE status='pending' AND deleted_at IS NULL")
+        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND is_verified=0 AND deleted_at IS NULL")
         pending_approvals = cursor.fetchone()['total']
         cursor.execute("SELECT COUNT(*) AS total FROM products WHERE status='active' AND deleted_at IS NULL")
         products_count = cursor.fetchone()['total']
@@ -1046,6 +1272,304 @@ def stats_trends():
             'date_from': str(date_from),
             'date_to': str(date_to),
         })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Promo Codes ───────────────────────────────────────────────────────────────
+
+class CreatePromoCodeSchema(BaseModel):
+    code: str = Field(min_length=2, max_length=50)
+    description: Optional[str] = None
+    discount_type: Literal['percentage', 'fixed'] = 'percentage'
+    discount_value: float = Field(gt=0)
+    min_order_amount: float = Field(default=0, ge=0)
+    max_uses: Optional[int] = Field(default=None, ge=1)
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+    is_active: bool = True
+
+    @field_validator('code', mode='before')
+    @classmethod
+    def upper_code(cls, v):
+        return str(v).strip().upper() if isinstance(v, str) else v
+
+
+class UpdatePromoCodeSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    description: Optional[str] = None
+    discount_type: Optional[Literal['percentage', 'fixed']] = None
+    discount_value: Optional[float] = Field(default=None, gt=0)
+    min_order_amount: Optional[float] = Field(default=None, ge=0)
+    max_uses: Optional[int] = Field(default=None, ge=1)
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@admin_bp.route('/promo-codes', methods=['GET'])
+@role_required('admin')
+def list_promo_codes():
+    page, page_size, offset = parse_page_params()
+    search = request.args.get('search', '').strip()
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        conditions, params = [], []
+        if search:
+            conditions.append("(code LIKE %s OR description LIKE %s)")
+            params += [f"%{search}%", f"%{search}%"]
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        cursor.execute(f"SELECT COUNT(*) AS total FROM promo_codes {where}", params)
+        total = cursor.fetchone()['total']
+        cursor.execute(
+            f"SELECT id, code, description, discount_type, discount_value, min_order_amount, "
+            f"max_uses, current_uses, valid_from, valid_to, is_active, created_at "
+            f"FROM promo_codes {where} ORDER BY created_at DESC LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        return paginated_response(cursor.fetchall(), total, page, page_size)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/promo-codes', methods=['POST'])
+@role_required('admin')
+def create_promo_code():
+    try:
+        body = CreatePromoCodeSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id FROM promo_codes WHERE code = %s", (body.code,))
+        if cursor.fetchone():
+            return jsonify({'error': 'Promo code already exists'}), 409
+        cursor.execute(
+            "INSERT INTO promo_codes (code, description, discount_type, discount_value, "
+            "min_order_amount, max_uses, valid_from, valid_to, is_active, created_by) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (body.code, body.description, body.discount_type, body.discount_value,
+             body.min_order_amount, body.max_uses, body.valid_from, body.valid_to,
+             1 if body.is_active else 0, request.user_id),
+        )
+        promo_id = cursor.lastrowid
+        conn.commit()
+        cursor.execute("SELECT * FROM promo_codes WHERE id = %s", (promo_id,))
+        return jsonify(cursor.fetchone()), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/promo-codes/<int:promo_id>', methods=['PUT'])
+@role_required('admin')
+def update_promo_code(promo_id):
+    try:
+        body = UpdatePromoCodeSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id FROM promo_codes WHERE id = %s", (promo_id,))
+        if not cursor.fetchone():
+            return jsonify({'error': 'Promo code not found'}), 404
+        fields = body.model_dump(exclude_none=True)
+        if not fields:
+            return jsonify({'error': 'Nothing to update'}), 400
+        set_clause = ", ".join(f"{k} = %s" for k in fields)
+        cursor.execute(
+            f"UPDATE promo_codes SET {set_clause} WHERE id = %s",
+            list(fields.values()) + [promo_id],
+        )
+        conn.commit()
+        cursor.execute("SELECT * FROM promo_codes WHERE id = %s", (promo_id,))
+        return jsonify(cursor.fetchone())
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/promo-codes/<int:promo_id>', methods=['DELETE'])
+@role_required('admin')
+def delete_promo_code(promo_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM promo_codes WHERE id = %s", (promo_id,))
+        if not cursor.fetchone():
+            return jsonify({'error': 'Promo code not found'}), 404
+        cursor.execute("DELETE FROM promo_codes WHERE id = %s", (promo_id,))
+        conn.commit()
+        return '', 204
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Global Discount ───────────────────────────────────────────────────────────
+
+def _get_global_discount_settings(cursor):
+    cursor.execute(
+        "SELECT `key`, value FROM site_settings "
+        "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active',"
+        "'global_discount_valid_from','global_discount_valid_to')"
+    )
+    s = {row['key']: row['value'] for row in cursor.fetchall()}
+    return {
+        'discount_type':  s.get('global_discount_type', 'percentage'),
+        'discount_value': float(s.get('global_discount_value', '0') or '0'),
+        'is_active':      s.get('global_discount_active', '0') == '1',
+        'valid_from':     s.get('global_discount_valid_from') or None,
+        'valid_to':       s.get('global_discount_valid_to') or None,
+    }
+
+
+@admin_bp.route('/global-discount', methods=['GET'])
+@role_required('admin')
+def get_global_discount():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        return jsonify(_get_global_discount_settings(cursor))
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/global-discount', methods=['PUT'])
+@role_required('admin')
+def update_global_discount():
+    try:
+        body = GlobalDiscountSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        rows = [
+            ('global_discount_type',       body.discount_type),
+            ('global_discount_value',      str(body.discount_value)),
+            ('global_discount_active',     '1' if body.is_active else '0'),
+            ('global_discount_valid_from', body.valid_from or ''),
+            ('global_discount_valid_to',   body.valid_to or ''),
+        ]
+        for key, value in rows:
+            cursor.execute(
+                "INSERT INTO site_settings (`key`, value, updated_by) VALUES (%s, %s, %s) "
+                "ON DUPLICATE KEY UPDATE value = VALUES(value), updated_by = VALUES(updated_by)",
+                (key, value, request.user_id),
+            )
+        if body.is_active and body.discount_value > 0:
+            discount_label = (
+                f"{int(body.discount_value)}% off"
+                if body.discount_type == 'percentage'
+                else f"Rs. {body.discount_value:.0f} off"
+            )
+            date_parts = []
+            if body.valid_from:
+                date_parts.append(f"from {body.valid_from}")
+            if body.valid_to:
+                date_parts.append(f"until {body.valid_to}")
+            date_suffix = f" ({', '.join(date_parts)})" if date_parts else ''
+            push_to_non_admins(
+                cursor, 'global_discount',
+                f"🛒 Sitewide Sale — {discount_label} on everything!",
+                f"A sitewide discount of {discount_label} is now active on all products{date_suffix}. Don't miss out!",
+            )
+        conn.commit()
+        return jsonify(_get_global_discount_settings(cursor))
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Product Discounts (per-product) ──────────────────────────────────────────
+
+@admin_bp.route('/products/<int:pid>/discount', methods=['PUT'])
+@role_required('admin')
+def set_product_discount(pid):
+    try:
+        body = SetProductDiscountSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id, name FROM products WHERE id = %s AND deleted_at IS NULL", (pid,))
+        product = cursor.fetchone()
+        if not product:
+            return jsonify({'error': 'Product not found'}), 404
+        cursor.execute(
+            "UPDATE products SET discount_type = %s, discount_value = %s, "
+            "discount_valid_from = %s, discount_valid_to = %s WHERE id = %s",
+            (body.discount_type, body.discount_value,
+             body.valid_from or None, body.valid_to or None, pid),
+        )
+        discount_label = (
+            f"{int(body.discount_value)}% off"
+            if body.discount_type == 'percentage'
+            else f"Rs. {body.discount_value:.0f} off"
+        )
+        date_parts = []
+        if body.valid_from:
+            date_parts.append(f"from {body.valid_from}")
+        if body.valid_to:
+            date_parts.append(f"until {body.valid_to}")
+        date_suffix = f" ({', '.join(date_parts)})" if date_parts else ''
+        push_to_non_admins(
+            cursor, 'product_discount',
+            f"🏷️ {discount_label} on {product['name']}",
+            f"Get {discount_label} on {product['name']}{date_suffix}. Shop now!",
+            pid,
+        )
+        conn.commit()
+        return jsonify({'message': 'Product discount set'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/products/<int:pid>/discount', methods=['DELETE'])
+@role_required('admin')
+def clear_product_discount(pid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id FROM products WHERE id = %s AND deleted_at IS NULL", (pid,))
+        if not cursor.fetchone():
+            return jsonify({'error': 'Product not found'}), 404
+        cursor.execute(
+            "UPDATE products SET discount_type = NULL, discount_value = NULL, "
+            "discount_valid_from = NULL, discount_valid_to = NULL WHERE id = %s",
+            (pid,),
+        )
+        conn.commit()
+        return jsonify({'message': 'Product discount cleared'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

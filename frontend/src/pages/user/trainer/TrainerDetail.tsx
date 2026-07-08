@@ -10,6 +10,10 @@ import {
   ShieldCheck,
   Dumbbell,
   FileText,
+  Clock,
+  Award,
+  ExternalLink,
+  Briefcase,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import useUser from "@/hooks/useUser";
@@ -78,11 +82,11 @@ export default function TrainerDetail() {
 
       {/* Hero card */}
       <Card className="overflow-hidden">
-        <div className="h-24 bg-gradient-to-br from-primary to-secondary-600" />
+        <div className="h-40 bg-[url('https://static.vecteezy.com/system/resources/thumbnails/020/724/865/small/athletic-man-training-biceps-at-the-gym-to-use-as-banner-photo.jpg')] bg-cover bg-center" />
 
         <CardContent className="pt-0 pb-6">
-          <div className="relative -mt-10 mb-4 flex items-end justify-between">
-            <Avatar className="h-20 w-20 border-4 border-background shadow-sm rounded-2xl">
+          <div className="relative -mt-20 mb-4 flex items-end justify-between">
+            <Avatar className="h-40 w-40 border-4">
               <AvatarFallback className="rounded-2xl bg-gradient-to-br from-primary-400 to-teal-600 text-white text-3xl font-black">
                 {trainer.name.charAt(0).toUpperCase()}
               </AvatarFallback>
@@ -126,13 +130,13 @@ export default function TrainerDetail() {
           )}
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-4 gap-3 text-center">
             <div>
               <p className="text-2xl font-black text-foreground">
                 {trainer.customer_count ?? 0}
               </p>
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                <Users className="h-3 w-3" /> Active clients
+                <Users className="h-3 w-3" /> Clients
               </p>
             </div>
             <div>
@@ -140,7 +144,7 @@ export default function TrainerDetail() {
                 {trainer.avg_rating || "—"}
               </p>
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                <Star className="h-3 w-3" /> Avg rating
+                <Star className="h-3 w-3" /> Rating
               </p>
             </div>
             <div>
@@ -149,6 +153,16 @@ export default function TrainerDetail() {
               </p>
               <p className="text-xs text-muted-foreground">Reviews</p>
             </div>
+            {(trainer.experience_years ?? 0) > 0 && (
+              <div>
+                <p className="text-2xl font-black text-foreground">
+                  {trainer.experience_years}
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Briefcase className="h-3 w-3" /> Yrs exp.
+                </p>
+              </div>
+            )}
           </div>
 
           {reviews && reviews.count > 0 && (
@@ -201,6 +215,80 @@ export default function TrainerDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Availability */}
+      {trainer.available_time && trainer.available_time.length > 0 && (
+        <Card>
+          <CardContent className="p-5">
+            <h2 className="text-base font-bold tracking-tight mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary-500" />
+              Availability
+            </h2>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {trainer.available_time.map((slot, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2"
+                >
+                  <p className="text-xs font-semibold text-emerald-700">
+                    {slot.day}
+                  </p>
+                  <p className="text-xs text-emerald-600 mt-0.5">
+                    {slot.from} – {slot.to}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Certifications */}
+      {trainer.certifications && trainer.certifications.length > 0 && (
+        <Card>
+          <CardContent className="p-5">
+            <h2 className="text-base font-bold tracking-tight mb-3 flex items-center gap-2">
+              <Award className="h-4 w-4 text-primary-500" />
+              Certifications
+            </h2>
+            <div className="space-y-2">
+              {trainer.certifications.map((cert) => (
+                <div
+                  key={cert.id}
+                  className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {cert.name}
+                    </p>
+                    {cert.issued_by && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {cert.issued_by}
+                      </p>
+                    )}
+                    {cert.issued_date && (
+                      <p className="text-xs text-muted-foreground">
+                        Issued:{" "}
+                        {new Date(cert.issued_date).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  {cert.file_url && (
+                    <a
+                      href={cert.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline"
+                    >
+                      View <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Reviews */}
       <div>

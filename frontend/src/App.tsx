@@ -2,14 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { Toaster } from "@/components/ui/sonner";
 
 import Home from "@/pages/Home";
-import Register from "@/pages/Register";
-import Products from "@/pages/Products";
-import ProductDetail from "@/pages/ProductDetail";
-import PaymentReturn from "@/pages/PaymentReturn";
+import Products from "@/pages/product/Products";
+import ProductDetail from "@/pages/product/ProductDetail";
+import PaymentReturn from "@/pages/product/PaymentReturn";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UserManagement from "@/pages/admin/user/UserManagement";
@@ -20,6 +19,11 @@ import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
 import CategoryManagement from "@/pages/admin/category/CategoryManagement";
 import TrainerAssignments from "@/pages/admin/TrainerAssignments";
+import TrainerVerification from "@/pages/admin/TrainerVerification";
+import SubscriptionManagement from "@/pages/admin/SubscriptionManagement";
+import PromoCodeManagement from "@/pages/admin/PromoCodeManagement";
+import DiscountManagement from "@/pages/admin/discount/DiscountManagement";
+import SubscriptionPaymentReturn from "@/pages/user/subscription/SubscriptionPaymentReturn";
 
 import DietitianDashboard from "@/pages/dietitian/DietitianDashboard";
 import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
@@ -30,8 +34,13 @@ import MyOrders from "@/pages/user/MyOrders";
 import RequestProduct from "@/pages/user/RequestProduct";
 import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
-import MyTrainer from "@/pages/user/MyTrainer";
-import TrainerDetail from "@/pages/user/TrainerDetail";
+import MyTrainer from "@/pages/user/trainer/MyTrainer";
+import TrainerDetail from "@/pages/user/trainer/TrainerDetail";
+import Subscription from "@/pages/user/subscription/Subscription";
+import AiRecommendation from "@/pages/user/AiRecommendation";
+import WeeklyReport from "@/pages/user/WeeklyReport";
+import Rewards from "@/pages/user/Rewards";
+import Notifications from "@/pages/user/Notifications";
 import AuthLayout from "./pages/auth/AuthLayout";
 
 function RoleRedirect() {
@@ -65,6 +74,14 @@ export default function App() {
           <Route path="/payment/esewa/success" element={<PaymentReturn />} />
           <Route path="/payment/esewa/failure" element={<PaymentReturn />} />
           <Route path="/payment/khalti/return" element={<PaymentReturn />} />
+          <Route
+            path="/payment/subscription/esewa/success"
+            element={<SubscriptionPaymentReturn />}
+          />
+          <Route
+            path="/payment/subscription/esewa/failure"
+            element={<SubscriptionPaymentReturn />}
+          />
           <Route path="/dashboard" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
           <Route
@@ -123,7 +140,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route
+          {/* <Route
             path="/admin/exercises"
             element={
               <ProtectedRoute roles={["admin"]}>
@@ -132,7 +149,7 @@ export default function App() {
                 </Layout>
               </ProtectedRoute>
             }
-          />
+          /> */}
           <Route
             path="/admin/products"
             element={
@@ -183,6 +200,56 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/trainer-verification"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <TrainerVerification />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/subscriptions"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <SubscriptionManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/promo-codes"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <PromoCodeManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/discounts"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <DiscountManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/notifications"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <Notifications />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
 
           {/* Trainer */}
           <Route
@@ -211,6 +278,16 @@ export default function App() {
               <ProtectedRoute roles={["dietitian"]}>
                 <Layout>
                   <TrainerProfile />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trainer/notifications"
+            element={
+              <ProtectedRoute roles={["dietitian"]}>
+                <Layout>
+                  <Notifications />
                 </Layout>
               </ProtectedRoute>
             }
@@ -271,7 +348,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route
+          {/* <Route
             path="/customer/log-exercise"
             element={
               <ProtectedRoute roles={["trainee"]}>
@@ -280,13 +357,63 @@ export default function App() {
                 </Layout>
               </ProtectedRoute>
             }
-          />
+          /> */}
           <Route
             path="/customer/profile"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
                   <Profile />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/subscription"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <Subscription />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/ai-recommendation"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <AiRecommendation />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+           <Route
+            path="/customer/weekly-report"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <WeeklyReport />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/rewards"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <Rewards />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/customer/notifications"
+            element={
+              <ProtectedRoute roles={["trainee"]}>
+                <Layout>
+                  <Notifications />
                 </Layout>
               </ProtectedRoute>
             }

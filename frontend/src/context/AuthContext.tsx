@@ -8,14 +8,6 @@ import {
 import { api } from "@/api/client";
 import type { User } from "@/types";
 
-export class PendingApprovalError extends Error {
-  readonly pending = true;
-  constructor(message: string) {
-    super(message);
-    this.name = "PendingApprovalError";
-  }
-}
-
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -58,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     });
     localStorage.setItem("token", data.token);
-    setUser(data.user);
+    await refreshUser();
     return data.user;
   };
 
@@ -68,15 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     role: string,
   ) => {
-    const data = await api.post<{ token?: string; user?: User; pending?: boolean; message?: string }>(
+    const data = await api.post<{ token: string; user: User }>(
       "/auth/register",
       { name, email, password, role },
     );
-    if (data.pending) {
-      throw new PendingApprovalError(data.message ?? "Your account is awaiting admin approval.");
-    }
-    localStorage.setItem("token", data.token!);
-    setUser(data.user!);
+    localStorage.setItem("token", data.token);
+    await refreshUser();
   };
 
   const logout = () => {
@@ -90,7 +79,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

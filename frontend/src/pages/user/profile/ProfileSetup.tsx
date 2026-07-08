@@ -10,18 +10,14 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
-import {
-  profileSchema,
-  STEP_REQUIRED,
-  type ProfileValues,
-} from "./profile/schema";
-import { STEPS } from "./profile/constants";
-import { parseJsonField, type Macros } from "./profile/utils";
-import { Step1Personal } from "./profile/Step1Personal";
-import { Step2Goals } from "./profile/Step2Goals";
-import { Step3Diet } from "./profile/Step3Diet";
-import { Step4Habits } from "./profile/Step4Habits";
-import { Step5Health } from "./profile/Step5Health";
+import { profileSchema, STEP_REQUIRED, type ProfileValues } from "./schema";
+import { STEPS } from "./constants";
+import { parseJsonField, type Macros } from "./utils";
+import { Step1Personal } from "./Step1Personal";
+import { Step2Goals } from "./Step2Goals";
+import { Step3Diet } from "./Step3Diet";
+import { Step4Habits } from "./Step4Habits";
+import { Step5Health } from "./Step5Health";
 import { Dialog } from "@radix-ui/react-dialog";
 import {
   DialogBody,
@@ -105,15 +101,12 @@ export default function ProfileSetup({
         ? String(data.current_weight_kg)
         : "",
       activity_level:
-        (data.activity_level as ProfileValues["activity_level"]) ??
-        "moderate",
+        (data.activity_level as ProfileValues["activity_level"]) ?? "moderate",
       occupation: (data.occupation as string) ?? "",
       primary_goal:
-        (data.primary_goal as ProfileValues["primary_goal"]) ??
-        "lose_weight",
+        (data.primary_goal as ProfileValues["primary_goal"]) ?? "lose_weight",
       fitness_level:
-        (data.fitness_level as ProfileValues["fitness_level"]) ??
-        "beginner",
+        (data.fitness_level as ProfileValues["fitness_level"]) ?? "beginner",
       target_water_ml: (data.target_water_ml as number) ?? 2000,
       diet_type: (data.diet_type as ProfileValues["diet_type"]) ?? "none",
       dietary_restrictions: parseJsonField<string[]>(
@@ -154,7 +147,7 @@ export default function ProfileSetup({
       ),
       notes: (data.notes as string) ?? "",
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const next = async () => {
@@ -242,7 +235,10 @@ export default function ProfileSetup({
           {STEPS.map((label, i) => (
             <div
               key={i}
-              className={cn("flex items-center", i < STEPS.length - 1 && "flex-1")}
+              className={cn(
+                "flex items-center",
+                i < STEPS.length - 1 && "flex-1",
+              )}
             >
               <div
                 title={label}
@@ -290,7 +286,11 @@ export default function ProfileSetup({
       <div className="flex justify-between">
         <div>
           {step > 1 && (
-            <Button type="button" variant="outline" onClick={() => setStep((s) => s - 1)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStep((s) => s - 1)}
+            >
               ← Previous
             </Button>
           )}
@@ -309,7 +309,8 @@ export default function ProfileSetup({
             Complete Your Profile
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Set up your fitness profile to unlock personalised metrics and recommendations.
+            Set up your fitness profile to unlock personalised metrics and
+            recommendations.
           </p>
         </div>
         <StepIndicator />

@@ -65,6 +65,11 @@ export const api = {
 
   delete: <T = unknown>(url: string, config?: AxiosRequestConfig) =>
     http.delete<T>(url, config).then((r) => r.data),
+
+  postForm: <T = unknown>(url: string, formData: FormData) =>
+    http
+      .post<T>(url, formData, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((r) => r.data),
 };
 
 export default http;

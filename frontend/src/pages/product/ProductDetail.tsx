@@ -1,18 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ShoppingCart, Package, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Package } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import usePublic from "@/hooks/usePublic";
 import PublicLayout from "@/components/PublicLayout";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
-import { StarRating, StarDisplay } from "@/components/ui/star-rating";
+import { StarDisplay } from "@/components/ui/star-rating";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import type { Review } from "@/types";
+import { ProductReviews } from "./ProductReviews";
 
 type CatMeta = { gradient: string; badgeClass: string; glyph: string };
 
@@ -51,35 +50,10 @@ export default function ProductDetail() {
   const { add, items: cartItems } = useCartStore();
 
   const [quantity, setQuantity] = useState(1);
-  const [reviewDraft, setReviewDraft] = useState({ rating: 0, comment: "" });
-  const [reviewEditing, setReviewEditing] = useState(false);
 
-  const {
-    GetProduct,
-    GetProductReviews,
-    SubmitProductReview,
-    DeleteProductReview,
-  } = usePublic();
+  const { GetProduct, GetProductReviews } = usePublic();
   const { data: product, isLoading, isError } = GetProduct(id);
   const { data: reviewStats } = GetProductReviews(product?.id);
-
-  const submitReview = SubmitProductReview(product?.id);
-  const deleteReview = DeleteProductReview(product?.id);
-
-  const userId = (user as unknown as { id: number } | null)?.id;
-  const myReview = reviewStats?.reviews.find(
-    (r: Review) => r.user_id === userId,
-  );
-
-  // Pre-fill draft when my review loads
-  useEffect(() => {
-    if (myReview) {
-      setReviewDraft({
-        rating: myReview.rating,
-        comment: myReview.comment ?? "",
-      });
-    }
-  }, [myReview?.id]);
 
   if (isLoading) {
     return (
@@ -117,9 +91,11 @@ export default function ProductDetail() {
   const lowStock = !outOfStock && product.stock_quantity <= 5;
   const cartQty = cartItems[product.id]?.quantity ?? 0;
   const remaining = Math.max(0, product.stock_quantity - cartQty);
-  const orderTotal = Number(product.price) * quantity;
+  const effectivePrice = product.discounted_price != null ? Number(product.discounted_price) : Number(product.price);
+  const orderTotal = effectivePrice * quantity;
 
   function handleAddToCart() {
+    if (!product) return;
     const toAdd = Math.min(quantity, remaining);
     if (toAdd <= 0) {
       toast.error("You've already added all available stock to your cart");
@@ -130,37 +106,12 @@ export default function ProductDetail() {
         product_id: product.id,
         name: product.name,
         price: Number(product.price),
+        discounted_price: product.discounted_price != null ? Number(product.discounted_price) : undefined,
+        stock_quantity: product.stock_quantity,
       },
       toAdd,
     );
     toast.success(`${product.name} added to cart`);
-  }
-
-  async function handleSubmitReview() {
-    if (reviewDraft.rating === 0) {
-      toast.error("Please select a star rating");
-      return;
-    }
-    try {
-      await submitReview.mutateAsync({
-        rating: reviewDraft.rating,
-        comment: reviewDraft.comment.trim() || null,
-      });
-      toast.success("Review saved");
-      setReviewEditing(false);
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
-  }
-
-  async function handleDeleteReview() {
-    try {
-      await deleteReview.mutateAsync();
-      toast.success("Review removed");
-      setReviewDraft({ rating: 0, comment: "" });
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
   }
 
   return (
@@ -236,9 +187,25 @@ export default function ProductDetail() {
             </div>
 
             <div>
-              <span className="text-4xl font-black tracking-tight text-foreground">
-                RS. {Number(product.price).toFixed(2)}
-              </span>
+              {product.discounted_price != null ? (
+                <div className="flex items-baseline gap-3">
+                  <span className="text-4xl font-black tracking-tight text-primary-700">
+                    RS. {Number(product.discounted_price).toFixed(2)}
+                  </span>
+                  <span className="text-xl line-through text-muted-foreground font-medium">
+                    RS. {Number(product.price).toFixed(2)}
+                  </span>
+                  <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white">
+                    {product.discount_type === 'percentage'
+                      ? `${Number(product.discount_value).toFixed(0)}% OFF`
+                      : `RS. ${Number(product.discount_value).toFixed(0)} OFF`}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-4xl font-black tracking-tight text-foreground">
+                  RS. {Number(product.price).toFixed(2)}
+                </span>
+              )}
               <div className="mt-1 text-sm">
                 {outOfStock ? (
                   <span className="font-semibold text-destructive">
@@ -255,6 +222,7 @@ export default function ProductDetail() {
                 )}
               </div>
             </div>
+
 
             <Separator />
 
@@ -364,158 +332,7 @@ export default function ProductDetail() {
         )}
 
         {/* ── Reviews ── */}
-        <div className="mt-14">
-          <Separator className="mb-10" />
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight text-foreground">
-                Customer Reviews
-              </h2>
-              {reviewStats && reviewStats.count > 0 && (
-                <StarDisplay
-                  value={reviewStats.avg_rating}
-                  count={reviewStats.count}
-                  size="md"
-                  className="mt-1"
-                />
-              )}
-            </div>
-            {user && !myReview && !reviewEditing && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setReviewEditing(true)}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Write a Review
-              </Button>
-            )}
-          </div>
-
-          {user && (reviewEditing || myReview) && (
-            <div className="mb-8 rounded-xl border bg-muted/30 p-5 space-y-4 max-w-2xl">
-              <p className="text-sm font-semibold">
-                {myReview && !reviewEditing
-                  ? "Your Review"
-                  : myReview
-                    ? "Edit Your Review"
-                    : "Write a Review"}
-              </p>
-              {reviewEditing ? (
-                <>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Rating *</p>
-                    <StarRating
-                      value={reviewDraft.rating}
-                      onChange={(v) =>
-                        setReviewDraft((d) => ({ ...d, rating: v }))
-                      }
-                      size="lg"
-                    />
-                  </div>
-                  <Textarea
-                    placeholder="Share your experience with this product (optional)…"
-                    value={reviewDraft.comment}
-                    onChange={(e) =>
-                      setReviewDraft((d) => ({ ...d, comment: e.target.value }))
-                    }
-                    rows={3}
-                    className="resize-none"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSubmitReview}
-                      disabled={submitReview.isPending}
-                    >
-                      {submitReview.isPending ? "Saving…" : "Save Review"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setReviewEditing(false);
-                        if (myReview)
-                          setReviewDraft({
-                            rating: myReview.rating,
-                            comment: myReview.comment ?? "",
-                          });
-                        else setReviewDraft({ rating: 0, comment: "" });
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              ) : myReview ? (
-                <div className="space-y-2">
-                  <StarRating value={myReview.rating} size="md" />
-                  {myReview.comment && (
-                    <p className="text-sm text-muted-foreground">
-                      {myReview.comment}
-                    </p>
-                  )}
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      onClick={() => setReviewEditing(true)}
-                    >
-                      <Pencil className="h-3 w-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="gap-1.5 text-destructive hover:text-destructive"
-                      onClick={handleDeleteReview}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {reviewStats && reviewStats.count > 0 ? (
-            <div className="space-y-4 max-w-2xl">
-              {reviewStats.reviews
-                .filter((r: Review) => r.user_id !== userId)
-                .map((r: Review) => (
-                  <div
-                    key={r.id}
-                    className="rounded-xl border bg-background p-4 space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">
-                        {r.user_name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(r.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <StarRating value={r.rating} size="sm" />
-                    {r.comment && (
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {r.comment}
-                      </p>
-                    )}
-                  </div>
-                ))}
-            </div>
-          ) : !user || !myReview ? (
-            <p className="text-sm text-muted-foreground">
-              No reviews yet.{" "}
-              {user
-                ? "Be the first to review after purchasing."
-                : "Sign in to leave a review after purchasing."}
-            </p>
-          ) : null}
-        </div>
+        <ProductReviews reviewStats={reviewStats} product={product} />
       </div>
     </PublicLayout>
   );

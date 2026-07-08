@@ -1,0 +1,468 @@
+import json
+import datetime
+import os
+import sys
+from flask import Blueprint, request, jsonify
+from pydantic import BaseModel, ValidationError
+from typing import Optional
+from database.connection import get_connection
+from middleware.auth import role_required
+
+_backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _backend_dir not in sys.path:
+    sys.path.insert(0, _backend_dir)
+
+from ai_engine.recommendation_engine import (
+    recommend_daily_meals, generate_weekly_plan,
+    recommend_exercise, search_food_unified, handle_natural_language_query,
+)
+from ai_engine.universal_food_lookup import recognize_food
+from ai_engine.nutrition_calculator import calculate_nutrition_targets
+
+try:
+    from ai_engine.ml.predict import load_models
+    load_models()
+except Exception as e:
+    print(f"  AI models not loaded ({e}) - using rule-based fallback")
+
+ai_bp = Blueprint("ai", __name__)
+
+
+def _pydantic_errors(exc):
+    return [{"field": e["loc"][-1], "message": e["msg"]} for e in exc.errors()]
+
+
+def _get_profile(cursor, user_id):
+    cursor.execute(
+        "SELECT current_weight_kg, height_cm, date_of_birth, gender, "
+        "activity_level, primary_goal, fitness_level, meals_per_day, "
+        "avg_sleep_hours, stress_level, dietary_restrictions, allergens, "
+        "cuisine_preferences, diet_type FROM user_profiles WHERE user_id = %s",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return {}
+    for jf in ("dietary_restrictions", "allergens", "cuisine_preferences"):
+        if isinstance(row.get(jf), str):
+            try:
+                row[jf] = json.loads(row[jf])
+            except Exception:
+                row[jf] = []
+        elif row.get(jf) is None:
+            row[jf] = []
+    dob = row.get("date_of_birth")
+    age = 25
+    if dob:
+        try:
+            if isinstance(dob, (datetime.date, datetime.datetime)):
+                t = datetime.date.today()
+                age = t.year - dob.year - ((t.month, t.day) < (dob.month, dob.day))
+            else:
+                d = datetime.date.fromisoformat(str(dob)[:10])
+                t = datetime.date.today()
+                age = t.year - d.year - ((t.month, t.day) < (d.month, d.day))
+        except Exception:
+            age = 25
+    row["age"] = age
+    dt = row.get("diet_type", "none") or "none"
+    rs = row.get("dietary_restrictions", []) or []
+    row["dietary"] = {
+        "is_vegetarian": dt in ("vegetarian", "vegan") or "vegetarian" in rs,
+        "is_vegan": dt == "vegan" or "vegan" in rs,
+        "is_diabetic_friendly": dt == "diabetic" or "diabetic" in rs,
+        "is_gluten_free": "gluten_free" in rs,
+    }
+    return row
+
+
+class LogMealSchema(BaseModel):
+    meal_type: str
+    food_name: str
+    quantity: float = 1.0
+    unit: str = "serving"
+    food_source: Optional[str] = "manual"
+    calories: float = 0
+    protein_g: float = 0
+    carbs_g: float = 0
+    fat_g: float = 0
+    fiber_g: float = 0
+    sugar_g: float = 0
+    sodium_mg: float = 0
+    portion_g: Optional[float] = None
+
+
+class NLQuerySchema(BaseModel):
+    text: str
+
+
+@ai_bp.route("/meals/log", methods=["POST"])
+@role_required("trainee")
+def log_meal():
+    try:
+        body = LogMealSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({"errors": _pydantic_errors(exc)}), 422
+    if body.meal_type not in ("breakfast", "lunch", "snack", "dinner"):
+        return jsonify({"error": "meal_type must be breakfast, lunch, snack, or dinner"}), 400
+    today = datetime.date.today().isoformat()
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "INSERT INTO meal_logs "
+            "(user_id, logged_date, meal_type, food_name, food_source, "
+            "quantity, unit, portion_g, calories, protein_g, carbs_g, "
+            "fat_g, fiber_g, sugar_g, sodium_mg) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (request.user_id, today, body.meal_type, body.food_name,
+             body.food_source, body.quantity, body.unit, body.portion_g,
+             body.calories, body.protein_g, body.carbs_g, body.fat_g,
+             body.fiber_g, body.sugar_g, body.sodium_mg)
+        )
+        log_id = cursor.lastrowid
+        conn.commit()
+        return jsonify({"id": log_id, "message": f"Logged {body.food_name} to {body.meal_type}"}), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/meals/today", methods=["GET"])
+@role_required("trainee")
+def get_todays_meals():
+    date_str = request.args.get("date", datetime.date.today().isoformat())
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, meal_type, food_name, food_source, quantity, unit, "
+            "calories, protein_g, carbs_g, fat_g, fiber_g, created_at "
+            "FROM meal_logs "
+            "WHERE user_id=%s AND logged_date=%s AND deleted_at IS NULL "
+            "ORDER BY FIELD(meal_type,'breakfast','lunch','snack','dinner'), created_at",
+            (request.user_id, date_str)
+        )
+        logs = cursor.fetchall()
+        grouped = {"breakfast": [], "lunch": [], "snack": [], "dinner": []}
+        totals = {"calories": 0.0, "protein_g": 0.0, "carbs_g": 0.0, "fat_g": 0.0, "fiber_g": 0.0}
+        for log in logs:
+            mt = log.get("meal_type")
+            if mt in grouped:
+                grouped[mt].append(log)
+            for k in totals:
+                totals[k] += float(log.get(k) or 0)
+        profile = _get_profile(cursor, request.user_id)
+        targets = {"calories": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65}
+        if profile.get("current_weight_kg") and profile.get("height_cm"):
+            try:
+                t = calculate_nutrition_targets(
+                    weight_kg=float(profile["current_weight_kg"]),
+                    height_cm=float(profile["height_cm"]),
+                    age=profile.get("age", 25),
+                    gender=profile.get("gender", "male"),
+                    activity_level=profile.get("activity_level", "moderate"),
+                    goal=profile.get("primary_goal", "maintain"),
+                )
+                targets = {
+                    "calories": t.daily_calories, "protein_g": t.protein_g,
+                    "carbs_g": t.carbs_g, "fat_g": t.fat_g,
+                }
+            except Exception:
+                pass
+        return jsonify({
+            "date": date_str,
+            "meals": grouped,
+            "totals": {k: round(v, 1) for k, v in totals.items()},
+            "targets": targets,
+            "total_entries": len(logs),
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/meals/log/<int:log_id>", methods=["DELETE"])
+@role_required("trainee")
+def delete_meal_log(log_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE meal_logs SET deleted_at=NOW() WHERE id=%s AND user_id=%s",
+            (log_id, request.user_id)
+        )
+        conn.commit()
+        return jsonify({"message": "Meal log deleted"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/food/search", methods=["GET"])
+@role_required("trainee")
+def food_search():
+    q = request.args.get("q", "").strip()
+    if not q or len(q) < 2:
+        return jsonify({"results": []})
+    return jsonify({"results": search_food_unified(q, limit=8), "query": q})
+
+
+@ai_bp.route("/food/recognize", methods=["POST"])
+@role_required("trainee")
+def food_recognize():
+    body = request.get_json() or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    return jsonify(recognize_food(text))
+
+
+@ai_bp.route("/nlp/query", methods=["POST"])
+@role_required("trainee")
+def nlp_query():
+    try:
+        body = NLQuerySchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({"errors": _pydantic_errors(exc)}), 422
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT dietary_restrictions, diet_type FROM user_profiles WHERE user_id=%s",
+            (request.user_id,)
+        )
+        profile = cursor.fetchone() or {}
+        dietary = {}
+        if profile.get("dietary_restrictions"):
+            try:
+                rs = json.loads(profile["dietary_restrictions"])
+            except Exception:
+                rs = []
+            dt = profile.get("diet_type", "none") or "none"
+            dietary = {
+                "is_vegetarian": dt in ("vegetarian", "vegan") or "vegetarian" in rs,
+                "is_vegan": dt == "vegan",
+            }
+    finally:
+        cursor.close()
+        conn.close()
+    return jsonify(handle_natural_language_query(body.text, dietary=dietary))
+
+
+@ai_bp.route("/recommend/meal", methods=["GET"])
+@role_required("trainee")
+def recommend_meal():
+    meal_type = request.args.get("meal_type")
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        profile = _get_profile(cursor, request.user_id)
+        if not profile:
+            return jsonify({"error": "Complete your profile first"}), 400
+        result = recommend_daily_meals(
+            weight_kg=float(profile.get("current_weight_kg") or 70),
+            height_cm=float(profile.get("height_cm") or 170),
+            age=profile.get("age", 25),
+            gender=profile.get("gender", "male"),
+            activity_level=profile.get("activity_level", "moderate"),
+            goal=profile.get("primary_goal", "maintain"),
+            meals_per_day=int(profile.get("meals_per_day") or 3),
+            dietary=profile.get("dietary", {}),
+            preferred_cuisines=profile.get("cuisine_preferences") or ["nepali"],
+        )
+        if meal_type and meal_type in result.get("meal_plan", {}):
+            return jsonify({
+                "nutrition_targets": result["nutrition_targets"],
+                "meal_type": meal_type,
+                "recommendation": result["meal_plan"][meal_type],
+            })
+        return jsonify(result)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/recommend/exercise", methods=["GET"])
+@role_required("trainee")
+def recommend_exercise_endpoint():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        today = datetime.date.today().isoformat()
+        cursor.execute(
+            "SELECT COALESCE(SUM(calories),0) AS consumed FROM meal_logs "
+            "WHERE user_id=%s AND logged_date=%s AND deleted_at IS NULL",
+            (request.user_id, today)
+        )
+        consumed = float((cursor.fetchone() or {}).get("consumed", 0))
+        profile = _get_profile(cursor, request.user_id)
+        if not profile:
+            return jsonify({"error": "Complete your profile first"}), 400
+        t = calculate_nutrition_targets(
+            weight_kg=float(profile.get("current_weight_kg") or 70),
+            height_cm=float(profile.get("height_cm") or 170),
+            age=profile.get("age", 25),
+            gender=profile.get("gender", "male"),
+            activity_level=profile.get("activity_level", "moderate"),
+            goal=profile.get("primary_goal", "maintain"),
+        )
+        calorie_ratio = round(consumed / t.daily_calories, 3) if t.daily_calories else 1.0
+        result = recommend_exercise(
+            goal=profile.get("primary_goal", "maintain"),
+            bmi=t.bmi,
+            age=profile.get("age", 25),
+            fitness_level=profile.get("fitness_level", "beginner"),
+            calorie_ratio=calorie_ratio,
+            activity_level=profile.get("activity_level", "moderate"),
+            today_calories=consumed,
+        )
+        return jsonify({**result, "today_calories": consumed,
+                        "target_calories": t.daily_calories, "calorie_ratio": calorie_ratio})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/report/weekly", methods=["GET"])
+@role_required("trainee")
+def weekly_report():
+    today = datetime.date.today()
+    ws_str = request.args.get("week_start")
+    if ws_str:
+        try:
+            week_start = datetime.date.fromisoformat(ws_str)
+        except Exception:
+            return jsonify({"error": "Invalid week_start (YYYY-MM-DD)"}), 400
+    else:
+        week_start = today - datetime.timedelta(days=today.weekday())
+    week_end = week_start + datetime.timedelta(days=6)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT logged_date, COALESCE(SUM(calories),0) AS calories, "
+            "COALESCE(SUM(protein_g),0) AS protein_g, "
+            "COALESCE(SUM(carbs_g),0) AS carbs_g, "
+            "COALESCE(SUM(fat_g),0) AS fat_g, COUNT(*) AS meal_count "
+            "FROM meal_logs WHERE user_id=%s "
+            "AND logged_date BETWEEN %s AND %s AND deleted_at IS NULL "
+            "GROUP BY logged_date ORDER BY logged_date",
+            (request.user_id, week_start.isoformat(), week_end.isoformat())
+        )
+        daily_rows = cursor.fetchall()
+        exercise_by_day = {}
+        try:
+            cursor.execute(
+                "SELECT logged_date, COALESCE(SUM(calories_burned),0) AS calories_burned, "
+                "COALESCE(SUM(duration_minutes),0) AS total_minutes "
+                "FROM exercise_logs WHERE user_id=%s AND logged_date BETWEEN %s AND %s "
+                "GROUP BY logged_date",
+                (request.user_id, week_start.isoformat(), week_end.isoformat())
+            )
+            for r in cursor.fetchall():
+                exercise_by_day[str(r["logged_date"])] = r
+        except Exception:
+            pass
+        profile = _get_profile(cursor, request.user_id)
+        target_calories = 2000
+        targets_data = {"calories": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65}
+        if profile.get("current_weight_kg") and profile.get("height_cm"):
+            try:
+                t = calculate_nutrition_targets(
+                    weight_kg=float(profile["current_weight_kg"]),
+                    height_cm=float(profile["height_cm"]),
+                    age=profile.get("age", 25),
+                    gender=profile.get("gender", "male"),
+                    activity_level=profile.get("activity_level", "moderate"),
+                    goal=profile.get("primary_goal", "maintain"),
+                )
+                target_calories = t.daily_calories
+                targets_data = {"calories": t.daily_calories, "protein_g": t.protein_g,
+                                "carbs_g": t.carbs_g, "fat_g": t.fat_g}
+            except Exception:
+                pass
+        daily_data = []
+        for i in range(7):
+            day = week_start + datetime.timedelta(days=i)
+            day_str = day.isoformat()
+            m = next((r for r in daily_rows if str(r["logged_date"]) == day_str), None)
+            ex = exercise_by_day.get(day_str, {})
+            daily_data.append({
+                "date": day_str, "day_name": day.strftime("%A"),
+                "calories": round(float(m["calories"]), 1) if m else 0,
+                "protein_g": round(float(m["protein_g"]), 1) if m else 0,
+                "carbs_g": round(float(m["carbs_g"]), 1) if m else 0,
+                "fat_g": round(float(m["fat_g"]), 1) if m else 0,
+                "meal_count": m["meal_count"] if m else 0,
+                "calories_burned": float(ex.get("calories_burned", 0)),
+                "exercise_minutes": int(ex.get("total_minutes", 0)),
+            })
+        logged = [d for d in daily_data if d["meal_count"] > 0]
+        avg_cal = round(sum(d["calories"] for d in logged) / len(logged), 1) if logged else 0
+        avg_prot = round(sum(d["protein_g"] for d in logged) / len(logged), 1) if logged else 0
+        avg_carb = round(sum(d["carbs_g"] for d in logged) / len(logged), 1) if logged else 0
+        avg_fat = round(sum(d["fat_g"] for d in logged) / len(logged), 1) if logged else 0
+        adherence = round(avg_cal / target_calories * 100, 1) if target_calories else 0
+        try:
+            cursor.execute(
+                "INSERT INTO weekly_reports "
+                "(user_id,week_start,week_end,avg_calories,avg_protein_g,"
+                "avg_carbs_g,avg_fat_g,total_meals,target_calories,adherence_pct) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON DUPLICATE KEY UPDATE avg_calories=VALUES(avg_calories),"
+                "avg_protein_g=VALUES(avg_protein_g),avg_carbs_g=VALUES(avg_carbs_g),"
+                "avg_fat_g=VALUES(avg_fat_g),total_meals=VALUES(total_meals),"
+                "adherence_pct=VALUES(adherence_pct)",
+                (request.user_id, week_start.isoformat(), week_end.isoformat(),
+                 avg_cal, avg_prot, avg_carb, avg_fat,
+                 sum(d["meal_count"] for d in daily_data), target_calories, adherence)
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        return jsonify({
+            "week_start": week_start.isoformat(), "week_end": week_end.isoformat(),
+            "daily_data": daily_data,
+            "summary": {"avg_calories": avg_cal, "avg_protein_g": avg_prot,
+                        "avg_carbs_g": avg_carb, "avg_fat_g": avg_fat,
+                        "target_calories": target_calories, "adherence_pct": adherence,
+                        "days_logged": len(logged),
+                        "total_meals": sum(d["meal_count"] for d in daily_data)},
+            "targets": targets_data,
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/plan/weekly", methods=["GET"])
+@role_required("trainee")
+def weekly_meal_plan():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        profile = _get_profile(cursor, request.user_id)
+        if not profile:
+            return jsonify({"error": "Complete your profile first"}), 400
+        result = generate_weekly_plan(
+            weight_kg=float(profile.get("current_weight_kg") or 70),
+            height_cm=float(profile.get("height_cm") or 170),
+            age=profile.get("age", 25),
+            gender=profile.get("gender", "male"),
+            activity_level=profile.get("activity_level", "moderate"),
+            goal=profile.get("primary_goal", "maintain"),
+            meals_per_day=int(profile.get("meals_per_day") or 3),
+            dietary=profile.get("dietary", {}),
+            preferred_cuisines=profile.get("cuisine_preferences") or ["nepali"],
+        )
+        return jsonify(result)
+    finally:
+        cursor.close()
+        conn.close()

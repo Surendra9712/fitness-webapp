@@ -4,6 +4,17 @@ from database.connection import get_connection
 public_bp = Blueprint('public', __name__)
 
 
+def _compute_discounted_price(price, discount_type, discount_value):
+    """Return effective price after applying product-level discount, or None if no discount."""
+    if not discount_type or not discount_value or float(discount_value) <= 0:
+        return None
+    price = float(price)
+    dv = float(discount_value)
+    if discount_type == 'percentage':
+        return round(price * (1 - dv / 100), 2)
+    return round(max(0.0, price - dv), 2)
+
+
 @public_bp.route('/categories', methods=['GET'])
 def list_categories():
     conn = get_connection()
@@ -47,13 +58,19 @@ def list_products():
         total = cursor.fetchone()['total']
         cursor.execute(
             f"SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
-            f"c.slug AS category, c.name AS category_name, p.image_url "
+            f"c.slug AS category, c.name AS category_name, p.image_url, "
+            f"p.discount_type, p.discount_value "
             f"FROM products p JOIN categories c ON p.category_id = c.id "
             f"WHERE {where} ORDER BY p.created_at DESC LIMIT %s OFFSET %s",
             params + [page_size, offset],
         )
+        rows = cursor.fetchall()
+        for row in rows:
+            row['discounted_price'] = _compute_discounted_price(
+                row['price'], row.get('discount_type'), row.get('discount_value')
+            )
         return jsonify({
-            'items': cursor.fetchall(),
+            'items': rows,
             'total': total,
             'page': page,
             'page_size': page_size,
@@ -71,7 +88,8 @@ def get_product(product_id):
     try:
         cursor.execute(
             "SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
-            "c.slug AS category, c.name AS category_name, p.image_url "
+            "c.slug AS category, c.name AS category_name, p.image_url, "
+            "p.discount_type, p.discount_value "
             "FROM products p JOIN categories c ON p.category_id = c.id "
             "WHERE p.id = %s AND p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL",
             (product_id,),
@@ -79,7 +97,30 @@ def get_product(product_id):
         product = cursor.fetchone()
         if not product:
             return jsonify({'error': 'Product not found'}), 404
+        product['discounted_price'] = _compute_discounted_price(
+            product['price'], product.get('discount_type'), product.get('discount_value')
+        )
         return jsonify(product)
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@public_bp.route('/global-discount', methods=['GET'])
+def get_global_discount():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT `key`, value FROM site_settings "
+            "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active')"
+        )
+        s = {row['key']: row['value'] for row in cursor.fetchall()}
+        return jsonify({
+            'discount_type':  s.get('global_discount_type', 'percentage'),
+            'discount_value': float(s.get('global_discount_value', '0') or '0'),
+            'is_active':      s.get('global_discount_active', '0') == '1',
+        })
     finally:
         cursor.close()
         conn.close()

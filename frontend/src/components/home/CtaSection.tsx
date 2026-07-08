@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Leaf, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath } from "@/lib/roles";
+import { getDashboardPath } from "@/lib/constant";
 import { Button } from "@/components/ui/button";
 import { fadeUp, VP } from "./animations";
 

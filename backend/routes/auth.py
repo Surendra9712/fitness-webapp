@@ -76,16 +76,17 @@ def register():
             return jsonify({'errors': {'email': 'Email already registered'}}), 422
 
         cursor.execute(
-            "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s, %s, %s, %s, 'pending')",
+            "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s, %s, %s, %s, 'active')",
             (name, email, password_hash, role),
         )
         user_id = cursor.lastrowid
         cursor.execute("INSERT INTO user_profiles (user_id) VALUES (%s)", (user_id,))
         conn.commit()
 
+        token = generate_token(user_id, role)
         return jsonify({
-            'pending': True,
-            'message': 'Registration successful. Your account is awaiting admin approval.',
+            'token': token,
+            'user': {'id': user_id, 'name': name, 'email': email, 'role': role},
         }), 201
     except Exception as e:
         conn.rollback()
@@ -116,8 +117,6 @@ def login():
         if not user or not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
             return jsonify({'error': 'Invalid email or password'}), 401
         if user['status'] != 'active':
-            if user['status'] == 'pending':
-                return jsonify({'error': 'Your account is pending admin approval'}), 403
             return jsonify({'error': 'Account is disabled'}), 403
 
         token = generate_token(user['id'], user['role'])
@@ -182,6 +181,7 @@ def me():
     try:
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.profile_image_url, "
+            "u.subscription_plan, u.subscription_status, "
             "p.full_name, p.date_of_birth, p.gender, p.phone_number, p.city, p.country, "
             "p.occupation, p.height_cm, p.current_weight_kg, p.activity_level, "
             "p.primary_goal, p.fitness_level, p.target_water_ml, "
@@ -191,7 +191,8 @@ def me():
             "p.snacks_between_meals, p.cooking_frequency, p.eating_out_frequency, "
             "p.track_hydration, p.avg_sleep_hours, p.emotional_eater, p.stress_level, "
             "p.health_conditions, p.notes, "
-            "p.age, p.weight_kg, p.goal "
+            "p.age, p.weight_kg, p.goal, "
+            "p.bio, p.specialization, p.experience_years, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s",
             (request.user_id,),

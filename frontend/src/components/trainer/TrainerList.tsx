@@ -32,29 +32,9 @@ interface Props {
 export function TrainerList({ trainers, onRequest }: Props) {
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [page, setPage] = useState(1);
-
-  const filtered = useMemo(() => {
-    if (!appliedSearch) return trainers;
-    const q = appliedSearch.toLowerCase();
-    return trainers.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q),
-    );
-  }, [trainers, appliedSearch]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const slice = filtered.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
-  );
-  const from = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const to = Math.min(safePage * PAGE_SIZE, filtered.length);
 
   function applySearch() {
     setAppliedSearch(searchInput);
-    setPage(1);
   }
 
   return (
@@ -96,12 +76,12 @@ export function TrainerList({ trainers, onRequest }: Props) {
 
       {/* ── Rows ── */}
       <div className="divide-y">
-        {slice.length === 0 ? (
+        {trainers.length === 0 ? (
           <div className="py-14 text-center text-sm text-muted-foreground">
             No trainers found{appliedSearch ? ` for "${appliedSearch}"` : ""}.
           </div>
         ) : (
-          slice.map((t) => {
+          trainers.map((t) => {
             const available = !t.customer_count || t.customer_count === 0;
             return (
               <div

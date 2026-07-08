@@ -16,6 +16,8 @@ import type {
   Order,
   TrainerAssignment,
   ProductRequest,
+  PromoCode,
+  GlobalDiscount,
   PaginatedResponse,
   CreateUserPayload,
   UpdateUserPayload,
@@ -101,6 +103,18 @@ interface UseAdminReturn {
     Error,
     AssignmentActionPayload
   >;
+  VerifyTrainer: () => UseMutationResult<{ is_verified: boolean }, Error, number>;
+  GetSubscriptions: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<User>>;
+  ApproveSubscription: () => UseMutationResult<void, Error, number>;
+  RejectSubscription: () => UseMutationResult<void, Error, { id: number; admin_note: string }>;
+  GetPromoCodes: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<PromoCode>>;
+  CreatePromoCode: () => UseMutationResult<PromoCode, Error, Omit<PromoCode, 'id' | 'current_uses' | 'created_at'>>;
+  UpdatePromoCode: () => UseMutationResult<PromoCode, Error, Partial<PromoCode> & { id: number }>;
+  DeletePromoCode: () => UseMutationResult<void, Error, number>;
+  GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
+  UpdateGlobalDiscount: () => UseMutationResult<GlobalDiscount, Error, GlobalDiscount>;
+  SetProductDiscount: () => UseMutationResult<void, Error, { id: number; discount_type: string; discount_value: number; valid_from?: string | null; valid_to?: string | null }>;
+  ClearProductDiscount: () => UseMutationResult<void, Error, number>;
 }
 
 const useAdmin = (): UseAdminReturn => {
@@ -246,6 +260,67 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
+  const VerifyTrainer = () =>
+    useMutation({
+      mutationFn: async (uid: number) => {
+        const { data } = await api.put(`${endpoint.adminUsers}/${uid}/verify`);
+        return data as { is_verified: boolean };
+      },
+    });
+
+  const { get: GetSubscriptions } = useApi({
+    endpoint: endpoint.adminSubscriptions,
+    queryKey: "adminSubscriptions",
+  });
+
+  const ApproveSubscription = () =>
+    useMutation({
+      mutationFn: async (uid: number) => {
+        await api.put(`${endpoint.adminSubscriptions}/${uid}/approve`);
+      },
+    });
+
+  const RejectSubscription = () =>
+    useMutation({
+      mutationFn: async ({ id, admin_note }: { id: number; admin_note: string }) => {
+        await api.put(`${endpoint.adminSubscriptions}/${id}/reject`, { admin_note });
+      },
+    });
+
+  const {
+    get: GetPromoCodes,
+    post: CreatePromoCode,
+    update: UpdatePromoCode,
+    delete: DeletePromoCode,
+  } = useApi({ endpoint: endpoint.adminPromoCodes, queryKey: "adminPromoCodes" });
+
+  const { get: GetGlobalDiscount } = useApi({
+    endpoint: endpoint.adminGlobalDiscount,
+    queryKey: "adminGlobalDiscount",
+  });
+
+  const UpdateGlobalDiscount = () =>
+    useMutation({
+      mutationFn: async (body: GlobalDiscount) => {
+        const { data } = await api.put(endpoint.adminGlobalDiscount, body);
+        return data as GlobalDiscount;
+      },
+    });
+
+  const SetProductDiscount = () =>
+    useMutation({
+      mutationFn: async ({ id, ...body }: { id: number; discount_type: string; discount_value: number; valid_from?: string | null; valid_to?: string | null }) => {
+        await api.put(`${endpoint.adminProducts}/${id}/discount`, body);
+      },
+    });
+
+  const ClearProductDiscount = () =>
+    useMutation({
+      mutationFn: async (id: number) => {
+        await api.delete(`${endpoint.adminProducts}/${id}/discount`);
+      },
+    });
+
   return {
     GetStats,
     GetStatsTrends,
@@ -275,6 +350,18 @@ const useAdmin = (): UseAdminReturn => {
     GetProductRequests,
     ApproveProductRequest,
     RejectProductRequest,
+    VerifyTrainer,
+    GetSubscriptions,
+    ApproveSubscription,
+    RejectSubscription,
+    GetPromoCodes,
+    CreatePromoCode,
+    UpdatePromoCode,
+    DeletePromoCode,
+    GetGlobalDiscount,
+    UpdateGlobalDiscount,
+    SetProductDiscount,
+    ClearProductDiscount,
   } as UseAdminReturn;
 };
 
