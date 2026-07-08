@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getDashboardPath, getProfilePath } from "@/lib/constant";
+import { useChatStore } from "@/store/chatStore";
 import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
@@ -83,11 +84,6 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Orders",
       icon: <ShoppingBag className="h-4 w-4" />,
     },
-    // {
-    //   to: "/admin/exercises",
-    //   label: "Exercises",
-    //   icon: <Dumbbell className="h-4 w-4" />,
-    // },
     {
       to: "/admin/trainer-assignments",
       label: "Trainer Assign.",
@@ -187,11 +183,7 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Request",
       icon: <Bell className="h-4 w-4" />,
     },
-    // {
-    //   to: "/customer/log-exercise",
-    //   label: "Exercise",
-    //   icon: <Dumbbell className="h-4 w-4" />,
-    // },
+
     {
       to: "/customer/subscription",
       label: "Subscription",
@@ -229,11 +221,24 @@ export default function Sidebar() {
   const { data: unreadData } = GetUnreadCount();
   const unreadCount = unreadData?.count ?? 0;
 
+  const isChatRole = user?.role === "trainee" || user?.role === "dietitian";
   const { GetChatUnreadCount } = useChat();
-  const { data: chatUnreadData } = GetChatUnreadCount(
-    user?.role === "trainee" || user?.role === "dietitian",
-  );
+  const { data: chatUnreadData } = GetChatUnreadCount(isChatRole);
   const chatUnreadCount = chatUnreadData?.count ?? 0;
+
+  const connect = useChatStore((s) => s.connect);
+  const disconnect = useChatStore((s) => s.disconnect);
+
+  // Connect once for the whole authenticated session (Sidebar persists across
+  // page navigation and only unmounts on logout) rather than per-page, so
+  // real-time chat delivery and incoming calls work app-wide, not just while
+  // the Chat page happens to be open.
+  useEffect(() => {
+    if (!isChatRole) return;
+    connect();
+    return () => disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isChatRole]);
 
   if (!user) return null;
 
@@ -244,18 +249,23 @@ export default function Sidebar() {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Brand */}
-      <div className="flex h-14 items-center gap-2.5 px-4">
+      <div className="flex items-center gap-2.5 px-4">
         <NavLink
           to="/"
           className="flex items-center gap-2 text-white"
           onClick={() => setOpen(false)}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
+          <img
+            src={import.meta.env.VITE_APP_LOGO}
+            alt={import.meta.env.VITE_APP_NAME}
+            className="h-14 w-auto"
+          />
+          {/* <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
             <Leaf className="h-4 w-4 text-emerald-400" />
-          </div>
-          <span className="text-base font-bold tracking-tight">
-            SmartDiet Pro
-          </span>
+          </div> */}
+          {/* <span className="text-base font-bold tracking-tight">
+            {import.meta.env.VITE_APP_NAME} Pro
+          </span> */}
         </NavLink>
       </div>
 

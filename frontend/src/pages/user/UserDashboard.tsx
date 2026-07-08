@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Zap, Clock, ShoppingBag, Bell } from "lucide-react";
+import { ShoppingBag, Bell } from "lucide-react";
 import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -54,18 +54,6 @@ export default function UserDashboard() {
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            {
-              label: "Calories Burned",
-              value: stats.calories_out,
-              icon: <Zap className="h-4 w-4 text-yellow-500" />,
-              sub: "kcal today",
-            },
-            {
-              label: "Exercise This Week",
-              value: `${stats.exercise_mins_this_week}m`,
-              icon: <Clock className="h-4 w-4 text-emerald-500" />,
-              sub: "minutes active",
-            },
             {
               label: "My Orders",
               value: stats.orders_count,

@@ -4,6 +4,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
 import { getDashboardPath } from "@/lib/constant";
 import { Toaster } from "@/components/ui/sonner";
+import IncomingCallDialog from "@/components/call/IncomingCallDialog";
+import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 
 import Home from "@/pages/Home";
 import PublicBecomeTrainer from "@/pages/PublicBecomeTrainer";
@@ -14,7 +16,6 @@ import PaymentReturn from "@/pages/product/PaymentReturn";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UserManagement from "@/pages/admin/user/UserManagement";
 import UserDetail from "@/pages/admin/user/UserDetail";
-import ExerciseLibrary from "@/pages/admin/exercise/ExerciseLibrary";
 import ProductManagement from "@/pages/admin/product/ProductManagement";
 import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
@@ -34,7 +35,6 @@ import TrainerChat from "@/pages/dietitian/TrainerChat";
 import UserDashboard from "@/pages/user/UserDashboard";
 import MyOrders from "@/pages/user/MyOrders";
 import RequestProduct from "@/pages/user/RequestProduct";
-import LogExercise from "@/pages/user/LogExercise";
 import Profile from "@/pages/user/Profile";
 import BecomeTrainer from "@/pages/user/BecomeTrainer";
 import MyTrainer from "@/pages/user/trainer/MyTrainer";
@@ -60,6 +60,8 @@ function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <IncomingCallDialog />
+      <ActiveCallOverlay />
     </div>
   );
 }

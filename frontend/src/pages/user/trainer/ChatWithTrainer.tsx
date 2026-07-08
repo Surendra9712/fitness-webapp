@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Phone, Video } from "lucide-react";
 import useChat from "@/hooks/useChat";
 import { useChatThread } from "@/hooks/useChatThread";
-import { useChatStore } from "@/store/chatStore";
+import { useCallStore } from "@/store/callStore";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ChatMessages from "@/components/chat/ChatMessages";
 import ChatComposer from "@/components/chat/ChatComposer";
@@ -18,8 +19,8 @@ export default function ChatWithTrainer() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
 
-  const connect = useChatStore((s) => s.connect);
-  const disconnect = useChatStore((s) => s.disconnect);
+  const callStatus = useCallStore((s) => s.status);
+  const startCall = useCallStore((s) => s.startCall);
 
   const {
     messages,
@@ -36,12 +37,6 @@ export default function ChatWithTrainer() {
     uploading,
     sendAttachment,
   } = useChatThread(activeId);
-
-  useEffect(() => {
-    connect();
-    return () => disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!threads || threads.length === 0) return;
@@ -135,6 +130,42 @@ export default function ChatWithTrainer() {
                   <p className="text-xs text-muted-foreground">
                     {activeThread.peer_email}
                   </p>
+                </div>
+                <div className="ml-auto flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={callStatus !== "idle"}
+                    aria-label="Start audio call"
+                    onClick={() =>
+                      startCall(
+                        activeThread.assignment_id,
+                        activeThread.peer_id,
+                        activeThread.peer_name,
+                        activeThread.peer_image_url,
+                        "audio",
+                      )
+                    }
+                  >
+                    <Phone className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={callStatus !== "idle"}
+                    aria-label="Start video call"
+                    onClick={() =>
+                      startCall(
+                        activeThread.assignment_id,
+                        activeThread.peer_id,
+                        activeThread.peer_name,
+                        activeThread.peer_image_url,
+                        "video",
+                      )
+                    }
+                  >
+                    <Video className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
 

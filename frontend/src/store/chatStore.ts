@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { queryClient } from "@/lib/queryClient";
+import { useCallStore } from "@/store/callStore";
 import type { ChatAttachmentType, ChatMessage } from "@/types";
 
 export interface ChatAttachment {
@@ -20,7 +21,11 @@ interface ChatState {
   connect: () => void;
   disconnect: () => void;
   joinThread: (assignmentId: number) => void;
-  sendMessage: (assignmentId: number, content: string, attachment?: ChatAttachment) => void;
+  sendMessage: (
+    assignmentId: number,
+    content: string,
+    attachment?: ChatAttachment,
+  ) => void;
   mergeMessages: (assignmentId: number, incoming: ChatMessage[]) => void;
   prependMessages: (assignmentId: number, olderMessages: ChatMessage[]) => void;
   appendMessage: (message: ChatMessage) => void;
@@ -48,12 +53,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         queryClient.invalidateQueries({ queryKey: ["chatThreads"] });
         queryClient.invalidateQueries({ queryKey: ["chatUnreadCount"] });
       });
-      socket.on("message_deleted", ({ id, assignment_id }: { id: number; assignment_id: number }) => {
-        get().removeMessage(assignment_id, id);
-        queryClient.invalidateQueries({ queryKey: ["chatThreads"] });
-      });
+      socket.on(
+        "message_deleted",
+        ({ id, assignment_id }: { id: number; assignment_id: number }) => {
+          get().removeMessage(assignment_id, id);
+          queryClient.invalidateQueries({ queryKey: ["chatThreads"] });
+        },
+      );
       listenersBound = true;
     }
+    useCallStore.getState().bindListeners();
   },
 
   disconnect: () => {
@@ -90,7 +99,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       for (const m of incoming) byId.set(m.id, m);
       const merged = Array.from(byId.values()).sort((a, b) => a.id - b.id);
       return {
-        messagesByAssignment: { ...state.messagesByAssignment, [assignmentId]: merged },
+        messagesByAssignment: {
+          ...state.messagesByAssignment,
+          [assignmentId]: merged,
+        },
       };
     }),
 

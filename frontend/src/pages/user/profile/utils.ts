@@ -1,4 +1,9 @@
-export type Macros = { calories: number; protein: number; carbs: number; fat: number };
+export type Macros = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
 
 export const togArr = (arr: string[], val: string) =>
   arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];

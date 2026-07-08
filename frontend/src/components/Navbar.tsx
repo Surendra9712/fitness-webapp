@@ -22,10 +22,11 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <Leaf className="h-5 w-5 text-emerald-600" />
-            <span className="text-lg font-bold tracking-tight text-emerald-900">
-              FitStore
-            </span>
+            <img
+              src={import.meta.env.VITE_APP_LOGO_LIGHT}
+              alt={import.meta.env.VITE_APP_NAME}
+              className="h-14 w-auto"
+            />
           </Link>
 
           <div className="flex items-center gap-2">

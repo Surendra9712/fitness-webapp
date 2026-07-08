@@ -15,6 +15,7 @@ from routes.upload import upload_bp
 from routes.notifications import notifications_bp
 from routes.chat import chat_bp
 import sockets.chat_events  # noqa: F401 - registers socketio event handlers
+import sockets.call_events  # noqa: F401 - registers socketio event handlers
 
 load_dotenv()
 

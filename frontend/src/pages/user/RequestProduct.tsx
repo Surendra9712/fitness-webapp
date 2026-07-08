@@ -39,14 +39,12 @@ const statusIcon: Record<RequestStatus, React.ReactNode> = {
   rejected: <XCircle className="h-4 w-4 text-destructive" />,
 };
 
-const statusVariant: Record<
-  RequestStatus,
-  "info" | "success" | "destructive"
-> = {
-  pending: "info",
-  approved: "success",
-  rejected: "destructive",
-};
+const statusVariant: Record<RequestStatus, "info" | "success" | "destructive"> =
+  {
+    pending: "info",
+    approved: "success",
+    rejected: "destructive",
+  };
 
 async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
@@ -98,9 +96,7 @@ export default function RequestProduct() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Request a Product
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">Request a Product</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Can't find what you're looking for? Submit a request and our admin
           will review it.
@@ -113,10 +109,7 @@ export default function RequestProduct() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-5"
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               {/* Product name */}
               <FormField
                 control={form.control}

@@ -300,6 +300,8 @@ export interface DietitianProfile {
 export interface DietitianStats {
   client_count: number;
   pending_assignments: number;
+  pending_requests: number;
+  customers: number;
 }
 
 // ─── Mutation payloads ───────────────────────────────────────────────
@@ -462,6 +464,18 @@ export interface ChatThread {
   last_message?: string | null;
   last_message_at?: string | null;
   unread_count: number;
+}
+
+export type CallType = "audio" | "video";
+export type CallStatus = "idle" | "outgoing" | "incoming" | "connected";
+
+export interface IncomingCallInfo {
+  assignment_id: number;
+  from_user_id: number;
+  from_name: string;
+  from_image?: string | null;
+  call_type: CallType;
+  sdp: RTCSessionDescriptionInit;
 }
 
 export interface BecomeTrainerPayload {

@@ -20,8 +20,6 @@ from utils.notify import push, push_to_admins
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
 ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
 ESEWA_URL          = os.getenv('ESEWA_URL', 'https://rc-epay.esewa.com.np/api/epay/main/v2/form')
-KHALTI_SECRET      = os.getenv('KHALTI_SECRET_KEY', 'test_secret_key_dc74e0fd57cb46cd93832aee0a390234')
-KHALTI_INITIATE_URL = os.getenv('KHALTI_INITIATE_URL', 'https://a.khalti.com/api/v2/epayment/initiate/')
 FRONTEND_URL       = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 user_bp = Blueprint('user', __name__)
@@ -31,14 +29,6 @@ user_bp = Blueprint('user', __name__)
 
 class BecomeTrainerSchema(UpdateTrainerProfileSchema):
     certifications: List[CertificationSchema] = Field(default_factory=list)
-
-
-class LogExerciseSchema(BaseModel):
-    exercise_id: int
-    logged_date: str = Field(min_length=1)
-    duration_minutes: int = Field(gt=0)
-    notes: Optional[str] = None
-
 
 class OrderItemSchema(BaseModel):
     product_id: int
@@ -90,143 +80,6 @@ class UpdateProfileSchema(BaseModel):
     gender: Optional[str] = None
     goal: Optional[str] = None
     activity_level: Optional[str] = None
-
-
-# ── Exercise Logs ─────────────────────────────────────────────────────────────
-
-@user_bp.route('/exercise-logs', methods=['GET'])
-@role_required('trainee')
-def get_exercise_logs():
-    date = request.args.get('date')
-    page, page_size, offset = parse_page_params(default_size=10, max_size=50)
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        if date:
-            cursor.execute(
-                "SELECT COUNT(*) AS total FROM exercise_logs el "
-                "WHERE el.user_id = %s AND el.logged_date = %s AND el.deleted_at IS NULL",
-                (request.user_id, date)
-            )
-            total = cursor.fetchone()['total']
-            cursor.execute(
-                "SELECT el.*, e.name AS exercise_name, e.category, e.calories_burned_per_hour "
-                "FROM exercise_logs el JOIN exercises e ON el.exercise_id = e.id "
-                "WHERE el.user_id = %s AND el.logged_date = %s AND el.deleted_at IS NULL "
-                "ORDER BY el.logged_at LIMIT %s OFFSET %s",
-                (request.user_id, date, page_size, offset),
-            )
-        else:
-            cursor.execute(
-                "SELECT COUNT(*) AS total FROM exercise_logs el "
-                "WHERE el.user_id = %s AND el.deleted_at IS NULL",
-                (request.user_id,)
-            )
-            total = cursor.fetchone()['total']
-            cursor.execute(
-                "SELECT el.*, e.name AS exercise_name, e.category, e.calories_burned_per_hour "
-                "FROM exercise_logs el JOIN exercises e ON el.exercise_id = e.id "
-                "WHERE el.user_id = %s AND el.deleted_at IS NULL "
-                "ORDER BY el.logged_date DESC LIMIT %s OFFSET %s",
-                (request.user_id, page_size, offset),
-            )
-        return paginated_response(cursor.fetchall(), total, page, page_size)
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@user_bp.route('/exercise-logs', methods=['POST'])
-@role_required('trainee')
-def log_exercise():
-    try:
-        body = LogExerciseSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute(
-            "SELECT calories_burned_per_hour FROM exercises WHERE id = %s AND deleted_at IS NULL",
-            (body.exercise_id,),
-        )
-        ex = cursor.fetchone()
-        if not ex:
-            return jsonify({'error': 'Exercise not found'}), 404
-
-        calories_burned = int(ex['calories_burned_per_hour'] * body.duration_minutes / 60)
-
-        cursor.execute(
-            "INSERT INTO exercise_logs (user_id, exercise_id, logged_date, duration_minutes, calories_burned, notes) "
-            "VALUES (%s,%s,%s,%s,%s,%s)",
-            (request.user_id, body.exercise_id, body.logged_date,
-             body.duration_minutes, calories_burned, body.notes),
-        )
-        conn.commit()
-        return jsonify({'id': cursor.lastrowid, 'calories_burned': calories_burned, 'message': 'Exercise logged'}), 201
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@user_bp.route('/exercise-logs/<int:log_id>', methods=['DELETE'])
-@role_required('trainee')
-def delete_exercise_log(log_id):
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "UPDATE exercise_logs SET deleted_at = NOW() WHERE id = %s AND user_id = %s",
-            (log_id, request.user_id),
-        )
-        conn.commit()
-        return jsonify({'message': 'Log deleted'})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-# ── Available Exercises ────────────────────────────────────────────────────────
-
-@user_bp.route('/exercises', methods=['GET'])
-@role_required('trainee')
-def available_exercises():
-    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
-    search = request.args.get('search', '').strip()
-    category = request.args.get('category', '').strip()
-
-    conditions = ["deleted_at IS NULL"]
-    params: list = []
-    if search:
-        conditions.append("name LIKE %s")
-        params.append(f"%{search}%")
-    if category:
-        conditions.append("category = %s")
-        params.append(category)
-
-    where = " AND ".join(conditions)
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute(f"SELECT COUNT(*) AS cnt FROM exercises WHERE {where}", params)
-        total = cursor.fetchone()['cnt']
-        cursor.execute(
-            f"SELECT id, name, category, calories_burned_per_hour FROM exercises "
-            f"WHERE {where} ORDER BY category, name LIMIT %s OFFSET %s",
-            params + [page_size, offset],
-        )
-        return paginated_response(cursor.fetchall(), total, page, page_size)
-    finally:
-        cursor.close()
-        conn.close()
-
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -309,23 +162,6 @@ def dashboard():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        if not today:
-            today = datetime.date.today().isoformat()
-
-        cursor.execute(
-            "SELECT COALESCE(SUM(calories_burned),0) AS calories_out "
-            "FROM exercise_logs WHERE user_id = %s AND logged_date = %s",
-            (request.user_id, today),
-        )
-        calories_out = cursor.fetchone()['calories_out']
-
-        cursor.execute(
-            "SELECT COALESCE(SUM(duration_minutes),0) AS exercise_mins "
-            "FROM exercise_logs WHERE user_id = %s AND logged_date >= DATE_SUB(%s, INTERVAL 6 DAY)",
-            (request.user_id, today),
-        )
-        exercise_mins = cursor.fetchone()['exercise_mins']
-
         cursor.execute(
             "SELECT COUNT(*) AS orders_count FROM orders WHERE user_id = %s",
             (request.user_id,),
@@ -348,8 +184,6 @@ def dashboard():
 
         return jsonify({
             'date': today,
-            'calories_out': int(calories_out),
-            'exercise_mins_this_week': int(exercise_mins),
             'orders_count': int(orders_count),
             'pending_requests': int(pending_requests),
             'metrics': metrics,
@@ -584,41 +418,6 @@ def place_order():
                 'esewa_url': ESEWA_URL,
                 'esewa_params': esewa_params,
             }), 201
-
-        # ── Khalti ───────────────────────────────────────────────────────────
-        if body.payment_method == 'khalti':
-            cursor.execute("SELECT name, email FROM users WHERE id = %s", (request.user_id,))
-            user = cursor.fetchone() or {}
-
-            headers = {'Authorization': f'Key {KHALTI_SECRET}'}
-            payload = {
-                'return_url': f"{FRONTEND_URL}/payment/khalti/return",
-                'website_url': FRONTEND_URL,
-                'amount': int(final_total * 100),
-                'purchase_order_id': transaction_uuid,
-                'purchase_order_name': f"SmartDiet Order #{order_id}",
-                'customer_info': {
-                    'name': user.get('name', ''),
-                    'email': user.get('email', ''),
-                },
-            }
-            try:
-                resp = http_req.post(KHALTI_INITIATE_URL, json=payload, headers=headers, timeout=10)
-                resp.raise_for_status()
-            except http_req.RequestException as e:
-                cursor.execute("DELETE FROM order_items WHERE order_id = %s", (order_id,))
-                cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
-                conn.commit()
-                return jsonify({'error': f'Khalti initiation failed: {str(e)}'}), 502
-
-            khalti_data = resp.json()
-            return jsonify({
-                'id': order_id,
-                'payment_method': 'khalti',
-                'payment_url': khalti_data.get('payment_url'),
-                'pidx': khalti_data.get('pidx'),
-            }), 201
-
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

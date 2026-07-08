@@ -19,14 +19,35 @@ export const profileSchema = z.object({
   country: z.string(),
   height_cm: positiveStr("Height is required"),
   current_weight_kg: positiveStr("Weight is required"),
-  activity_level: z.enum(["sedentary", "light", "moderate", "active", "very_active"]),
+  activity_level: z.enum([
+    "sedentary",
+    "light",
+    "moderate",
+    "active",
+    "very_active",
+  ]),
   occupation: z.string(),
   // Step 2
-  primary_goal: z.enum(["lose_weight", "gain_muscle", "maintain", "improve_health", "athletic_performance"]),
+  primary_goal: z.enum([
+    "lose_weight",
+    "gain_muscle",
+    "maintain",
+    "improve_health",
+    "athletic_performance",
+  ]),
   fitness_level: z.enum(["beginner", "intermediate", "advanced"]),
   target_water_ml: z.number().min(500).max(6000),
   // Step 3
-  diet_type: z.enum(["none", "vegetarian", "vegan", "keto", "paleo", "diabetic", "low_carb", "intermittent_fasting"]),
+  diet_type: z.enum([
+    "none",
+    "vegetarian",
+    "vegan",
+    "keto",
+    "paleo",
+    "diabetic",
+    "low_carb",
+    "intermittent_fasting",
+  ]),
   dietary_restrictions: z.array(z.string()),
   other_restrictions: z.string(),
   allergens: z.array(z.string()),
@@ -35,10 +56,14 @@ export const profileSchema = z.object({
   breakfast_time: z.string(),
   lunch_time: z.string(),
   dinner_time: z.string(),
-  avg_sleep_hours: z.string().refine(
-    (v) => v === "" || (!isNaN(parseFloat(v)) && parseFloat(v) >= 3 && parseFloat(v) <= 12),
-    "Must be 3–12",
-  ),
+  avg_sleep_hours: z
+    .string()
+    .refine(
+      (v) =>
+        v === "" ||
+        (!isNaN(parseFloat(v)) && parseFloat(v) >= 3 && parseFloat(v) <= 12),
+      "Must be 3–12",
+    ),
   meals_per_day: z.number().int().min(1).max(8),
   snacks_between_meals: z.boolean(),
   cooking_frequency: z.enum(["daily", "few_times_week", "weekly", "rarely"]),

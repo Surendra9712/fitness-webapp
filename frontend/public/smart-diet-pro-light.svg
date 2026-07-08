@@ -1,0 +1,35 @@
+<svg viewBox="0 0 300 64" xmlns="http://www.w3.org/2000/svg" font-family="'Poppins','Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="sparkGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2A93B"/>
+      <stop offset="100%" stop-color="#F7C873"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: macro-balance ring, original palette for a white surface -->
+  <g transform="translate(4,2) scale(0.45)">
+    <circle cx="60" cy="60" r="42" fill="none" stroke="#E7EEEC" stroke-width="14"/>
+
+    <path d="M 54.15 18.41 A 42 42 0 0 1 76.00 98.83"
+          fill="none" stroke="#0F5257" stroke-width="14" stroke-linecap="round"/>
+
+    <path d="M 72.56 100.08 A 42 42 0 0 1 18.10 62.86"
+          fill="none" stroke="#54B399" stroke-width="14" stroke-linecap="round"/>
+
+    <path d="M 18.01 59.19 A 42 42 0 0 1 50.55 19.08"
+          fill="none" stroke="#F2A93B" stroke-width="14" stroke-linecap="round"/>
+
+    <circle cx="50.5" cy="19" r="8" fill="url(#sparkGradLight)"/>
+    <path d="M 50.5 13.8 L 52.3 18.2 L 56.7 20 L 52.3 21.8 L 50.5 26.2 L 48.7 21.8 L 44.3 20 L 48.7 18.2 Z"
+          fill="#ffffff"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(64,0)">
+    <text x="0" y="38" font-size="25" font-weight="600" fill="#1B2B2A">smart</text>
+    <text x="76" y="38" font-size="25" font-weight="300" fill="#1B2B2A">diet</text>
+
+    <rect x="150" y="17" width="38" height="20" rx="10" fill="#0F5257"/>
+    <text x="169" y="31.5" font-size="11" font-weight="700" letter-spacing="1" fill="#ffffff" text-anchor="middle">PRO</text>
+  </g>
+</svg>

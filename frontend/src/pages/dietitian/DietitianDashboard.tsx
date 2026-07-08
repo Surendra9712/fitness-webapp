@@ -1,13 +1,20 @@
-import { Users, Bell } from 'lucide-react'
-import useDietitian from '@/hooks/useDietitian'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Users, Bell } from "lucide-react";
+import useDietitian from "@/hooks/useDietitian";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function DietitianDashboard() {
-  const { GetClients, GetStats } = useDietitian()
-  const { data: clientsData } = GetClients({ queryParams: { page_size: 50 } })
-  const clients = clientsData?.items ?? []
-  const { data: stats = { customers: 0, pending_requests: 0 } } = GetStats()
+  const { GetClients, GetStats } = useDietitian();
+  const { data: clientsData } = GetClients({ queryParams: { page_size: 50 } });
+  const clients = clientsData?.items ?? [];
+  const { data: stats = { customers: 0, pending_requests: 0 } } = GetStats();
 
   return (
     <div className="space-y-6">
@@ -16,7 +23,9 @@ export default function DietitianDashboard() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Clients</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Clients
+            </CardTitle>
             <Users className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
@@ -25,20 +34,26 @@ export default function DietitianDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Requests</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pending Requests
+            </CardTitle>
             <Bell className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.pending_requests}</div>
             {stats.pending_requests > 0 && (
-              <p className="text-xs text-yellow-600 mt-1">Review in Assignments</p>
+              <p className="text-xs text-yellow-600 mt-1">
+                Review in Assignments
+              </p>
             )}
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle>My Clients</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>My Clients</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -48,15 +63,22 @@ export default function DietitianDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map(c => (
+              {clients.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.email}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {c.email}
+                  </TableCell>
                 </TableRow>
               ))}
               {!clients.length && (
                 <TableRow>
-                  <TableCell colSpan={2} className="py-8 text-center text-muted-foreground">No assigned clients yet</TableCell>
+                  <TableCell
+                    colSpan={2}
+                    className="py-8 text-center text-muted-foreground"
+                  >
+                    No assigned clients yet
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -64,5 +86,5 @@ export default function DietitianDashboard() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

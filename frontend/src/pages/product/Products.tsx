@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, ShoppingCart, ArrowRight, Package, Zap } from "lucide-react";
+import { ShoppingCart, ArrowRight, Package, Zap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import usePublic from "@/hooks/usePublic";
@@ -202,7 +202,7 @@ export default function Products() {
                         discounted_price:
                           p.discounted_price != null
                             ? Number(p.discounted_price)
-                            : undefined,
+                            : null,
                         stock_quantity: p.stock_quantity,
                       });
                       toast.success(`${p.name} added to cart`);
