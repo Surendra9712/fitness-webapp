@@ -1,7 +1,16 @@
 import { useEffect, useState, useRef } from "react";
 import {
-  Sparkles, Dumbbell, Utensils, Search, Send, RefreshCw,
-  ChevronDown, ChevronUp, Lock, Flame, Leaf,
+  Sparkles,
+  Dumbbell,
+  Utensils,
+  Search,
+  Send,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  Flame,
+  Leaf,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
@@ -30,7 +39,11 @@ interface MealRecommendation {
   meal_type: string;
   meal_class: string;
   recommendations: (FoodResult & { ai_score?: number })[];
-  dry_fruits_addon?: { name: string; grams: number; calories_per_serving: number }[];
+  dry_fruits_addon?: {
+    name: string;
+    grams: number;
+    calories_per_serving: number;
+  }[];
 }
 
 interface ExerciseItem {
@@ -56,23 +69,47 @@ interface ExerciseRec {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const MEAL_LABELS: Record<string, { label: string; emoji: string; class: string }> = {
+const MEAL_LABELS: Record<
+  string,
+  { label: string; emoji: string; class: string }
+> = {
   breakfast: { label: "Breakfast", emoji: "🌅", class: "Light" },
-  lunch:     { label: "Lunch",     emoji: "☀️", class: "Heavy" },
-  snack:     { label: "Snack",     emoji: "🍎", class: "Light" },
-  dinner:    { label: "Dinner",    emoji: "🌙", class: "Heavy" },
+  lunch: { label: "Lunch", emoji: "☀️", class: "Heavy" },
+  snack: { label: "Snack", emoji: "🍎", class: "Light" },
+  dinner: { label: "Dinner", emoji: "🌙", class: "Heavy" },
 };
 
-function MacroPill({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+function MacroPill({
+  label,
+  value,
+  unit,
+  color,
+}: {
+  label: string;
+  value: number;
+  unit: string;
+  color: string;
+}) {
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${color}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${color}`}
+    >
       <span className="font-semibold">{label}</span>
-      <span>{Math.round(value)}{unit}</span>
+      <span>
+        {Math.round(value)}
+        {unit}
+      </span>
     </span>
   );
 }
 
-function FoodCard({ food, rank }: { food: FoodResult & { ai_score?: number }; rank: number }) {
+function FoodCard({
+  food,
+  rank,
+}: {
+  food: FoodResult & { ai_score?: number };
+  rank: number;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border rounded-lg p-3 bg-card hover:shadow-sm transition-shadow">
@@ -83,7 +120,8 @@ function FoodCard({ food, rank }: { food: FoodResult & { ai_score?: number }; ra
             <p className="font-medium text-sm truncate">{food.name}</p>
             {food.serving_size && (
               <p className="text-xs text-muted-foreground">
-                per {food.serving_size}{food.serving_unit || "g"}
+                per {food.serving_size}
+                {food.serving_unit || "g"}
               </p>
             )}
           </div>
@@ -95,17 +133,44 @@ function FoodCard({ food, rank }: { food: FoodResult & { ai_score?: number }; ra
             </Badge>
           )}
           {food.source && (
-            <Badge variant="outline" className="text-xs capitalize">{food.source}</Badge>
+            <Badge variant="outline" className="text-xs capitalize">
+              {food.source}
+            </Badge>
           )}
         </div>
       </div>
       <div className="flex flex-wrap gap-1 mt-2">
-        <MacroPill label="Cal" value={food.calories} unit=" kcal" color="bg-orange-100 text-orange-700" />
-        <MacroPill label="P" value={food.protein_g} unit="g" color="bg-blue-100 text-blue-700" />
-        <MacroPill label="C" value={food.carbs_g} unit="g" color="bg-green-100 text-green-700" />
-        <MacroPill label="F" value={food.fat_g} unit="g" color="bg-yellow-100 text-yellow-700" />
+        <MacroPill
+          label="Cal"
+          value={food.calories}
+          unit=" kcal"
+          color="bg-orange-100 text-orange-700"
+        />
+        <MacroPill
+          label="P"
+          value={food.protein_g}
+          unit="g"
+          color="bg-blue-100 text-blue-700"
+        />
+        <MacroPill
+          label="C"
+          value={food.carbs_g}
+          unit="g"
+          color="bg-green-100 text-green-700"
+        />
+        <MacroPill
+          label="F"
+          value={food.fat_g}
+          unit="g"
+          color="bg-yellow-100 text-yellow-700"
+        />
         {(food.fiber_g ?? 0) > 0 && (
-          <MacroPill label="Fiber" value={food.fiber_g!} unit="g" color="bg-purple-100 text-purple-700" />
+          <MacroPill
+            label="Fiber"
+            value={food.fiber_g!}
+            unit="g"
+            color="bg-purple-100 text-purple-700"
+          />
         )}
       </div>
     </div>
@@ -131,25 +196,36 @@ function ExerciseCard({ ex }: { ex: ExerciseItem }) {
       <div className="p-3 space-y-1">
         <p className="font-semibold text-sm">{ex.name}</p>
         <div className="flex flex-wrap gap-1">
-          <Badge variant="secondary" className="text-xs capitalize">{ex.body_part}</Badge>
-          <Badge variant="outline" className="text-xs capitalize">{ex.equipment}</Badge>
+          <Badge variant="secondary" className="text-xs capitalize">
+            {ex.body_part}
+          </Badge>
+          <Badge variant="outline" className="text-xs capitalize">
+            {ex.equipment}
+          </Badge>
           {ex.difficulty && (
-            <Badge variant="outline" className="text-xs capitalize">{ex.difficulty}</Badge>
+            <Badge variant="outline" className="text-xs capitalize">
+              {ex.difficulty}
+            </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">Target: {ex.target_muscle}</p>
+        <p className="text-xs text-muted-foreground">
+          Target: {ex.target_muscle}
+        </p>
         {ex.instructions && ex.instructions.length > 0 && (
           <div>
             <button
               className="text-xs text-primary underline mt-1"
-              onClick={() => setShowInstr(v => !v)}
+              onClick={() => setShowInstr((v) => !v)}
             >
               {showInstr ? "Hide instructions" : "Show instructions"}
             </button>
             {showInstr && (
               <ol className="mt-2 space-y-1">
                 {ex.instructions.map((step, i) => (
-                  <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                  <li
+                    key={i}
+                    className="text-xs text-muted-foreground flex gap-2"
+                  >
                     <span className="font-bold shrink-0">{i + 1}.</span>
                     <span>{step}</span>
                   </li>
@@ -166,9 +242,13 @@ function ExerciseCard({ ex }: { ex: ExerciseItem }) {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function AiRecommendation() {
   const { user } = useAuth();
-  const isPro = user?.subscription_plan === "pro" && user?.subscription_status === "active";
+  const isPro =
+    user?.subscription_plan === "pro" && user?.subscription_status === "active";
 
-  const [mealPlan, setMealPlan] = useState<Record<string, MealRecommendation> | null>(null);
+  const [mealPlan, setMealPlan] = useState<Record<
+    string,
+    MealRecommendation
+  > | null>(null);
   const [exercise, setExercise] = useState<ExerciseRec | null>(null);
   const [loadingMeal, setLoadingMeal] = useState(false);
   const [loadingEx, setLoadingEx] = useState(false);
@@ -182,14 +262,18 @@ export default function AiRecommendation() {
 
   // NLP query
   const [nlpText, setNlpText] = useState("");
-  const [nlpResult, setNlpResult] = useState<Record<string, unknown> | null>(null);
+  const [nlpResult, setNlpResult] = useState<Record<string, unknown> | null>(
+    null,
+  );
   const [nlpLoading, setNlpLoading] = useState(false);
 
   const loadMealPlan = async () => {
     setLoadingMeal(true);
     setError("");
     try {
-      const res = await api.get<{ meal_plan: Record<string, MealRecommendation> }>("/ai/recommend/meal");
+      const res = await api.get<{
+        meal_plan: Record<string, MealRecommendation>;
+      }>("/ai/recommend/meal");
       setMealPlan(res.meal_plan);
     } catch (e) {
       setError((e as Error).message);
@@ -220,13 +304,19 @@ export default function AiRecommendation() {
   const handleSearch = (q: string) => {
     setSearchQuery(q);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.trim().length < 2) { setSearchResults([]); return; }
+    if (q.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await api.get<{ results: FoodResult[] }>(`/ai/food/search?q=${encodeURIComponent(q)}`);
+        const res = await api.get<{ results: FoodResult[] }>(
+          `/ai/food/search?q=${encodeURIComponent(q)}`,
+        );
         setSearchResults(res.results);
-      } catch {} finally {
+      } catch {
+      } finally {
         setSearching(false);
       }
     }, 350);
@@ -237,7 +327,9 @@ export default function AiRecommendation() {
     setNlpLoading(true);
     setNlpResult(null);
     try {
-      const res = await api.post<Record<string, unknown>>("/ai/nlp/query", { text: nlpText });
+      const res = await api.post<Record<string, unknown>>("/ai/nlp/query", {
+        text: nlpText,
+      });
       setNlpResult(res);
     } catch (e) {
       setError((e as Error).message);
@@ -254,9 +346,9 @@ export default function AiRecommendation() {
         </div>
         <h2 className="text-xl font-bold">Pro Feature</h2>
         <p className="text-sm text-muted-foreground">
-          AI Recommendations are available exclusively on the Pro plan.
-          Upgrade to unlock personalised meal plans, exercise recommendations
-          with animated GIFs, food search, and natural language logging.
+          AI Recommendations are available exclusively on the Pro plan. Upgrade
+          to unlock personalised meal plans, exercise recommendations with
+          animated GIFs, food search, and natural language logging.
         </p>
         <Button asChild className="mt-2">
           <Link to="/customer/subscription">Upgrade to Pro</Link>
@@ -273,9 +365,12 @@ export default function AiRecommendation() {
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">AI Recommendations</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+              AI Recommendations
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Personalised meal plans &amp; animated exercise recommendations powered by AI
+              Personalised meal plans &amp; animated exercise recommendations
+              powered by AI
             </p>
           </div>
         </div>
@@ -299,69 +394,99 @@ export default function AiRecommendation() {
         <TabsContent value="meals" className="space-y-4 mt-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              Breakfast &amp; snack = <span className="font-medium text-primary">light</span> &nbsp;•&nbsp;
-              Lunch &amp; dinner = <span className="font-medium text-orange-500">heavy</span>
+              Breakfast &amp; snack ={" "}
+              <span className="font-medium text-primary">light</span>{" "}
+              &nbsp;•&nbsp; Lunch &amp; dinner ={" "}
+              <span className="font-medium text-orange-500">heavy</span>
             </p>
-            <Button variant="outline" size="sm" onClick={loadMealPlan} disabled={loadingMeal}>
-              <RefreshCw className={`h-4 w-4 mr-1 ${loadingMeal ? "animate-spin" : ""}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMealPlan}
+              disabled={loadingMeal}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${loadingMeal ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
 
           {loadingMeal ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="h-48 rounded-xl bg-muted animate-pulse"
+                />
               ))}
             </div>
           ) : mealPlan ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {(["breakfast", "lunch", "snack", "dinner"] as const).map(mt => {
-                const rec = mealPlan[mt];
-                if (!rec) return null;
-                const info = MEAL_LABELS[mt];
-                const isLight = info.class === "Light";
-                return (
-                  <Card key={mt} className="overflow-hidden">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <span>{info.emoji}</span>
-                          {info.label}
-                        </CardTitle>
-                        <Badge
-                          variant={isLight ? "secondary" : "default"}
-                          className={`text-xs ${isLight ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}
-                        >
-                          {isLight ? <><Leaf className="h-3 w-3 mr-1" />Light</> : <><Flame className="h-3 w-3 mr-1" />Heavy</>}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Target: ~{rec.target?.calories ?? 0} kcal
-                      </p>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {rec.recommendations.slice(0, 3).map((food, i) => (
-                        <FoodCard key={i} food={food} rank={i + 1} />
-                      ))}
-                      {mt === "breakfast" && rec.dry_fruits_addon && rec.dry_fruits_addon.length > 0 && (
-                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-xs font-semibold text-amber-700 mb-1">
-                            🌰 Recommended dry fruits (add-on)
-                          </p>
-                          <div className="flex flex-wrap gap-1">
-                            {rec.dry_fruits_addon.map(df => (
-                              <span key={df.name} className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                                {df.name} — {df.grams}g ({df.calories_per_serving} kcal)
-                              </span>
-                            ))}
-                          </div>
+              {(["breakfast", "lunch", "snack", "dinner"] as const).map(
+                (mt) => {
+                  const rec = mealPlan[mt];
+                  if (!rec) return null;
+                  const info = MEAL_LABELS[mt];
+                  const isLight = info.class === "Light";
+                  return (
+                    <Card key={mt} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <span>{info.emoji}</span>
+                            {info.label}
+                          </CardTitle>
+                          <Badge
+                            variant={isLight ? "secondary" : "default"}
+                            className={`text-xs ${isLight ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}
+                          >
+                            {isLight ? (
+                              <>
+                                <Leaf className="h-3 w-3 mr-1" />
+                                Light
+                              </>
+                            ) : (
+                              <>
+                                <Flame className="h-3 w-3 mr-1" />
+                                Heavy
+                              </>
+                            )}
+                          </Badge>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        <p className="text-xs text-muted-foreground">
+                          Target: ~{rec.target?.calories ?? 0} kcal
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {rec.recommendations.slice(0, 3).map((food, i) => (
+                          <FoodCard key={i} food={food} rank={i + 1} />
+                        ))}
+                        {mt === "breakfast" &&
+                          rec.dry_fruits_addon &&
+                          rec.dry_fruits_addon.length > 0 && (
+                            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                              <p className="text-xs font-semibold text-amber-700 mb-1">
+                                🌰 Recommended dry fruits (add-on)
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {rec.dry_fruits_addon.map((df) => (
+                                  <span
+                                    key={df.name}
+                                    className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full"
+                                  >
+                                    {df.name} — {df.grams}g (
+                                    {df.calories_per_serving} kcal)
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </CardContent>
+                    </Card>
+                  );
+                },
+              )}
             </div>
           ) : null}
         </TabsContent>
@@ -370,16 +495,26 @@ export default function AiRecommendation() {
         <TabsContent value="exercise" className="space-y-4 mt-4">
           <div className="flex items-center justify-between">
             <div />
-            <Button variant="outline" size="sm" onClick={loadExercise} disabled={loadingEx}>
-              <RefreshCw className={`h-4 w-4 mr-1 ${loadingEx ? "animate-spin" : ""}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadExercise}
+              disabled={loadingEx}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${loadingEx ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
 
           {loadingEx ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-64 rounded-xl bg-muted animate-pulse" />
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-64 rounded-xl bg-muted animate-pulse"
+                />
               ))}
             </div>
           ) : exercise ? (
@@ -391,19 +526,35 @@ export default function AiRecommendation() {
                       <p className="font-semibold capitalize">
                         {exercise.category.replace(/_/g, " ")}
                       </p>
-                      <p className="text-sm text-muted-foreground mt-1">{exercise.reason}</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {exercise.reason}
+                      </p>
                     </div>
-                    <Badge variant="secondary" className="shrink-0 capitalize text-xs">
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 capitalize text-xs"
+                    >
                       {exercise.scoring_method?.replace(/_/g, " ") ?? "AI"}
                     </Badge>
                   </div>
                   <div className="flex gap-4 text-sm">
-                    <span>🔥 Consumed: <strong>{Math.round(exercise.today_calories)} kcal</strong></span>
-                    <span>🎯 Target: <strong>{Math.round(exercise.target_calories)} kcal</strong></span>
+                    <span>
+                      🔥 Consumed:{" "}
+                      <strong>
+                        {Math.round(exercise.today_calories)} kcal
+                      </strong>
+                    </span>
+                    <span>
+                      🎯 Target:{" "}
+                      <strong>
+                        {Math.round(exercise.target_calories)} kcal
+                      </strong>
+                    </span>
                   </div>
                   {!exercise.exercisedb_configured && (
                     <p className="text-xs text-muted-foreground border-t pt-2">
-                      ℹ️ Add <code>EXERCISEDB_API_KEY</code> to .env to enable real animated GIFs from ExerciseDB.
+                      ℹ️ Add <code>EXERCISEDB_API_KEY</code> to .env to enable
+                      real animated GIFs from ExerciseDB.
                     </p>
                   )}
                 </CardContent>
@@ -430,10 +581,12 @@ export default function AiRecommendation() {
               className="pl-9"
               placeholder="e.g. daal bhat, chicken curry, sushi..."
               value={searchQuery}
-              onChange={e => handleSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
-          {searching && <p className="text-sm text-muted-foreground">Searching...</p>}
+          {searching && (
+            <p className="text-sm text-muted-foreground">Searching...</p>
+          )}
           {searchResults.length > 0 && (
             <div className="space-y-2">
               {searchResults.map((food, i) => (
@@ -446,17 +599,21 @@ export default function AiRecommendation() {
         {/* ── ASK AI / NLP TAB ──────────────────────────────── */}
         <TabsContent value="nlp" className="space-y-4 mt-4">
           <p className="text-sm text-muted-foreground">
-            Tell the AI what you ate or ask for a recommendation in plain English.
-            Examples: "I ate chiya and pauroti for breakfast" — "suggest high protein lunch"
+            Tell the AI what you ate or ask for a recommendation in plain
+            English. Examples: "I ate chiya and pauroti for breakfast" —
+            "suggest high protein lunch"
           </p>
           <div className="flex gap-2">
             <Input
               placeholder="I ate daal bhat and chicken curry..."
               value={nlpText}
-              onChange={e => setNlpText(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleNlpQuery()}
+              onChange={(e) => setNlpText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleNlpQuery()}
             />
-            <Button onClick={handleNlpQuery} disabled={nlpLoading || !nlpText.trim()}>
+            <Button
+              onClick={handleNlpQuery}
+              disabled={nlpLoading || !nlpText.trim()}
+            >
               <Send className="h-4 w-4 mr-1" />
               {nlpLoading ? "..." : "Ask"}
             </Button>
@@ -466,42 +623,78 @@ export default function AiRecommendation() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">
-                  AI detected: {(nlpResult.nlp_analysis as Record<string, unknown>)?.intent as string}
-                  {((nlpResult.nlp_analysis as Record<string, unknown>)?.foods_detected as string[])?.length > 0 && (
+                  AI detected:{" "}
+                  {
+                    (nlpResult.nlp_analysis as Record<string, unknown>)
+                      ?.intent as string
+                  }
+                  {(
+                    (nlpResult.nlp_analysis as Record<string, unknown>)
+                      ?.foods_detected as string[]
+                  )?.length > 0 && (
                     <span className="font-normal text-muted-foreground">
-                      {" "}— {((nlpResult.nlp_analysis as Record<string, unknown>)?.foods_detected as string[]).join(", ")}
+                      {" "}
+                      —{" "}
+                      {(
+                        (nlpResult.nlp_analysis as Record<string, unknown>)
+                          ?.foods_detected as string[]
+                      ).join(", ")}
                     </span>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {nlpResult.result && (nlpResult.result as Record<string, unknown>).type === "logged_meal_nutrition" && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground">Nutrition totals:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries((nlpResult.result as Record<string, unknown>).totals as Record<string, number>).map(([k, v]) => (
-                        <Badge key={k} variant="secondary" className="text-xs">
-                          {k}: {v}
-                        </Badge>
+                {nlpResult.result &&
+                  (nlpResult.result as Record<string, unknown>).type ===
+                    "logged_meal_nutrition" && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        Nutrition totals:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(
+                          (nlpResult.result as Record<string, unknown>)
+                            .totals as Record<string, number>,
+                        ).map(([k, v]) => (
+                          <Badge
+                            key={k}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {k}: {v}
+                          </Badge>
+                        ))}
+                      </div>
+                      {(
+                        (nlpResult.result as Record<string, unknown>)
+                          .items as FoodResult[]
+                      )?.map((food, i) => (
+                        <FoodCard key={i} food={food} rank={i + 1} />
                       ))}
                     </div>
-                    {((nlpResult.result as Record<string, unknown>).items as FoodResult[])?.map((food, i) => (
-                      <FoodCard key={i} food={food} rank={i + 1} />
-                    ))}
-                  </div>
-                )}
-                {nlpResult.result && (nlpResult.result as Record<string, unknown>).type === "recommendation" && (
-                  <div className="space-y-2">
-                    {((nlpResult.result as Record<string, unknown>).options as FoodResult[])?.map((food, i) => (
-                      <FoodCard key={i} food={food} rank={i + 1} />
-                    ))}
-                  </div>
-                )}
-                {nlpResult.result && (nlpResult.result as Record<string, unknown>).type === "not_found" && (
-                  <p className="text-sm text-muted-foreground">
-                    {(nlpResult.result as Record<string, unknown>).message as string}
-                  </p>
-                )}
+                  )}
+                {nlpResult.result &&
+                  (nlpResult.result as Record<string, unknown>).type ===
+                    "recommendation" && (
+                    <div className="space-y-2">
+                      {(
+                        (nlpResult.result as Record<string, unknown>)
+                          .options as FoodResult[]
+                      )?.map((food, i) => (
+                        <FoodCard key={i} food={food} rank={i + 1} />
+                      ))}
+                    </div>
+                  )}
+                {nlpResult.result &&
+                  (nlpResult.result as Record<string, unknown>).type ===
+                    "not_found" && (
+                    <p className="text-sm text-muted-foreground">
+                      {
+                        (nlpResult.result as Record<string, unknown>)
+                          .message as string
+                      }
+                    </p>
+                  )}
               </CardContent>
             </Card>
           )}

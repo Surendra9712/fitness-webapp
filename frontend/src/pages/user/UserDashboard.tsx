@@ -330,6 +330,42 @@ function MealSection({
               </p>
             )}
 
+            {/* AI recommendation button per meal */}
+            {!selected && results.length === 0 && (
+              <button
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 text-sm text-primary hover:bg-primary/10 transition-colors"
+                onClick={async () => {
+                  try {
+                    const res = await api.get<{
+                      recommendation: {
+                        recommendations: {
+                          name: string;
+                          calories: number;
+                          protein_g: number;
+                          carbs_g: number;
+                          fat_g: number;
+                        }[];
+                      };
+                    }>(`/ai/recommend/meal?meal_type=${mealType}`);
+                    const food = res?.recommendation?.recommendations?.[0];
+                    if (food) {
+                      setQuery(food.name);
+                      selectFood({
+                        name: food.name,
+                        calories: food.calories,
+                        protein_g: food.protein_g,
+                        carbs_g: food.carbs_g,
+                        fat_g: food.fat_g,
+                        source: "ai",
+                      });
+                    }
+                  } catch {}
+                }}
+              >
+                🤖 AI: what should I eat for {label.toLowerCase()}?
+              </button>
+            )}
+
             {results.length > 0 && !selected && (
               <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                 {results.map((f, i) => (
@@ -557,41 +593,95 @@ export default function UserDashboard() {
         </Alert>
       )}
 
-      {/* Today's nutrition progress */}
+      {/* Today's nutrition — circular macro rings like Image 2 */}
       {totals && targets && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <NutritionRing
-            label="Calories"
-            value={totals.calories}
-            target={targets.calories}
-            unit="kcal"
-            ringColor="#2dd4bf"
-            dotColor="bg-teal-400"
-          />
-          <NutritionRing
-            label="Protein"
-            value={totals.protein_g}
-            target={targets.protein_g}
-            unit="g"
-            ringColor="#a3e635"
-            dotColor="bg-lime-400"
-          />
-          <NutritionRing
-            label="Carbs"
-            value={totals.carbs_g}
-            target={targets.carbs_g}
-            unit="g"
-            ringColor="#22d3ee"
-            dotColor="bg-cyan-400"
-          />
-          <NutritionRing
-            label="Fat"
-            value={totals.fat_g}
-            target={targets.fat_g}
-            unit="g"
-            ringColor="#60a5fa"
-            dotColor="bg-blue-400"
-          />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            {
+              label: "Calories",
+              value: totals.calories,
+              target: targets.calories,
+              unit: "kcal",
+              stroke: "#f97316",
+              emoji: "🔥",
+            },
+            {
+              label: "Protein",
+              value: totals.protein_g,
+              target: targets.protein_g,
+              unit: "g",
+              stroke: "#3b82f6",
+              emoji: "💪",
+            },
+            {
+              label: "Carbs",
+              value: totals.carbs_g,
+              target: targets.carbs_g,
+              unit: "g",
+              stroke: "#22c55e",
+              emoji: "🌾",
+            },
+            {
+              label: "Fat",
+              value: totals.fat_g,
+              target: targets.fat_g,
+              unit: "g",
+              stroke: "#eab308",
+              emoji: "🥑",
+            },
+          ].map((m) => {
+            const pct =
+              m.target > 0
+                ? Math.min(100, Math.round((m.value / m.target) * 100))
+                : 0;
+            const r = 36;
+            const circ = 2 * Math.PI * r;
+            const dash = (pct / 100) * circ;
+            return (
+              <div
+                key={m.label}
+                className="bg-card border rounded-xl p-4 flex flex-col items-center gap-2"
+              >
+                <div className="relative w-24 h-24">
+                  <svg viewBox="0 0 88 88" className="w-full h-full -rotate-90">
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r={r}
+                      fill="none"
+                      stroke="#e5e7eb"
+                      strokeWidth="8"
+                    />
+                    <circle
+                      cx="44"
+                      cy="44"
+                      r={r}
+                      fill="none"
+                      stroke={m.stroke}
+                      strokeWidth="8"
+                      strokeDasharray={`${dash} ${circ - dash}`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xs font-bold text-foreground">
+                      {pct}%
+                    </span>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-foreground">
+                    {Math.round(m.value)}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      /{Math.round(m.target)}
+                      {m.unit}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{m.label}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

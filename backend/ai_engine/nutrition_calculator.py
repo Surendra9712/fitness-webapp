@@ -16,4 +16,4 @@ def calculate_nutrition_targets(weight_kg,height_cm,age,gender,activity_level,go
     return NutritionTargets(bmi=bmi,bmr=round(bmr,1),tdee=round(tdee,1),daily_calories=round(cal),protein_g=round((cal*pp)/4,1),carbs_g=round((cal*cp)/4,1),fat_g=round((cal*fp)/9,1),water_ml=int(water))
 def calculate_meal_distribution(targets,meals_per_day=3):
     split={"breakfast":0.25,"lunch":0.40,"dinner":0.35} if meals_per_day<=3 else {"breakfast":0.20,"lunch":0.35,"snack":0.15,"dinner":0.30}
-    return {m:{k:round(getattr(targets,"daily_calories" if k=="calories" else k+"_g")*p,1) if k!="calories" else round(targets.daily_calories*p) for k in ["calories","protein_g","carbs_g","fat_g"]} for m,p in split.items()}
+    return {m:{k:round(getattr(targets,"daily_calories" if k=="calories" else k)*p,1) if k!="calories" else round(targets.daily_calories*p) for k in ["calories","protein_g","carbs_g","fat_g"]} for m,p in split.items()}
