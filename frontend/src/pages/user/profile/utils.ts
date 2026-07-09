@@ -5,6 +5,15 @@ export type Macros = {
   fat: number;
 };
 
+export type WeightRecommendation = {
+  bmi: number;
+  current_weight_kg: number;
+  target_weight_kg: number;
+  healthy_min_kg: number;
+  healthy_max_kg: number;
+  weeks_to_target: number;
+};
+
 export const togArr = (arr: string[], val: string) =>
   arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
 

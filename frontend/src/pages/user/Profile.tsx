@@ -94,6 +94,46 @@ function calcBMI(weight?: number, height?: number): number | null {
   return weight / (height / 100) ** 2;
 }
 
+const SAFE_WEEKLY_RATE_KG = 0.5; // sustainable rate of change (~500 kcal/day deficit/surplus)
+
+function calcWeightRecommendation(
+  weightKg: number,
+  heightCm: number,
+  goal?: string,
+) {
+  const heightM = heightCm / 100;
+  const bmi = weightKg / heightM ** 2;
+  const healthyMinKg = Math.round(18.5 * heightM ** 2 * 10) / 10;
+  const healthyMaxKg = Math.round(24.9 * heightM ** 2 * 10) / 10;
+
+  let target: number;
+  if (goal === "lose_weight") {
+    target = bmi > 24.9 ? Math.round(weightKg * 0.9 * 10) / 10 : weightKg;
+    target = Math.max(target, healthyMinKg);
+  } else if (goal === "gain_muscle") {
+    target =
+      bmi < 18.5
+        ? Math.min(Math.round(weightKg * 1.05 * 10) / 10, healthyMaxKg)
+        : Math.round((weightKg + 2) * 10) / 10;
+  } else {
+    target = weightKg;
+    if (bmi > 24.9) target = healthyMaxKg;
+    else if (bmi < 18.5) target = healthyMinKg;
+  }
+
+  const diff = Math.abs(Math.round(weightKg * 10) / 10 - target);
+  const weeksToTarget =
+    diff >= SAFE_WEEKLY_RATE_KG ? Math.round(diff / SAFE_WEEKLY_RATE_KG) : 0;
+
+  return {
+    currentWeightKg: Math.round(weightKg * 10) / 10,
+    targetWeightKg: target,
+    healthyMinKg,
+    healthyMaxKg,
+    weeksToTarget,
+  };
+}
+
 function bmiMeta(bmi: number): {
   label: string;
   textColor: string;
@@ -108,8 +148,8 @@ function bmiMeta(bmi: number): {
   if (bmi < 25)
     return {
       label: "Normal",
-      textColor: "text-emerald-600",
-      bgColor: "bg-emerald-50",
+      textColor: "text-primary-600",
+      bgColor: "bg-primary-50",
     };
   if (bmi < 30)
     return {
@@ -216,7 +256,7 @@ function TagList({ items }: { items?: string[] }) {
       {items.map((item) => (
         <span
           key={item}
-          className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-medium capitalize"
+          className="px-3 py-1 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-xs font-medium capitalize"
         >
           {item.replace(/_/g, " ")}
         </span>
@@ -528,6 +568,14 @@ export default function Profile() {
   const age = data?.date_of_birth ? calcAge(data.date_of_birth) : null;
   const bmi = calcBMI(data?.current_weight_kg, data?.height_cm);
   const bmiInfo = bmi ? bmiMeta(bmi) : null;
+  const weightRec =
+    data?.current_weight_kg && data?.height_cm
+      ? calcWeightRecommendation(
+          data.current_weight_kg,
+          data.height_cm,
+          data.primary_goal,
+        )
+      : null;
 
   const genderLabel = data?.gender
     ? data.gender
@@ -540,7 +588,7 @@ export default function Profile() {
       {/* ── Hero card ─────────────────────────────────────── */}
       <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
         {/* Cover */}
-        <div className="h-32 bg-linear-to-br from-emerald-400 via-green-500 to-teal-500 relative">
+        <div className="h-32 bg-linear-to-br from-primary-400 via-green-500 to-teal-500 relative">
           {/* subtle mesh pattern */}
           <svg
             className="absolute inset-0 w-full h-full opacity-10"
@@ -580,7 +628,7 @@ export default function Profile() {
             <button
               type="button"
               onClick={() => setAvatarModalOpen(true)}
-              className="relative group rounded-full ring-4 ring-white focus:outline-none focus-visible:ring-emerald-400 inline-block"
+              className="relative group rounded-full ring-4 ring-white focus:outline-none focus-visible:ring-primary-400 inline-block"
               title="Change profile photo"
             >
               {data?.profile_image_url ? (
@@ -590,7 +638,7 @@ export default function Profile() {
                   className="h-20 w-20 rounded-full object-cover"
                 />
               ) : (
-                <div className="h-20 w-20 rounded-full bg-linear-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-2xl font-bold text-white select-none">
+                <div className="h-20 w-20 rounded-full bg-linear-to-br from-primary-400 to-teal-500 flex items-center justify-center text-2xl font-bold text-white select-none">
                   {initials || <User2 className="h-8 w-8 text-white" />}
                 </div>
               )}
@@ -606,7 +654,7 @@ export default function Profile() {
           <p className="text-sm text-gray-500 mt-0.5">{data?.email}</p>
 
           <div className="flex flex-wrap items-center gap-2 mt-3">
-            <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold capitalize">
+            <span className="px-3 py-1 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-xs font-semibold capitalize">
               {data?.role}
             </span>
             {data?.city && (
@@ -619,7 +667,7 @@ export default function Profile() {
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-7 px-3 text-xs"
+                className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50 h-7 px-3 text-xs"
                 asChild
               >
                 <Link to="/customer/become-trainer">
@@ -635,7 +683,7 @@ export default function Profile() {
       {/* ── Empty state ──────────────────────────────────── */}
       {!hasProfile ? (
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-14 text-center">
-          <div className="mx-auto mb-5 h-16 w-16 rounded-2xl bg-linear-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-200">
+          <div className="mx-auto mb-5 h-16 w-16 rounded-2xl bg-linear-to-br from-primary-400 to-teal-500 flex items-center justify-center shadow-lg shadow-primary-200">
             <User2 className="h-8 w-8 text-white" />
           </div>
           <h2 className="text-xl font-bold text-gray-800">
@@ -646,7 +694,7 @@ export default function Profile() {
             calorie targets, and recommendations.
           </p>
           <Button
-            className="mt-6 bg-linear-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md shadow-emerald-200 gap-2"
+            className="mt-6 bg-linear-to-r from-primary-500 to-teal-500 hover:from-primary-600 hover:to-teal-600 text-white shadow-md shadow-primary-200 gap-2"
             onClick={() => setModalOpen(true)}
           >
             <Zap className="h-4 w-4" />
@@ -701,7 +749,7 @@ export default function Profile() {
                 <Card className="lg:col-span-1">
                   <CardHeader className="pb-1">
                     <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                      <Activity className="h-4 w-4 text-emerald-500" /> BMI
+                      <Activity className="h-4 w-4 text-primary-500" /> BMI
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -748,6 +796,70 @@ export default function Profile() {
                   <MacroDonut macros={metrics.macros} />
                 </CardContent>
               </Card>
+
+              {weightRec && (
+                <Card>
+                  <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Target className="h-4 w-4 text-primary-500" />{" "}
+                      Recommended Weight Range
+                    </CardTitle>
+                    {bmi && (
+                      <span className="text-xs text-gray-400">
+                        BMI: {bmi.toFixed(1)}
+                      </span>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-center gap-6">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-gray-900">
+                          {weightRec.currentWeightKg}
+                          <span className="text-sm font-normal text-gray-400 ml-0.5">
+                            kg
+                          </span>
+                        </p>
+                        <p className="mt-1 text-[11px] tracking-wide text-gray-400">
+                          CURRENT
+                        </p>
+                      </div>
+                      <span className="text-gray-300">→</span>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-primary-600">
+                          {weightRec.targetWeightKg}
+                          <span className="text-sm font-normal text-primary-600/50 ml-0.5">
+                            kg
+                          </span>
+                        </p>
+                        <p className="mt-1 text-[11px] tracking-wide text-gray-400">
+                          RECOMMENDED TARGET
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-5 space-y-1 text-center text-xs text-gray-500">
+                      <p>
+                        Healthy range for your height:{" "}
+                        <span className="font-semibold text-gray-700">
+                          {weightRec.healthyMinKg}–{weightRec.healthyMaxKg}kg
+                        </span>
+                      </p>
+                      {weightRec.weeksToTarget > 0 ? (
+                        <p>
+                          Estimated time to reach target:{" "}
+                          <span className="font-semibold text-gray-700">
+                            ~{weightRec.weeksToTarget} weeks
+                          </span>{" "}
+                          at a safe, sustainable rate.
+                        </p>
+                      ) : (
+                        <p className="font-semibold text-gray-700">
+                          You're already at a healthy weight for your goal 🎯
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </section>
           )}
 
@@ -772,8 +884,8 @@ export default function Profile() {
           <SectionCard
             icon={<Target className="h-4 w-4" />}
             title="Fitness Goals"
-            iconBg="bg-emerald-50"
-            iconColor="text-emerald-600"
+            iconBg="bg-primary-50"
+            iconColor="text-primary-600"
           >
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <InfoItem
@@ -919,7 +1031,7 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <Activity className="h-4 w-4 text-emerald-400" />
+                  <Activity className="h-4 w-4 text-primary-400" />
                   No health conditions reported
                 </div>
               )}

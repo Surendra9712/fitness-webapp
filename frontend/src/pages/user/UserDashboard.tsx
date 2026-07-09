@@ -14,7 +14,6 @@ import {
 import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +22,13 @@ import ProfileSetup from "./profile/ProfileSetup";
 import type { DashboardStats } from "@/types";
 
 const today = new Date().toISOString().split("T")[0];
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface MealLog {
@@ -98,35 +104,70 @@ const UNITS = [
   "ml",
 ];
 
-// ── NutritionBar ──────────────────────────────────────────────────────────────
-function NutritionBar({
+// ── NutritionRing ─────────────────────────────────────────────────────────────
+function NutritionRing({
   label,
   value,
   target,
-  color,
+  unit,
+  ringColor,
+  dotColor,
 }: {
   label: string;
   value: number;
   target: number;
-  color: string;
+  unit: string;
+  ringColor: string;
+  dotColor: string;
 }) {
   const pct = Math.min(
     100,
     target > 0 ? Math.round((value / target) * 100) : 0,
   );
+  const r = 32;
+  const circumference = 2 * Math.PI * r;
+  const dash = (pct / 100) * circumference;
+
   return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span className="font-medium">{label}</span>
-        <span>
-          {Math.round(value)} / {Math.round(target)}
-        </span>
+    <div className="rounded-2xl bg-[#0c1310] border border-white/5 px-5 py-5 flex items-center gap-4 overflow-hidden">
+      <div className="flex flex-col items-center gap-2 shrink-0">
+        <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+        <div className="relative h-[76px] w-[76px]">
+          <svg viewBox="0 0 76 76" className="h-[76px] w-[76px] -rotate-90">
+            <circle
+              cx={38}
+              cy={38}
+              r={r}
+              fill="none"
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth={7}
+            />
+            <circle
+              cx={38}
+              cy={38}
+              r={r}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth={7}
+              strokeLinecap="round"
+              strokeDasharray={`${dash} ${circumference}`}
+              className="transition-all"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-sm font-bold text-white">{pct}%</span>
+          </div>
+        </div>
       </div>
-      <div className="w-full bg-secondary rounded-full h-1.5">
-        <div
-          className={`h-1.5 rounded-full transition-all ${color}`}
-          style={{ width: `${pct}%` }}
-        />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-white/50 truncate">{label}</p>
+        <p className="text-2xl font-bold text-white leading-tight truncate">
+          {Math.round(value)}
+        </p>
+        <p className="text-xs text-white/40 truncate">
+          /{Math.round(target)}
+          {unit}
+        </p>
       </div>
     </div>
   );
@@ -486,9 +527,17 @@ export default function UserDashboard() {
   const targets = todayMeals?.targets;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+    <div className="space-y-6 pt-1">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight leading-snug">
+            {getGreeting()}, {user?.name?.split(" ")[0] || "there"} 👋
+          </h1>
+          <p className="text-sm text-foreground/60 mt-1.5 leading-relaxed">
+            Log your meals through the day — breakfast, lunch, snacks, then
+            dinner
+          </p>
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -508,79 +557,42 @@ export default function UserDashboard() {
         </Alert>
       )}
 
-      {/* Stats cards */}
-      {stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              label: "My Orders",
-              value: stats.orders_count,
-              icon: <ShoppingBag className="h-4 w-4 text-blue-500" />,
-              sub: "total orders",
-            },
-            {
-              label: "Pending Requests",
-              value: stats.pending_requests,
-              icon: <Bell className="h-4 w-4 text-orange-500" />,
-              sub: "awaiting review",
-            },
-          ].map((s) => (
-            <Card key={s.label}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {s.label}
-                </CardTitle>
-                {s.icon}
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{s.value}</div>
-                <p className="text-xs text-muted-foreground">{s.sub}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
       {/* Today's nutrition progress */}
       {totals && targets && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span>Today's Nutrition</span>
-              <Badge variant="secondary" className="font-normal">
-                {totals.calories > 0
-                  ? `${Math.round((totals.calories / targets.calories) * 100)}% of daily goal`
-                  : "Not started"}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <NutritionBar
-              label="Calories"
-              value={totals.calories}
-              target={targets.calories}
-              color="bg-orange-400"
-            />
-            <NutritionBar
-              label="Protein"
-              value={totals.protein_g}
-              target={targets.protein_g}
-              color="bg-blue-400"
-            />
-            <NutritionBar
-              label="Carbs"
-              value={totals.carbs_g}
-              target={targets.carbs_g}
-              color="bg-green-400"
-            />
-            <NutritionBar
-              label="Fat"
-              value={totals.fat_g}
-              target={targets.fat_g}
-              color="bg-yellow-400"
-            />
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <NutritionRing
+            label="Calories"
+            value={totals.calories}
+            target={targets.calories}
+            unit="kcal"
+            ringColor="#2dd4bf"
+            dotColor="bg-teal-400"
+          />
+          <NutritionRing
+            label="Protein"
+            value={totals.protein_g}
+            target={targets.protein_g}
+            unit="g"
+            ringColor="#a3e635"
+            dotColor="bg-lime-400"
+          />
+          <NutritionRing
+            label="Carbs"
+            value={totals.carbs_g}
+            target={targets.carbs_g}
+            unit="g"
+            ringColor="#22d3ee"
+            dotColor="bg-cyan-400"
+          />
+          <NutritionRing
+            label="Fat"
+            value={totals.fat_g}
+            target={targets.fat_g}
+            unit="g"
+            ringColor="#60a5fa"
+            dotColor="bg-blue-400"
+          />
+        </div>
       )}
 
       {/* Meal sections: breakfast → lunch → snack → dinner */}

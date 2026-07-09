@@ -12,7 +12,11 @@ import { useAuth } from "@/context/AuthContext";
 
 import { profileSchema, STEP_REQUIRED, type ProfileValues } from "./schema";
 import { STEPS } from "./constants";
-import { parseJsonField, type Macros } from "./utils";
+import {
+  parseJsonField,
+  type Macros,
+  type WeightRecommendation,
+} from "./utils";
 import { Step1Personal } from "./Step1Personal";
 import { Step2Goals } from "./Step2Goals";
 import { Step3Diet } from "./Step3Diet";
@@ -41,6 +45,10 @@ export default function ProfileSetup({
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
+  const [result, setResult] = useState<{
+    daily_targets?: Macros;
+    weight_recommendation?: WeightRecommendation;
+  } | null>(null);
   const { user } = useAuth();
 
   const form = useForm<ProfileValues>({
@@ -196,15 +204,18 @@ export default function ProfileSetup({
       };
 
       if (isEdit) {
-        await api.put<{ message: string; daily_targets?: Macros }>(
-          "/onboarding/profile",
-          payload,
-        );
+        const res = await api.put<{
+          message: string;
+          daily_targets?: Macros;
+          weight_recommendation?: WeightRecommendation;
+        }>("/onboarding/profile", payload);
+        setResult(res);
       } else {
-        await api.post<{ daily_targets: Macros }>(
-          "/onboarding/complete",
-          payload,
-        );
+        const res = await api.post<{
+          daily_targets: Macros;
+          weight_recommendation: WeightRecommendation;
+        }>("/onboarding/complete", payload);
+        setResult(res);
       }
       setStep(6);
     } catch {
@@ -227,7 +238,7 @@ export default function ProfileSetup({
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+            className="h-full rounded-full bg-primary-500 transition-all duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -245,7 +256,7 @@ export default function ProfileSetup({
                 className={cn(
                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 transition-colors",
                   step > i + 1 || step === i + 1
-                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    ? "border-primary-600 bg-primary-600 text-white"
                     : "border-gray-200 bg-white text-gray-400",
                 )}
               >
@@ -255,7 +266,7 @@ export default function ProfileSetup({
                 <div
                   className={cn(
                     "h-0.5 flex-1 mx-1 transition-colors",
-                    step > i + 1 ? "bg-emerald-500" : "bg-gray-200",
+                    step > i + 1 ? "bg-primary-500" : "bg-gray-200",
                   )}
                 />
               )}
@@ -265,43 +276,155 @@ export default function ProfileSetup({
       </div>
     ) : null;
 
-  const DoneScreen = () => (
-    <div className="flex flex-col items-center py-8 text-center gap-2">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
-        <Check className="h-8 w-8 text-primary-600" />
+  const DoneScreen = () => {
+    const macros = result?.daily_targets;
+    const rec = result?.weight_recommendation;
+
+    return (
+      <div className="rounded-3xl bg-white p-6 sm:p-10 text-center">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border-2 border-primary-200 bg-primary-50">
+          <Check className="h-8 w-8 text-primary-600" />
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          You're all set! 🎉
+        </h2>
+        <p className="mt-2 text-sm text-gray-500">
+          {macros
+            ? "Your personalised AI nutrition plan is ready."
+            : "Your personalised fitness profile is ready."}
+        </p>
+
+        {macros && (
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              {
+                icon: "🔥",
+                value: macros.calories,
+                unit: "",
+                label: "kcal/day",
+              },
+              {
+                icon: "💪",
+                value: macros.protein,
+                unit: "g",
+                label: "Protein",
+              },
+              { icon: "🌾", value: macros.carbs, unit: "g", label: "Carbs" },
+              { icon: "🥑", value: macros.fat, unit: "g", label: "Fat" },
+            ].map((m) => (
+              <div
+                key={m.label}
+                className="rounded-2xl bg-gray-50 border border-gray-100 px-4 py-5 text-center"
+              >
+                <p className="text-xl">{m.icon}</p>
+                <p className="mt-2 text-xl sm:text-2xl font-bold text-primary-600 truncate">
+                  {m.value}
+                  {m.unit}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">{m.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {rec && (
+          <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-6 text-left">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                Weight Recommendation
+              </p>
+              <p className="shrink-0 text-xs text-gray-400">BMI: {rec.bmi}</p>
+            </div>
+            <div className="mt-6 flex items-center justify-center gap-6">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-gray-900">
+                  {rec.current_weight_kg}
+                  <span className="text-sm font-normal text-gray-400">kg</span>
+                </p>
+                <p className="mt-1 text-[11px] tracking-wide text-gray-400">
+                  CURRENT
+                </p>
+              </div>
+              <span className="text-gray-300">→</span>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-primary-600">
+                  {rec.target_weight_kg}
+                  <span className="text-sm font-normal text-primary-600/50">
+                    kg
+                  </span>
+                </p>
+                <p className="mt-1 text-[11px] tracking-wide text-gray-400">
+                  RECOMMENDED TARGET
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 space-y-1 text-center text-xs text-gray-500">
+              <p>
+                Healthy range for your height:{" "}
+                <span className="font-semibold text-gray-700">
+                  {rec.healthy_min_kg}–{rec.healthy_max_kg}kg
+                </span>
+              </p>
+              {rec.weeks_to_target > 0 ? (
+                <p>
+                  Estimated time to reach target:{" "}
+                  <span className="font-semibold text-gray-700">
+                    ~{rec.weeks_to_target} weeks
+                  </span>{" "}
+                  at a safe, sustainable rate.
+                </p>
+              ) : (
+                <p className="font-semibold text-gray-700">
+                  You're already at a healthy weight for your goal 🎯
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <Button
+          className="mt-8 w-full h-12 text-base bg-primary-600 hover:bg-primary-500"
+          onClick={() => (onDone ? onDone() : navigate("/dashboard"))}
+        >
+          {onDone ? "Done" : "Go to Dashboard →"}
+        </Button>
       </div>
-      <h2 className="text-2xl font-bold text-gray-900">You're all set! 🎉</h2>
-      <p className="mt-2 max-w-sm text-sm text-gray-500">
-        Your personalised fitness profile is ready. Head to your dashboard to
-        start tracking.
-      </p>
-      <Button onClick={() => (onDone ? onDone() : navigate("/dashboard"))}>
-        {onDone ? "Done" : "Go to Dashboard"}
-      </Button>
-    </div>
-  );
+    );
+  };
 
   const NavButtons = () =>
     step <= 5 ? (
-      <div className="flex justify-between">
-        <div>
-          {step > 1 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setStep((s) => s - 1)}
-            >
-              ← Previous
-            </Button>
-          )}
-        </div>
-        <Button type="button" onClick={next} disabled={loading}>
+      <>
+        {/* <div> */}
+        {step > 1 && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setStep((s) => s - 1)}
+          >
+            ← Previous
+          </Button>
+        )}
+        {/* </div> */}
+        <Button
+          className="ml-auto"
+          type="button"
+          onClick={next}
+          disabled={loading}
+        >
           {loading ? "Saving…" : step === 5 ? "Finish Setup" : "Continue →"}
         </Button>
-      </div>
+      </>
     ) : null;
 
   if (inline) {
+    if (step === 6) {
+      return (
+        <div className="max-w-2xl mx-auto">
+          <DoneScreen />
+        </div>
+      );
+    }
     return (
       <div className="max-w-2xl mx-auto space-y-4">
         <div>
@@ -322,18 +445,25 @@ export default function ProfileSetup({
               {step === 3 && <Step3Diet />}
               {step === 4 && <Step4Habits />}
               {step === 5 && <Step5Health />}
-              {step === 6 && <DoneScreen />}
             </CardContent>
-            {step <= 5 && (
-              <CardFooter className="w-full">
-                <div className="w-full">
-                  <NavButtons />
-                </div>
-              </CardFooter>
-            )}
+            <CardFooter className="w-full">
+              <div className="w-full">
+                <NavButtons />
+              </div>
+            </CardFooter>
           </Card>
         </Form>
       </div>
+    );
+  }
+
+  if (step === 6) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden">
+          <DoneScreen />
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -351,14 +481,11 @@ export default function ProfileSetup({
               {step === 3 && <Step3Diet />}
               {step === 4 && <Step4Habits />}
               {step === 5 && <Step5Health />}
-              {step === 6 && <DoneScreen />}
             </div>
           </DialogBody>
-          {step <= 5 && (
-            <DialogFooter className="justify-between!">
-              <NavButtons />
-            </DialogFooter>
-          )}
+          <DialogFooter className="justify-between!">
+            <NavButtons />
+          </DialogFooter>
         </Form>
       </DialogContent>
     </Dialog>

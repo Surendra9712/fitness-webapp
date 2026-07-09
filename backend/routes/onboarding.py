@@ -146,6 +146,43 @@ def _calc_macros(weight_kg, height_cm, dob_str, gender, activity_level, goal):
     }
 
 
+# ── Target weight recommendation ────────────────────────────────────────────────
+
+SAFE_WEEKLY_RATE_KG = 0.5  # sustainable rate of change, matches the -500 kcal/day deficit used above
+
+
+def _calc_weight_recommendation(weight_kg, height_cm, goal):
+    height_m = height_cm / 100
+    bmi = round(weight_kg / (height_m ** 2), 1)
+    healthy_min = round(18.5 * height_m ** 2, 1)
+    healthy_max = round(24.9 * height_m ** 2, 1)
+
+    if goal == 'lose_weight':
+        target = round(weight_kg * 0.9, 1) if bmi > 24.9 else weight_kg
+        target = max(target, healthy_min)
+    elif goal == 'gain_muscle':
+        target = round(weight_kg * 1.05, 1) if bmi < 18.5 else round(weight_kg + 2, 1)
+        target = min(target, healthy_max) if bmi < 18.5 else target
+    else:
+        target = weight_kg
+        if bmi > 24.9:
+            target = healthy_max
+        elif bmi < 18.5:
+            target = healthy_min
+
+    diff = abs(round(weight_kg, 1) - target)
+    weeks_to_target = round(diff / SAFE_WEEKLY_RATE_KG) if diff >= SAFE_WEEKLY_RATE_KG else 0
+
+    return {
+        'bmi': bmi,
+        'current_weight_kg': round(weight_kg, 1),
+        'target_weight_kg': target,
+        'healthy_min_kg': healthy_min,
+        'healthy_max_kg': healthy_max,
+        'weeks_to_target': weeks_to_target,
+    }
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 _JSON_FIELDS = {'dietary_restrictions', 'allergens', 'cuisine_preferences', 'health_conditions'}
@@ -221,7 +258,16 @@ def complete():
             activity_level=body.activity_level,
             goal=body.primary_goal,
         )
-        return jsonify({'message': 'Profile saved', 'daily_targets': macros}), 201
+        weight_recommendation = _calc_weight_recommendation(
+            weight_kg=body.current_weight_kg,
+            height_cm=body.height_cm,
+            goal=body.primary_goal,
+        )
+        return jsonify({
+            'message': 'Profile saved',
+            'daily_targets': macros,
+            'weight_recommendation': weight_recommendation,
+        }), 201
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -268,15 +314,27 @@ def update_profile():
                 (request.user_id,)
             )
             profile = cursor.fetchone() or {}
+            weight_kg = float(profile.get('current_weight_kg') or 70)
+            height_cm = float(profile.get('height_cm') or 170)
+            goal = profile.get('primary_goal') or 'maintain'
             macros = _calc_macros(
-                weight_kg=float(profile.get('current_weight_kg') or 70),
-                height_cm=float(profile.get('height_cm') or 170),
+                weight_kg=weight_kg,
+                height_cm=height_cm,
                 dob_str=str(profile.get('date_of_birth') or '1990-01-01'),
                 gender=profile.get('gender') or 'male',
                 activity_level=profile.get('activity_level') or 'moderate',
-                goal=profile.get('primary_goal') or 'maintain',
+                goal=goal,
             )
-            return jsonify({'message': 'Profile updated', 'daily_targets': macros})
+            weight_recommendation = _calc_weight_recommendation(
+                weight_kg=weight_kg,
+                height_cm=height_cm,
+                goal=goal,
+            )
+            return jsonify({
+                'message': 'Profile updated',
+                'daily_targets': macros,
+                'weight_recommendation': weight_recommendation,
+            })
 
         return jsonify({'message': 'Profile updated'})
     except Exception as e:
