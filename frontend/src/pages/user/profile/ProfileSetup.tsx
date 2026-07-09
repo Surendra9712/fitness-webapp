@@ -41,6 +41,7 @@ export default function ProfileSetup({
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
+  const [dailyTargets, setDailyTargets] = useState<Record<string, number> | null>(null);
   const { user } = useAuth();
 
   const form = useForm<ProfileValues>({
@@ -201,10 +202,11 @@ export default function ProfileSetup({
           payload,
         );
       } else {
-        await api.post<{ daily_targets: Macros }>(
+        const res = await api.post<{ daily_targets: Record<string, number> }>(
           "/onboarding/complete",
           payload,
         );
+        if (res?.daily_targets) setDailyTargets(res.daily_targets);
       }
       setStep(6);
     } catch {
@@ -266,17 +268,67 @@ export default function ProfileSetup({
     ) : null;
 
   const DoneScreen = () => (
-    <div className="flex flex-col items-center py-8 text-center gap-2">
-      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
-        <Check className="h-8 w-8 text-primary-600" />
+    <div className="flex flex-col items-center py-6 text-center gap-4">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 border-2 border-emerald-300">
+        <Check className="h-8 w-8 text-emerald-600" />
       </div>
-      <h2 className="text-2xl font-bold text-gray-900">You're all set! 🎉</h2>
-      <p className="mt-2 max-w-sm text-sm text-gray-500">
-        Your personalised fitness profile is ready. Head to your dashboard to
-        start tracking.
-      </p>
-      <Button onClick={() => (onDone ? onDone() : navigate("/dashboard"))}>
-        {onDone ? "Done" : "Go to Dashboard"}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">You're all set! 🎉</h2>
+        <p className="mt-1 text-sm text-gray-500">Your personalised AI nutrition plan is ready.</p>
+      </div>
+
+      {dailyTargets && (
+        <>
+          {/* Macro cards */}
+          <div className="grid grid-cols-4 gap-3 w-full">
+            {[
+              { icon: "🔥", value: dailyTargets.calories, label: "kcal/day" },
+              { icon: "💪", value: `${dailyTargets.protein}g`, label: "Protein" },
+              { icon: "🌾", value: `${dailyTargets.carbs}g`, label: "Carbs" },
+              { icon: "🥑", value: `${dailyTargets.fat}g`, label: "Fat" },
+            ].map((m) => (
+              <div key={m.label} className="bg-gray-900 rounded-xl p-3 flex flex-col items-center gap-1">
+                <span className="text-lg">{m.icon}</span>
+                <span className="text-sm font-bold text-emerald-400">{m.value}</span>
+                <span className="text-[10px] text-gray-400">{m.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* AI Weight Recommendation */}
+          {dailyTargets.bmi && (
+            <div className="w-full bg-gray-50 border border-gray-100 rounded-xl p-4 text-left space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-800">🤖 AI Target Weight Recommendation</span>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">BMI: {dailyTargets.bmi}</span>
+              </div>
+              <div className="flex items-center justify-center gap-6">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-gray-900">{dailyTargets.current_weight}<span className="text-sm font-normal text-gray-400">kg</span></p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mt-0.5">Current</p>
+                </div>
+                <span className="text-gray-300 text-xl">→</span>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-emerald-500">{dailyTargets.recommended_weight}<span className="text-sm font-normal text-gray-400">kg</span></p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mt-0.5">Recommended Target</p>
+                </div>
+              </div>
+              <div className="text-center space-y-0.5">
+                <p className="text-xs text-gray-500">Healthy range for your height: <span className="font-semibold text-gray-700">{dailyTargets.healthy_range_low}–{dailyTargets.healthy_range_high}kg</span></p>
+                {dailyTargets.weeks_to_target > 0 && (
+                  <p className="text-xs text-gray-500">Estimated time to reach target: <span className="font-bold text-gray-800">~{dailyTargets.weeks_to_target} weeks</span> at a safe, sustainable rate.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <Button
+        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+        onClick={() => (onDone ? onDone() : navigate("/dashboard"))}
+      >
+        Go to Dashboard →
       </Button>
     </div>
   );

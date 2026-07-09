@@ -386,7 +386,6 @@ ALTER TABLE products ADD COLUMN discount_valid_to   DATE DEFAULT NULL;
 ALTER TABLE product_requests ADD COLUMN image_url VARCHAR(500) DEFAULT NULL;
 
 
--- Meal logs (breakfast, lunch, snack, dinner per day)
 CREATE TABLE IF NOT EXISTS meal_logs (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id         INT NOT NULL,
@@ -411,7 +410,6 @@ CREATE TABLE IF NOT EXISTS meal_logs (
     INDEX idx_meal_type (meal_type)
 ) ENGINE=InnoDB;
 
--- AI recommendation logs
 CREATE TABLE IF NOT EXISTS ai_recommendations (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id         INT NOT NULL,
@@ -425,7 +423,6 @@ CREATE TABLE IF NOT EXISTS ai_recommendations (
     INDEX idx_user_date (user_id, rec_date)
 ) ENGINE=InnoDB;
 
--- Weekly nutrition reports (auto-generated)
 CREATE TABLE IF NOT EXISTS weekly_reports (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     user_id         INT NOT NULL,
@@ -442,5 +439,7 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
     UNIQUE KEY uniq_user_week (user_id, week_start),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+
 
 

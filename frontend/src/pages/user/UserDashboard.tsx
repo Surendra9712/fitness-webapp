@@ -182,6 +182,22 @@ function MealSection({
 
             {searching && <p className="text-xs text-muted-foreground pl-1">Searching USDA, Nutritionix...</p>}
 
+            {/* AI recommendation button per meal */}
+            {!selected && results.length === 0 && (
+              <button
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 text-sm text-primary hover:bg-primary/10 transition-colors"
+                onClick={async () => {
+                  try {
+                    const res = await api.get<{recommendation:{recommendations:{name:string;calories:number;protein_g:number;carbs_g:number;fat_g:number}[]}}>(`/ai/recommend/meal?meal_type=${mealType}`);
+                    const food = res?.recommendation?.recommendations?.[0];
+                    if (food) { setQuery(food.name); selectFood({name:food.name,calories:food.calories,protein_g:food.protein_g,carbs_g:food.carbs_g,fat_g:food.fat_g,source:"ai"}); }
+                  } catch {}
+                }}
+              >
+                🤖 AI: what should I eat for {label.toLowerCase()}?
+              </button>
+            )}
+
             {results.length > 0 && !selected && (
               <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                 {results.map((f, i) => (
@@ -323,7 +339,14 @@ export default function UserDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Welcome back, {(user as any)?.full_name?.split(" ")[0] || (user as any)?.name || "there"} 👋
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Log your meals through the day — breakfast, lunch, snacks, then dinner
+          </p>
+        </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
           <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
           Refresh
@@ -355,24 +378,38 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Today's nutrition progress */}
+      {/* Today's nutrition — circular macro rings like Image 2 */}
       {totals && targets && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center justify-between">
-              <span>Today's Nutrition</span>
-              <Badge variant="secondary" className="font-normal">
-                {totals.calories > 0 ? `${Math.round((totals.calories / targets.calories) * 100)}% of daily goal` : "Not started"}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <NutritionBar label="Calories" value={totals.calories} target={targets.calories} color="bg-orange-400" />
-            <NutritionBar label="Protein" value={totals.protein_g} target={targets.protein_g} color="bg-blue-400" />
-            <NutritionBar label="Carbs" value={totals.carbs_g} target={targets.carbs_g} color="bg-green-400" />
-            <NutritionBar label="Fat" value={totals.fat_g} target={targets.fat_g} color="bg-yellow-400" />
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Calories", value: totals.calories, target: targets.calories, unit: "kcal", stroke: "#f97316", emoji: "🔥" },
+            { label: "Protein",  value: totals.protein_g, target: targets.protein_g, unit: "g", stroke: "#3b82f6", emoji: "💪" },
+            { label: "Carbs",    value: totals.carbs_g, target: targets.carbs_g, unit: "g", stroke: "#22c55e", emoji: "🌾" },
+            { label: "Fat",      value: totals.fat_g, target: targets.fat_g, unit: "g", stroke: "#eab308", emoji: "🥑" },
+          ].map((m) => {
+            const pct = m.target > 0 ? Math.min(100, Math.round((m.value / m.target) * 100)) : 0;
+            const r = 36; const circ = 2 * Math.PI * r;
+            const dash = (pct / 100) * circ;
+            return (
+              <div key={m.label} className="bg-card border rounded-xl p-4 flex flex-col items-center gap-2">
+                <div className="relative w-24 h-24">
+                  <svg viewBox="0 0 88 88" className="w-full h-full -rotate-90">
+                    <circle cx="44" cy="44" r={r} fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                    <circle cx="44" cy="44" r={r} fill="none" stroke={m.stroke} strokeWidth="8"
+                      strokeDasharray={`${dash} ${circ - dash}`} strokeLinecap="round" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xs font-bold text-foreground">{pct}%</span>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-foreground">{Math.round(m.value)}<span className="text-xs font-normal text-muted-foreground">/{Math.round(m.target)}{m.unit}</span></p>
+                  <p className="text-xs text-muted-foreground">{m.label}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Meal sections: breakfast → lunch → snack → dinner */}

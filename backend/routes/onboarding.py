@@ -138,11 +138,28 @@ def _calc_macros(weight_kg, height_cm, dob_str, gender, activity_level, goal):
     fat = calories * 0.25 / 9
     carbs = max((calories - protein * 4 - fat * 9) / 4, 0)
 
+    bmi = round(weight_kg / ((height_cm / 100) ** 2), 1)
+    # Healthy BMI target weight range (18.5 - 24.9)
+    h_m = height_cm / 100
+    healthy_low = round(18.5 * h_m * h_m, 1)
+    healthy_high = round(24.9 * h_m * h_m, 1)
+    # Recommended target = middle of healthy range
+    recommended_weight = round((healthy_low + healthy_high) / 2, 1)
+    # Weeks to reach target at 0.5 kg/week safe rate
+    weight_diff = abs(weight_kg - recommended_weight)
+    weeks_to_target = round(weight_diff / 0.5) if weight_diff > 1 else 0
+
     return {
         'calories': round(calories),
         'protein': round(protein),
         'carbs': round(carbs),
         'fat': round(fat),
+        'bmi': bmi,
+        'current_weight': weight_kg,
+        'recommended_weight': recommended_weight,
+        'healthy_range_low': healthy_low,
+        'healthy_range_high': healthy_high,
+        'weeks_to_target': weeks_to_target,
     }
 
 
