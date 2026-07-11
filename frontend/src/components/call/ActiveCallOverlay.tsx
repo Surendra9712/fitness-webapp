@@ -52,6 +52,9 @@ export default function ActiveCallOverlay() {
   function bindLocalVideo(el: HTMLVideoElement | null) {
     if (el) el.srcObject = localStream;
   }
+  function bindRemoteAudio(el: HTMLAudioElement | null) {
+    if (el) el.srcObject = remoteStream;
+  }
 
   const open = status === "outgoing" || status === "connected";
   const isVideo = callType === "video";
@@ -97,6 +100,10 @@ export default function ActiveCallOverlay() {
             </>
           ) : (
             <div className="flex flex-col items-center gap-3">
+              {/* Audio-only calls still carry an audio track over the same
+                  peer connection — without a media element bound to it,
+                  nothing ever plays it. */}
+              <audio ref={bindRemoteAudio} autoPlay className="hidden" />
               <Avatar className="h-24 w-24">
                 <AvatarImage src={peerImage ?? undefined} />
                 <AvatarFallback className="text-3xl">

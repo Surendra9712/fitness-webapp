@@ -18,7 +18,9 @@ import { toast } from "sonner";
 import type { User } from "@/types";
 import SubscriptionRejectDialog from "./SubscriptionRejectDialog";
 
-type SubUser = User & { subscription_payment_method?: "cash" | "esewa" };
+type SubUser = User & {
+  subscription_payment_method?: "cash" | "esewa" | "stripe";
+};
 
 const STATUS_TABS = [
   { label: "Pending", value: "pending" },
@@ -188,6 +190,10 @@ export default function SubscriptionManagement() {
                       {u.subscription_payment_method === "esewa" ? (
                         <>
                           <CreditCard className="h-3 w-3" /> eSewa
+                        </>
+                      ) : u.subscription_payment_method === "stripe" ? (
+                        <>
+                          <CreditCard className="h-3 w-3" /> Card
                         </>
                       ) : (
                         <>

@@ -22,7 +22,17 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
+socketio.init_app(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading",
+    # Default (25s/20s) means an abruptly-closed tab (crash, network drop —
+    # no clean disconnect frame) can look "online" for up to ~45s, during
+    # which a call to that person would ring pointlessly. Shorter heartbeat
+    # catches that faster at the cost of a bit more idle ping traffic.
+    ping_interval=10,
+    ping_timeout=8,
+)
 
 app.register_blueprint(auth_bp,       url_prefix='/api/auth')
 app.register_blueprint(admin_bp,      url_prefix='/api/admin')
@@ -44,4 +54,7 @@ def health():
 
 if __name__ == '__main__':
     port = int(os.getenv('FLASK_PORT', 5000))
-    socketio.run(app, debug=True, port=port, allow_unsafe_werkzeug=True)
+    # Bind all interfaces (not just 127.0.0.1) so devices on the LAN — e.g.
+    # a phone or second laptop hitting the frontend via the host's IP — can
+    # also reach the Socket.IO server for chat/calls, not just the REST API.
+    socketio.run(app, host='0.0.0.0', debug=True, port=port, allow_unsafe_werkzeug=True)

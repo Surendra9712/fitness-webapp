@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Self-signed dev TLS cert (machine-specific, see scripts/gen-dev-certs.mjs)
+.certs/
+
 # Env
 .env
 .env.*

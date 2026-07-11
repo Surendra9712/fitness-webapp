@@ -2,8 +2,8 @@ import json
 import datetime
 import os
 import sys
-from flask import Blueprint, request, jsonify
-from pydantic import BaseModel, ValidationError
+from flask import Blueprint, request, jsonify, make_response
+from pydantic import BaseModel, ValidationError, field_validator
 from typing import Optional
 from database.connection import get_connection
 from middleware.auth import role_required
@@ -18,6 +18,7 @@ from ai_engine.recommendation_engine import (
 )
 from ai_engine.universal_food_lookup import recognize_food
 from ai_engine.nutrition_calculator import calculate_nutrition_targets
+from ai_engine.integrations import exercisedb
 
 try:
     from ai_engine.ml.predict import load_models
@@ -76,6 +77,9 @@ def _get_profile(cursor, user_id):
     return row
 
 
+FOOD_SOURCES = {"nepali_kb", "usda", "nutritionix", "manual","ai"}
+
+
 class LogMealSchema(BaseModel):
     meal_type: str
     food_name: str
@@ -90,6 +94,11 @@ class LogMealSchema(BaseModel):
     sugar_g: float = 0
     sodium_mg: float = 0
     portion_g: Optional[float] = None
+
+    @field_validator("food_source")
+    @classmethod
+    def _coerce_food_source(cls, v):
+        return v if v in FOOD_SOURCES else "manual"
 
 
 class NLQuerySchema(BaseModel):
@@ -328,6 +337,22 @@ def recommend_exercise_endpoint():
     finally:
         cursor.close()
         conn.close()
+
+
+@ai_bp.route("/exercise/gif/<exercise_id>", methods=["GET"])
+@role_required("trainee")
+def exercise_gif(exercise_id):
+    """Proxies ExerciseDB's auth-required /image endpoint so the browser
+    never needs the RapidAPI key — the frontend just hits this route."""
+    resolution = request.args.get("resolution", "180")
+    result = exercisedb.get_exercise_gif(exercise_id, resolution)
+    if not result:
+        return jsonify({"error": "GIF not available"}), 404
+    content, content_type = result
+    resp = make_response(content)
+    resp.headers["Content-Type"] = content_type
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 
 @ai_bp.route("/report/weekly", methods=["GET"])

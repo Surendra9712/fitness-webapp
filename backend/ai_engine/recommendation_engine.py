@@ -1,7 +1,7 @@
 from typing import Optional
 from ai_engine.nutrition_calculator import calculate_nutrition_targets, calculate_meal_distribution, NutritionTargets
 from ai_engine.knowledge_base.nepali_foods import get_foods_by_meal_type, DRY_FRUITS_GRAMS, get_all_tags_index
-from ai_engine.integrations import usda, nutritionix, exercisedb
+from ai_engine.integrations import usda, nutritionix, wger, exercisedb
 from ai_engine.nlp.pipeline import process_text
 from ai_engine.nlp.fuzzy_matcher import fuzzy_match_multiple
 from ai_engine.universal_food_lookup import recognize_food
@@ -41,7 +41,7 @@ def _score_food_fit(food, meal_target, dietary):
     if dietary.get("is_vegan") and not food.get("is_vegan"): score -= 100
     elif dietary.get("is_vegetarian") and not food.get("is_vegetarian"): score -= 100
     if dietary.get("is_diabetic_friendly") and food.get("sugar_g",0) > 15: score -= 15
-    return round(score,1)
+    return round(max(0.0, min(score, 100.0)) / 100, 3)
 
 def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary, preferred_cuisines=None, top_n=3):
     meal_targets = calculate_meal_distribution(targets, meals_per_day)
@@ -169,6 +169,9 @@ def recommend_exercise(goal,bmi,age,fitness_level,calorie_ratio,activity_level="
         elif goal=="improve_health" and activity_level in("sedentary","light"): category="yoga_light"; reason="Within target — light yoga supports overall wellness."
         else: category="yoga_light"; reason="Within target — light activity recommended for maintenance."
         scoring = "rule_based_fallback"
-    exercises = exercisedb.get_exercises_for_category(category, limit_per_part=3)
+    exercises = exercisedb.get_exercises_for_category(category, limit_per_part=3) if exercisedb.is_configured() else []
+    using_exercisedb = any(e.get("gif_url") for e in exercises)
+    if not using_exercisedb:
+        exercises = wger.get_exercises_for_category(category, limit_per_part=3)
     for ex in exercises: ex["has_animation"] = bool(ex.get("gif_url"))
-    return {"category":category,"reason":reason,"scoring_method":scoring,"exercises":exercises,"animated_exercise_count":sum(1 for e in exercises if e["has_animation"]),"exercisedb_configured":exercisedb.is_configured()}
+    return {"category":category,"reason":reason,"scoring_method":scoring,"exercises":exercises,"animated_exercise_count":sum(1 for e in exercises if e["has_animation"]),"exercisedb_configured":using_exercisedb}

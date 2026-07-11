@@ -10,17 +10,24 @@ import json
 import os
 import time
 import requests as http_req
+import stripe
 from database.connection import get_connection
 from middleware.auth import generate_token, role_required
 from routes.dietitian import UpdateTrainerProfileSchema, CertificationSchema
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_admins
+from utils.fx import npr_to_usd_cents
 
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
 ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
 ESEWA_URL          = os.getenv('ESEWA_URL', 'https://rc-epay.esewa.com.np/api/epay/main/v2/form')
+STRIPE_SECRET_KEY  = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_CURRENCY    = os.getenv('STRIPE_CURRENCY', 'usd')
 FRONTEND_URL       = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+stripe.api_key = STRIPE_SECRET_KEY
+
+STRIPE_MIN_USD_CENTS = 50  # Stripe's minimum chargeable amount in USD
 
 user_bp = Blueprint('user', __name__)
 
@@ -45,8 +52,8 @@ class PlaceOrderSchema(BaseModel):
     @field_validator('payment_method')
     @classmethod
     def validate_payment_method(cls, v: str) -> str:
-        if v not in ('cod', 'esewa', 'khalti'):
-            raise ValueError('payment_method must be cod, esewa, or khalti')
+        if v not in ('cod', 'esewa', 'stripe'):
+            raise ValueError('payment_method must be cod, esewa, or stripe')
         return v
 
 
@@ -417,6 +424,51 @@ def place_order():
                 'payment_method': 'esewa',
                 'esewa_url': ESEWA_URL,
                 'esewa_params': esewa_params,
+            }), 201
+
+        # ── Stripe ───────────────────────────────────────────────────────────
+        if body.payment_method == 'stripe':
+            if not STRIPE_SECRET_KEY:
+                return jsonify({
+                    'error': 'Stripe is not configured. Set STRIPE_SECRET_KEY in backend/.env '
+                             '(get a test secret key from https://dashboard.stripe.com/test/apikeys).',
+                }), 503
+
+            usd_amount, usd_cents, fx_rate = npr_to_usd_cents(final_total)
+            if usd_cents < STRIPE_MIN_USD_CENTS:
+                return jsonify({
+                    'error': f'Order total is too small to charge via Stripe '
+                             f'(minimum ~Rs. {STRIPE_MIN_USD_CENTS / 100 * fx_rate:.0f}). '
+                             'Please choose another payment method.',
+                }), 400
+
+            try:
+                session = stripe.checkout.Session.create(
+                    mode='payment',
+                    payment_method_types=['card'],
+                    line_items=[{
+                        'price_data': {
+                            'currency': STRIPE_CURRENCY,
+                            'product_data': {'name': f"Order #{order_id} (Rs. {final_total:.2f})"},
+                            'unit_amount': usd_cents,
+                        },
+                        'quantity': 1,
+                    }],
+                    success_url=f"{FRONTEND_URL}/payment/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+                    cancel_url=f"{FRONTEND_URL}/payment/stripe/cancel",
+                    metadata={'order_id': str(order_id)},
+                    client_reference_id=transaction_uuid,
+                )
+            except Exception as e:
+                return jsonify({'error': f'Stripe error: {e}'}), 502
+
+            return jsonify({
+                'id': order_id,
+                'payment_method': 'stripe',
+                'stripe_url': session.url,
+                'session_id': session.id,
+                'usd_amount': usd_amount,
+                'fx_rate': fx_rate,
             }), 201
     except Exception as e:
         conn.rollback()
@@ -1117,19 +1169,19 @@ def get_subscription():
         conn.close()
 
 
-SUBSCRIPTION_PRICE_NPR = 999  # Rs 999 per month for Pro
+SUBSCRIPTION_PRICE_NPR = 200  # Rs 200 per month for Pro
 
 @user_bp.route('/subscription', methods=['PUT'])
 @role_required('trainee')
 def update_subscription():
     body = request.get_json() or {}
     plan   = body.get('plan', '').strip()
-    method = body.get('method', 'cash').strip()  # 'cash' or 'esewa'
+    method = body.get('method', 'cash').strip()  # 'cash', 'esewa', or 'stripe'
 
     if plan not in ('free', 'pro'):
         return jsonify({'error': 'plan must be free or pro'}), 400
-    if plan == 'pro' and method not in ('cash', 'esewa'):
-        return jsonify({'error': 'method must be cash or esewa'}), 400
+    if plan == 'pro' and method not in ('cash', 'esewa', 'stripe'):
+        return jsonify({'error': 'method must be cash, esewa, or stripe'}), 400
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -1165,31 +1217,72 @@ def update_subscription():
             conn.commit()
             return jsonify({'subscription_plan': 'pro', 'subscription_status': 'pending', 'payment_method': 'cash'})
 
-        # eSewa — build payment form, don't update plan yet (update on verify)
-        amount_str       = f"{SUBSCRIPTION_PRICE_NPR}.00"
-        transaction_uuid = f"sub-{request.user_id}-{int(time.time() * 1000)}"
-        message = f"total_amount={amount_str},transaction_uuid={transaction_uuid},product_code={ESEWA_PRODUCT_CODE}"
-        sig = base64.b64encode(
-            hmac.new(ESEWA_SECRET.encode(), message.encode(), hashlib.sha256).digest()
-        ).decode()
+        if method == 'esewa':
+            # eSewa — build payment form, don't update plan yet (update on verify)
+            amount_str       = f"{SUBSCRIPTION_PRICE_NPR}.00"
+            transaction_uuid = f"sub-{request.user_id}-{int(time.time() * 1000)}"
+            message = f"total_amount={amount_str},transaction_uuid={transaction_uuid},product_code={ESEWA_PRODUCT_CODE}"
+            sig = base64.b64encode(
+                hmac.new(ESEWA_SECRET.encode(), message.encode(), hashlib.sha256).digest()
+            ).decode()
 
-        esewa_params = {
-            'amount':                   amount_str,
-            'tax_amount':               '0',
-            'total_amount':             amount_str,
-            'transaction_uuid':         transaction_uuid,
-            'product_code':             ESEWA_PRODUCT_CODE,
-            'product_service_charge':   '0',
-            'product_delivery_charge':  '0',
-            'success_url': f"{FRONTEND_URL}/payment/subscription/esewa/success",
-            'failure_url': f"{FRONTEND_URL}/payment/subscription/esewa/failure",
-            'signed_field_names': 'total_amount,transaction_uuid,product_code',
-            'signature': sig,
-        }
+            esewa_params = {
+                'amount':                   amount_str,
+                'tax_amount':               '0',
+                'total_amount':             amount_str,
+                'transaction_uuid':         transaction_uuid,
+                'product_code':             ESEWA_PRODUCT_CODE,
+                'product_service_charge':   '0',
+                'product_delivery_charge':  '0',
+                'success_url': f"{FRONTEND_URL}/payment/subscription/esewa/success",
+                'failure_url': f"{FRONTEND_URL}/payment/subscription/esewa/failure",
+                'signed_field_names': 'total_amount,transaction_uuid,product_code',
+                'signature': sig,
+            }
+            return jsonify({
+                'payment_method': 'esewa',
+                'esewa_url':    ESEWA_URL,
+                'esewa_params': esewa_params,
+            })
+
+        # Stripe — initiate payment, don't update plan yet (update on verify)
+        if not STRIPE_SECRET_KEY:
+            return jsonify({
+                'error': 'Stripe is not configured. Set STRIPE_SECRET_KEY in backend/.env '
+                         '(get a test secret key from https://dashboard.stripe.com/test/apikeys).',
+            }), 503
+
+        usd_amount, usd_cents, fx_rate = npr_to_usd_cents(SUBSCRIPTION_PRICE_NPR)
+        if usd_cents < STRIPE_MIN_USD_CENTS:
+            return jsonify({'error': 'Subscription price is too small to charge via Stripe.'}), 400
+
+        transaction_uuid = f"sub-{request.user_id}-{int(time.time() * 1000)}"
+        try:
+            session = stripe.checkout.Session.create(
+                mode='payment',
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': STRIPE_CURRENCY,
+                        'product_data': {'name': f'SmartDiet Pro Subscription (Rs. {SUBSCRIPTION_PRICE_NPR})'},
+                        'unit_amount': usd_cents,
+                    },
+                    'quantity': 1,
+                }],
+                success_url=f"{FRONTEND_URL}/payment/subscription/stripe/return?session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{FRONTEND_URL}/payment/subscription/stripe/cancel",
+                metadata={'user_id': str(request.user_id)},
+                client_reference_id=transaction_uuid,
+            )
+        except Exception as e:
+            return jsonify({'error': f'Stripe error: {e}'}), 502
+
         return jsonify({
-            'payment_method': 'esewa',
-            'esewa_url':    ESEWA_URL,
-            'esewa_params': esewa_params,
+            'payment_method': 'stripe',
+            'stripe_url': session.url,
+            'session_id': session.id,
+            'usd_amount': usd_amount,
+            'fx_rate': fx_rate,
         })
 
     except Exception as e:

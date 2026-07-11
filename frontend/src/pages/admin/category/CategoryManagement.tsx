@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, Tag, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,29 +11,43 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Category } from "@/types";
 import CategoryFormDialog from "./CategoryFormDialog";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
+import { SearchInput } from "@/components/ui/search-input";
 
 export default function CategoryManagement() {
+  const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
-  const { page, pageSize, goToPage, setPageSize } = usePagination({
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
     initialPageSize: 10,
   });
 
   const { GetCategories, DeleteCategory } = useAdmin();
   const { data: categoriesData } = GetCategories({
-    queryParams: { page, page_size: pageSize },
+    queryParams: { page, page_size: pageSize, search: search || undefined },
   });
   const categories = categoriesData?.items ?? [];
   const total = categoriesData?.total ?? 0;
   const deleteCategory = DeleteCategory();
+
+  function handleSearch(value: string) {
+    setSearch(value);
+    resetPage();
+  }
 
   function openAdd() {
     setEditing(null);
@@ -78,6 +92,19 @@ export default function CategoryManagement() {
         </Button>
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative max-w-sm flex-1">
+          <SearchInput
+            value={search}
+            onSearch={handleSearch}
+            placeholder="Search categories…"
+          />
+        </div>
+        <p className="shrink-0 text-sm text-muted-foreground">
+          {total} {total === 1 ? "category" : "categories"}
+        </p>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -102,24 +129,28 @@ export default function CategoryManagement() {
                     {category.description ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(category)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteClick(category)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(category)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => handleDeleteClick(category)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
@@ -130,7 +161,7 @@ export default function CategoryManagement() {
                     className="py-12 text-center text-muted-foreground"
                   >
                     <Tag className="mx-auto mb-2 h-10 w-10 opacity-30" />
-                    No categories yet
+                    {search ? "No categories match your search" : "No categories yet"}
                   </TableCell>
                 </TableRow>
               )}

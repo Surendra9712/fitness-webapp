@@ -33,6 +33,10 @@ const PRO_ONLY = [
   "AI Recommendation — personalised fitness plans",
 ];
 
+// Used only until the live rate loads; the authoritative conversion always
+// happens server-side and the exact charge is shown on Stripe's checkout page.
+const NPR_TO_USD_RATE_FALLBACK = 133;
+
 // ── eSewa auto-submit form ────────────────────────────────────────────────────
 
 function EsewaAutoForm({ url, params }: { url: string; params: EsewaParams }) {
@@ -57,10 +61,12 @@ function PaymentDialog({
   onClose,
   onSelect,
   loading,
+  nprToUsdRate,
 }: {
   onClose: () => void;
   onSelect: (method: SubscriptionPaymentMethod) => void;
   loading: boolean;
+  nprToUsdRate: number;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -69,7 +75,7 @@ function PaymentDialog({
           <div>
             <h2 className="text-lg font-bold">Choose Payment Method</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Pro plan — Rs 999 / month
+              Pro plan — Rs {import.meta.env.VITE_PRO_PLAN_FEE} / month
             </p>
           </div>
           <button
@@ -85,11 +91,9 @@ function PaymentDialog({
           <button
             disabled={loading}
             onClick={() => onSelect("esewa")}
-            className="w-full flex items-center gap-4 rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-4 text-left hover:border-emerald-400 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+            className="w-full flex items-center gap-4 rounded-xl border-2 border-primary-200 bg-primary-50 px-4 py-4 text-left hover:border-primary-400 hover:bg-primary-100 transition-colors disabled:opacity-50"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white font-black text-xs">
-              e
-            </div>
+            <img src="/esewaLogo.png" className="h-12" />
             <div>
               <p className="font-semibold text-sm">eSewa</p>
               <p className="text-xs text-muted-foreground">
@@ -97,9 +101,35 @@ function PaymentDialog({
               </p>
             </div>
             {loading ? (
-              <Loader2 className="ml-auto h-4 w-4 animate-spin text-emerald-600" />
+              <Loader2 className="ml-auto h-4 w-4 animate-spin text-primary-600" />
             ) : (
-              <CreditCard className="ml-auto h-4 w-4 text-emerald-600" />
+              <CreditCard className="ml-auto h-4 w-4 text-primary-600" />
+            )}
+          </button>
+
+          {/* Stripe */}
+          <button
+            disabled={loading}
+            onClick={() => onSelect("stripe")}
+            className="w-full flex items-center gap-4 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-4 text-left hover:border-indigo-400 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600">
+              <CreditCard className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Card (Stripe)</p>
+              <p className="text-xs text-muted-foreground">
+                Pay online — activates immediately (≈ $
+                {(
+                  Number(import.meta.env.VITE_PRO_PLAN_FEE) / nprToUsdRate
+                ).toFixed(2)}
+                )
+              </p>
+            </div>
+            {loading ? (
+              <Loader2 className="ml-auto h-4 w-4 animate-spin text-indigo-600" />
+            ) : (
+              <CreditCard className="ml-auto h-4 w-4 text-indigo-600" />
             )}
           </button>
 
@@ -129,8 +159,10 @@ function PaymentDialog({
 
 export default function Subscription() {
   const { user, refreshUser } = useAuth();
-  const { UpdateSubscription } = useUser();
+  const { UpdateSubscription, GetFxRate } = useUser();
   const updatePlan = UpdateSubscription();
+  const { data: fxRateData } = GetFxRate({});
+  const nprToUsdRate = fxRateData?.npr_to_usd_rate ?? NPR_TO_USD_RATE_FALLBACK;
 
   const [showDialog, setShowDialog] = useState(false);
   const [esewaData, setEsewaData] = useState<{
@@ -148,11 +180,18 @@ export default function Subscription() {
   async function handleMethodSelect(method: SubscriptionPaymentMethod) {
     try {
       const res = await updatePlan.mutateAsync({ plan: "pro", method });
+      console.log("Update subscription response:", res);
 
       if (method === "esewa" && res.esewa_url && res.esewa_params) {
         // Redirect to eSewa — auto-submit form
         setEsewaData({ url: res.esewa_url, params: res.esewa_params });
         setShowDialog(false);
+        return;
+      }
+
+      if (method === "stripe" && res.stripe_url) {
+        setShowDialog(false);
+        window.location.href = res.stripe_url;
         return;
       }
 
@@ -190,6 +229,7 @@ export default function Subscription() {
           onClose={() => setShowDialog(false)}
           onSelect={handleMethodSelect}
           loading={updatePlan.isPending}
+          nprToUsdRate={nprToUsdRate}
         />
       )}
 
@@ -243,7 +283,7 @@ export default function Subscription() {
               <ul className="space-y-2">
                 {FREE_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <Check className="h-4 w-4 text-primary-500 shrink-0 mt-0.5" />
                     {f}
                   </li>
                 ))}
@@ -286,7 +326,7 @@ export default function Subscription() {
                 Pro
               </CardTitle>
               <p className="text-3xl font-black text-primary">
-                Rs 999{" "}
+                Rs {import.meta.env.VITE_PRO_PLAN_FEE}{" "}
                 <span className="text-sm font-normal text-muted-foreground">
                   / month
                 </span>
@@ -296,7 +336,7 @@ export default function Subscription() {
               <ul className="space-y-2">
                 {FREE_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <Check className="h-4 w-4 text-primary-500 shrink-0 mt-0.5" />
                     {f}
                   </li>
                 ))}

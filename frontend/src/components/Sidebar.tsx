@@ -260,12 +260,6 @@ export default function Sidebar() {
             alt={import.meta.env.VITE_APP_NAME}
             className="h-14 w-auto"
           />
-          {/* <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
-            <Leaf className="h-4 w-4 text-emerald-400" />
-          </div> */}
-          {/* <span className="text-base font-bold tracking-tight">
-            {import.meta.env.VITE_APP_NAME} Pro
-          </span> */}
         </NavLink>
       </div>
 
@@ -287,8 +281,8 @@ export default function Sidebar() {
                     `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors
                     ${
                       isActive
-                        ? "bg-emerald-500/20 text-white"
-                        : "text-emerald-200/80 hover:bg-white/8 hover:text-white"
+                        ? "bg-primary-500/20 text-white"
+                        : "text-primary-200/80 hover:bg-white/8 hover:text-white"
                     }`
                   }
                 >
@@ -318,18 +312,18 @@ export default function Sidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5 text-left transition-colors hover:bg-white/10">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/30 text-xs font-bold text-emerald-300">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-500/30 text-xs font-bold text-primary-300">
                 {user.name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-white">
                   {user.name}
                 </div>
-                <div className="truncate text-[11px] text-emerald-300/70">
+                <div className="truncate text-[11px] text-primary-300/70">
                   {user.email ?? ""}
                 </div>
               </div>
-              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-emerald-300/70" />
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-primary-300/70" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
@@ -371,7 +365,7 @@ export default function Sidebar() {
     <>
       {/* Mobile toggle button */}
       <button
-        className="fixed left-4 top-3.5 z-50 flex h-7 w-7 items-center justify-center rounded-md bg-emerald-900 text-white lg:hidden"
+        className={`fixed ${open ? "left-50" : "left-4"} top-3.5 z-50 flex h-7 w-7 items-center justify-center rounded-md bg-primary-900 text-white lg:hidden`}
         onClick={() => setOpen((v) => !v)}
         aria-label="Toggle sidebar"
       >
@@ -388,7 +382,7 @@ export default function Sidebar() {
 
       {/* Sidebar panel */}
       <aside
-        className={`fixed inset-y-0 h-screen left-0 z-40 w-60 bg-emerald-950 transition-transform duration-200  lg:translate-x-0
+        className={`fixed inset-y-0 h-screen left-0 z-40 w-60 bg-primary-950 transition-transform duration-200  lg:translate-x-0
           ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         {sidebarContent}

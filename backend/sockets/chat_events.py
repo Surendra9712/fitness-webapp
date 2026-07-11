@@ -8,6 +8,15 @@ from middleware.auth import decode_token_string
 # sid -> {'user_id': int, 'role': str}. In-memory is fine for a single-process dev server.
 sid_users = {}
 
+# user_id -> set of sids currently connected as that user (a person can have
+# more than one tab/device open). Used to tell whether a call target is
+# reachable at all before ringing them.
+online_sids_by_user = {}
+
+
+def is_user_online(user_id):
+    return bool(online_sids_by_user.get(user_id))
+
 
 def _get_assignment(cursor, assignment_id):
     cursor.execute(
@@ -33,6 +42,7 @@ def handle_connect(auth):
     if err:
         return False
     sid_users[request.sid] = {'user_id': data['user_id'], 'role': data['role']}
+    online_sids_by_user.setdefault(data['user_id'], set()).add(request.sid)
     # Personal room so this user receives messages for ANY of their threads
     # (e.g. sidebar previews/unread counts), not just the one they currently
     # have open — join_thread's per-assignment room only covers that thread's
@@ -42,7 +52,14 @@ def handle_connect(auth):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    sid_users.pop(request.sid, None)
+    user = sid_users.pop(request.sid, None)
+    if not user:
+        return
+    sids = online_sids_by_user.get(user['user_id'])
+    if sids:
+        sids.discard(request.sid)
+        if not sids:
+            online_sids_by_user.pop(user['user_id'], None)
 
 
 @socketio.on('join_thread')

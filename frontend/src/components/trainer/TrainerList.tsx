@@ -1,11 +1,10 @@
-import { useState, useMemo } from "react";
-import { Search, Send, Users, Mail, Dumbbell, X, Clock } from "lucide-react";
+import { Send, Users, Mail, Dumbbell, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { AppPagination } from "@/components/ui/app-pagination";
 import { StarDisplay } from "@/components/ui/star-rating";
 import type { TrainerInfo } from "@/types";
 import { AvatarImage } from "@radix-ui/react-avatar";
+import { SearchInput } from "../ui/search-input";
 
 const PAGE_SIZE = 5;
 
@@ -33,16 +32,16 @@ interface Props {
   onRequest: (trainer: TrainerInfo) => void;
   onCancel: (trainer: TrainerInfo) => void;
   onViewDetail: (trainer: TrainerInfo) => void;
+  onSearch: (e: string) => void;
 }
 
-export function TrainerList({ trainers, onRequest, onCancel, onViewDetail }: Props) {
-  const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-
-  function applySearch() {
-    setAppliedSearch(searchInput);
-  }
-
+export function TrainerList({
+  trainers,
+  onRequest,
+  onCancel,
+  onViewDetail,
+  onSearch,
+}: Props) {
   return (
     <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
       {/* ── Header ── */}
@@ -64,27 +63,15 @@ export function TrainerList({ trainers, onRequest, onCancel, onViewDetail }: Pro
       {/* ── Search ── */}
       <div className="flex items-center gap-3 px-6 py-4 border-b bg-muted/20">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search by name or email…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && applySearch()}
-            className="w-full rounded-xl border border-border bg-background pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-muted-foreground"
-          />
+          <SearchInput onSearch={onSearch} />
         </div>
-        <Button className="gap-2 rounded-xl px-5" onClick={applySearch}>
-          <Search className="h-3.5 w-3.5" />
-          Search
-        </Button>
       </div>
 
       {/* ── Rows ── */}
       <div className="divide-y">
         {trainers.length === 0 ? (
           <div className="py-14 text-center text-sm text-muted-foreground">
-            No trainers found{appliedSearch ? ` for "${appliedSearch}"` : ""}.
+            No trainers found
           </div>
         ) : (
           trainers.map((t) => {
@@ -119,7 +106,8 @@ export function TrainerList({ trainers, onRequest, onCancel, onViewDetail }: Pro
                       <>
                         <Clock className="h-3 w-3 text-amber-500" />
                         <span className="text-xs font-semibold text-amber-600">
-                          {PENDING_STATUS_LABEL[t.my_pending_status ?? ""] ?? "Requested"}
+                          {PENDING_STATUS_LABEL[t.my_pending_status ?? ""] ??
+                            "Requested"}
                         </span>
                       </>
                     ) : (

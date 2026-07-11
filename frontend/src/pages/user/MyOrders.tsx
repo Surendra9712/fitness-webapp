@@ -24,7 +24,7 @@ const STATUS_COLORS: Record<
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cod: "Cash on Delivery",
   esewa: "eSewa",
-  khalti: "Khalti",
+  stripe: "Card",
 };
 
 export default function MyOrders() {
@@ -84,9 +84,9 @@ export default function MyOrders() {
           {orders.map((order) => (
             <Card key={order.id}>
               <CardContent className="p-0">
-                <div className="flex w-full items-center justify-between px-4 py-3 gap-2">
+                <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                   <button
-                    className="flex flex-1 items-center gap-4 text-left"
+                    className="flex flex-1 flex-wrap items-center gap-2 text-left sm:gap-4"
                     onClick={() =>
                       setExpanded(expanded === order.id ? null : order.id)
                     }
@@ -105,50 +105,53 @@ export default function MyOrders() {
                     </Badge>
                   </button>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center justify-between gap-2 sm:shrink-0 sm:justify-end">
                     <span className="font-bold">
                       Rs. {Number(order.total_amount).toFixed(2)}
                     </span>
 
-                    {order.status === "pending" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        disabled={
-                          cancelOrder.isPending && pendingCancelId === order.id
-                        }
-                        onClick={() => handleCancelClick(order.id)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        {cancelOrder.isPending && pendingCancelId === order.id
-                          ? "Cancelling…"
-                          : "Cancel"}
-                      </Button>
-                    )}
-
-                    <button
-                      onClick={() =>
-                        setExpanded(expanded === order.id ? null : order.id)
-                      }
-                    >
-                      {expanded === order.id ? (
-                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-1">
+                      {order.status === "pending" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={
+                            cancelOrder.isPending &&
+                            pendingCancelId === order.id
+                          }
+                          onClick={() => handleCancelClick(order.id)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          {cancelOrder.isPending && pendingCancelId === order.id
+                            ? "Cancelling…"
+                            : "Cancel"}
+                        </Button>
                       )}
-                    </button>
+
+                      <button
+                        onClick={() =>
+                          setExpanded(expanded === order.id ? null : order.id)
+                        }
+                      >
+                        {expanded === order.id ? (
+                          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {expanded === order.id && (
-                  <div className="border-t px-4 py-3 space-y-2 bg-muted/20">
+                  <div className="space-y-2 border-t bg-muted/20 px-4 py-3">
                     {order.items?.map((item) => (
                       <div
                         key={item.id}
-                        className="flex justify-between text-sm"
+                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm"
                       >
-                        <span>
+                        <span className="min-w-0 break-words">
                           {item.product_name}{" "}
                           <span className="text-muted-foreground">
                             × {item.quantity}
@@ -161,9 +164,11 @@ export default function MyOrders() {
                       </div>
                     ))}
 
-                    <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                    <div className="mt-2 flex flex-col gap-1 border-t pt-2 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1">
                       {order.shipping_address && (
-                        <span>Shipping to: {order.shipping_address}</span>
+                        <span className="break-words">
+                          Shipping to: {order.shipping_address}
+                        </span>
                       )}
                       {(order as Order & { payment_method?: string })
                         .payment_method && (

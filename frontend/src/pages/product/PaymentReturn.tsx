@@ -82,44 +82,31 @@ export default function PaymentReturn() {
       return;
     }
 
-    // ── Khalti return ────────────────────────────────────────────────────────
-    if (path.includes("/khalti/return")) {
-      const pidx = params.get("pidx");
-      const txnStatus = params.get("status");
-      const txnMsg = params.get("message");
+    // ── Stripe cancel ────────────────────────────────────────────────────────
+    if (path.includes("/stripe/cancel")) {
+      setStatus("failed");
+      setHeading("Payment Cancelled");
+      setDetail("You cancelled the Stripe checkout. No charge was made.");
+      return;
+    }
 
-      if (txnStatus === "User canceled") {
-        setStatus("failed");
-        setHeading("Payment Cancelled");
-        setDetail("You cancelled the Khalti payment. No charge was made.");
-        return;
-      }
+    // ── Stripe return ────────────────────────────────────────────────────────
+    if (path.includes("/stripe/return")) {
+      const sessionId = params.get("session_id");
 
-      if (txnStatus && txnStatus !== "Completed") {
-        setStatus("failed");
-        setHeading("Khalti Payment Failed");
-        setDetail(
-          txnMsg
-            ? `Khalti: ${txnMsg} (status: ${txnStatus})`
-            : `Payment status from Khalti: "${txnStatus}". No charge was made.`,
-        );
-        return;
-      }
-
-      if (!pidx) {
+      if (!sessionId) {
         setStatus("failed");
         setHeading("Verification Failed");
         setDetail(
-          "Khalti did not return a payment reference. Please contact support.",
+          "Stripe did not return a session reference. Please contact support.",
         );
         return;
       }
 
       api
-        .post<{ message: string; order_id: number }>(
-          "/payments/khalti/verify",
-          { pidx },
-        )
+        .post<{ message: string; order_id: number }>("/payments/stripe/verify", {
+          session_id: sessionId,
+        })
         .then((res) => {
           setOrderId(res.order_id);
           setStatus("success");
@@ -129,7 +116,7 @@ export default function PaymentReturn() {
         .catch((e: Error) => {
           setStatus("failed");
           setHeading("Payment Verification Failed");
-          setDetail(e.message || "Could not verify your Khalti payment.");
+          setDetail(e.message || "Could not verify your Stripe payment.");
         });
     }
   }, [location]);

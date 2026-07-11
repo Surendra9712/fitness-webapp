@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Banknote,
+  CreditCard,
 } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import type { GlobalDiscount } from "@/types";
@@ -24,7 +26,7 @@ import {
   DrawerFooter,
 } from "@/components/ui/drawer";
 import { toast } from "sonner";
-import type { PromoValidateResult } from "@/types";
+import type { Order, PromoValidateResult } from "@/types";
 
 export interface CheckoutItem {
   product_id: number;
@@ -42,7 +44,7 @@ interface Props {
   onSuccess: () => void;
 }
 
-type PaymentMethod = "cod" | "esewa";
+type PaymentMethod = "cod" | "esewa" | "stripe";
 
 interface EsewaParams {
   amount: string;
@@ -57,6 +59,19 @@ interface EsewaParams {
   signed_field_names: string;
   signature: string;
 }
+
+type OrderPaymentResponse = Order & {
+  points_earned?: number;
+  esewa_url?: string;
+  esewa_params?: EsewaParams;
+  stripe_url?: string;
+  session_id?: string;
+  usd_amount?: number;
+};
+
+// Used only until the live rate loads; the authoritative conversion always
+// happens server-side and the exact charge is shown on Stripe's checkout page.
+const NPR_TO_USD_RATE_FALLBACK = 133;
 
 function submitEsewaForm(url: string, params: EsewaParams) {
   const form = document.createElement("form");
@@ -78,18 +93,28 @@ const PAYMENT_METHODS: {
   label: string;
   sub: string;
   active: string;
+  img?: string | null;
 }[] = [
   {
     key: "cod",
     label: "Cash on Delivery",
     sub: "Pay when your order arrives",
     active: "bg-amber-50 border-amber-400 text-amber-800",
+    img: null,
   },
   {
+    img: "/esewaLogo.png",
     key: "esewa",
     label: "eSewa",
     sub: "Secure digital wallet payment",
     active: "bg-green-50 border-green-500 text-green-800",
+  },
+  {
+    key: "stripe",
+    label: "Card",
+    sub: "Pay securely with credit/debit card via Stripe",
+    active: "bg-indigo-50 border-indigo-500 text-indigo-800",
+    img: null,
   },
 ];
 
@@ -116,7 +141,7 @@ export default function CheckoutDialog({
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [availablePoints, setAvailablePoints] = useState(0);
 
-  const { CreateOrder, ValidatePromo, GetPoints, GetGlobalDiscount } =
+  const { CreateOrder, ValidatePromo, GetPoints, GetGlobalDiscount, GetFxRate } =
     useUser();
   const createOrder = CreateOrder();
   const validatePromo = ValidatePromo();
@@ -124,6 +149,8 @@ export default function CheckoutDialog({
   const { data: pointsData } = GetPoints({});
   const { data: globalDiscountData } = GetGlobalDiscount({});
   const globalDiscount = globalDiscountData as GlobalDiscount | undefined;
+  const { data: fxRateData } = GetFxRate({});
+  const nprToUsdRate = fxRateData?.npr_to_usd_rate ?? NPR_TO_USD_RATE_FALLBACK;
 
   useEffect(() => {
     if (open) {
@@ -242,7 +269,7 @@ export default function CheckoutDialog({
     }
 
     try {
-      const res = await createOrder.mutateAsync({
+      const res = (await createOrder.mutateAsync({
         items: cartItems.map((i) => ({
           product_id: i.product_id,
           quantity: i.quantity,
@@ -251,11 +278,11 @@ export default function CheckoutDialog({
         payment_method: paymentMethod,
         promo_code: appliedPromo?.code,
         points_to_redeem: usePoints ? pointsToRedeem : 0,
-      });
+      })) as OrderPaymentResponse;
       clear();
 
       if (paymentMethod === "cod") {
-        const earned = (res as { points_earned?: number }).points_earned ?? 0;
+        const earned = res.points_earned ?? 0;
         toast.success(
           earned > 0
             ? `Order placed! You earned ${earned} reward points.`
@@ -266,14 +293,13 @@ export default function CheckoutDialog({
         return;
       }
 
-      if (
-        paymentMethod === "esewa" &&
-        (res as { esewa_url?: string }).esewa_url
-      ) {
-        submitEsewaForm(
-          (res as { esewa_url: string }).esewa_url,
-          (res as { esewa_params: EsewaParams }).esewa_params,
-        );
+      if (paymentMethod === "esewa" && res.esewa_url && res.esewa_params) {
+        submitEsewaForm(res.esewa_url, res.esewa_params);
+        return;
+      }
+
+      if (paymentMethod === "stripe" && res.stripe_url) {
+        window.location.href = res.stripe_url;
         return;
       }
     } catch (e) {
@@ -559,10 +585,25 @@ export default function CheckoutDialog({
                     : "border-border bg-background hover:bg-muted"
                 }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">{m.label}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    {m.sub}
+                <div className="flex flex-1 min-w-0 items-center gap-2">
+                  {m.img ? (
+                    <img src={m.img} alt={m.label} className="h-6 w-6 shrink-0" />
+                  ) : m.key === "stripe" ? (
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600">
+                      <CreditCard className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  ) : (
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <Banknote className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{m.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {m.key === "stripe"
+                        ? `${m.sub} (≈ $${(finalTotal / nprToUsdRate).toFixed(2)})`
+                        : m.sub}
+                    </div>
                   </div>
                 </div>
                 <div
@@ -593,7 +634,9 @@ export default function CheckoutDialog({
               className={`flex-1 ${
                 paymentMethod === "esewa"
                   ? "bg-primary-600 hover:bg-primary-700 text-white"
-                  : ""
+                  : paymentMethod === "stripe"
+                    ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                    : ""
               }`}
               onClick={handleSubmit}
               disabled={createOrder.isPending || cartItems.length === 0}
@@ -602,7 +645,9 @@ export default function CheckoutDialog({
                 ? "Processing…"
                 : paymentMethod === "cod"
                   ? `Place Order · Rs. ${finalTotal.toFixed(2)}`
-                  : `Pay Rs. ${finalTotal} with eSewa`}
+                  : paymentMethod === "esewa"
+                    ? `Pay Rs. ${finalTotal} with eSewa`
+                    : `Pay ≈ $${(finalTotal / nprToUsdRate).toFixed(2)} with Card`}
             </Button>
           </div>
         </DrawerFooter>

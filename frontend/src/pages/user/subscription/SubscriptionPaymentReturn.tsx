@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { CheckCircle2, XCircle, Loader2, Crown } from "lucide-react";
+import { XCircle, Loader2, Crown } from "lucide-react";
 import { api } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import PublicLayout from "@/components/PublicLayout";
@@ -58,6 +58,45 @@ export default function SubscriptionPaymentReturn() {
           setStatus("failed");
           setHeading("Verification Failed");
           setDetail(e.message || "Could not verify your eSewa payment.");
+        });
+      return;
+    }
+
+    if (path.includes("/stripe/cancel")) {
+      setStatus("failed");
+      setHeading("Payment Cancelled");
+      setDetail("You cancelled the Stripe checkout. No charge was made.");
+      return;
+    }
+
+    if (path.includes("/stripe/return")) {
+      const sessionId = params.get("session_id");
+
+      if (!sessionId) {
+        setStatus("failed");
+        setHeading("Verification Failed");
+        setDetail(
+          "Stripe did not return a session reference. Please contact support.",
+        );
+        return;
+      }
+
+      api
+        .post<{ message: string }>("/payments/subscription/stripe/verify", {
+          session_id: sessionId,
+        })
+        .then(async () => {
+          await refreshUser();
+          setStatus("success");
+          setHeading("Pro Plan Activated!");
+          setDetail(
+            "Your payment was verified. You now have full access to Pro features.",
+          );
+        })
+        .catch((e: Error) => {
+          setStatus("failed");
+          setHeading("Verification Failed");
+          setDetail(e.message || "Could not verify your Stripe payment.");
         });
     }
   }, [location]);

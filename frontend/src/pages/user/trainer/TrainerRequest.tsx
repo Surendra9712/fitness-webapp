@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, UserCheck } from "lucide-react";
+import { UserCheck } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
-import { Input } from "@/components/ui/input";
 import { TrainerList } from "@/components/trainer/TrainerList";
 import { TrainerRequestDialog } from "@/components/trainer/TrainerRequestDialog";
 import { TrainerDetailModal } from "@/components/trainer/TrainerDetailModal";
@@ -12,12 +11,15 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { TrainerInfo } from "@/types";
 
-export default function TrainerRequest({ embedded = false }: { embedded?: boolean }) {
+export default function TrainerRequest({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const queryClient = useQueryClient();
   const [requestTarget, setRequestTarget] = useState<TrainerInfo | null>(null);
   const [cancelTarget, setCancelTarget] = useState<TrainerInfo | null>(null);
   const [detailTarget, setDetailTarget] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
@@ -51,7 +53,6 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    setSearchQuery(search.trim());
     resetPage();
   }
 
@@ -67,17 +68,6 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
       )}
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search trainers…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </form>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
@@ -87,11 +77,6 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
         <div className="flex flex-col items-center gap-3 py-20 text-center">
           <UserCheck className="h-12 w-12 text-muted-foreground/30" />
           <p className="font-medium text-muted-foreground">No trainers found</p>
-          {searchQuery && (
-            <p className="text-sm text-muted-foreground">
-              Try a different search term.
-            </p>
-          )}
         </div>
       ) : (
         <>
@@ -100,6 +85,7 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
             onRequest={(t) => setRequestTarget(t)}
             onCancel={(t) => setCancelTarget(t)}
             onViewDetail={(t) => setDetailTarget(t.id)}
+            onSearch={setSearchQuery}
           />
           <AppPagination
             page={page}
@@ -113,7 +99,9 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
 
       <TrainerRequestDialog
         open={!!requestTarget}
-        onOpenChange={(open) => { if (!open) setRequestTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) setRequestTarget(null);
+        }}
         trainer={requestTarget}
         onSuccess={() => {
           setRequestTarget(null);
@@ -123,7 +111,9 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
 
       <ConfirmDialog
         open={!!cancelTarget}
-        onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
         title="Cancel trainer request?"
         description="Your pending request will be withdrawn. You can send a new request anytime."
         confirmLabel="Cancel Request"
@@ -132,7 +122,9 @@ export default function TrainerRequest({ embedded = false }: { embedded?: boolea
 
       <TrainerDetailModal
         trainerId={detailTarget}
-        onOpenChange={(open) => { if (!open) setDetailTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) setDetailTarget(null);
+        }}
       />
     </div>
   );

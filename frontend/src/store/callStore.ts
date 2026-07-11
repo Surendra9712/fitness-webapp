@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import { getSocket } from "@/lib/socket";
 import { ICE_SERVERS } from "@/lib/webrtc";
+import { startRingtone, stopRingtone } from "@/lib/ringtone";
 import type { CallStatus, CallType, IncomingCallInfo } from "@/types";
 
 interface CallState {
@@ -80,6 +81,7 @@ function resetCallState(
   set: (partial: Partial<CallState>) => void,
   get: () => CallState,
 ) {
+  stopRingtone();
   get()
     .localStream?.getTracks()
     .forEach((t) => t.stop());
@@ -131,6 +133,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         peerName: info.from_name,
         peerImage: info.from_image,
       });
+      startRingtone("incoming");
     });
 
     socket.on(
@@ -147,6 +150,7 @@ export const useCallStore = create<CallState>((set, get) => ({
           await pc.addIceCandidate(candidate).catch(() => {});
         }
         pendingCandidates = [];
+        stopRingtone();
         set({ status: "connected" });
       },
     );
@@ -181,6 +185,11 @@ export const useCallStore = create<CallState>((set, get) => ({
       resetCallState(set, get);
     });
 
+    socket.on("call:offline", () => {
+      toast.error(`${get().peerName || "The other person"} is offline right now`);
+      resetCallState(set, get);
+    });
+
     socket.on("call:error", ({ error }: { error: string }) => {
       toast.error(error || "Call failed");
       resetCallState(set, get);
@@ -207,6 +216,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         muted: false,
         cameraOff: false,
       });
+      startRingtone("outgoing");
 
       pc = createPeerConnection(assignmentId, set);
       localStream
@@ -229,6 +239,7 @@ export const useCallStore = create<CallState>((set, get) => ({
   acceptCall: async () => {
     const { assignmentId, callType } = get();
     if (!assignmentId || !callType || !pendingOffer) return;
+    stopRingtone();
     try {
       const localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,

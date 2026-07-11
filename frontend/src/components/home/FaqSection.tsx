@@ -18,7 +18,7 @@ const faqs = [
   },
   {
     q: "What fitness products can I buy on SmartDiet?",
-    a: "We stock a curated range of equipment, supplements, and recovery gear. You can browse, add to cart, and pay via Cash on Delivery, eSewa, or Khalti.",
+    a: "We stock a curated range of equipment, supplements, and recovery gear. You can browse, add to cart, and pay via Cash on Delivery, eSewa, or card (Stripe).",
   },
   {
     q: "Is my data safe?",

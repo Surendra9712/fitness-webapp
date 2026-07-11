@@ -1,7 +1,29 @@
-import { Trash2, FileText, Download } from "lucide-react";
+import {
+  Trash2,
+  FileText,
+  Download,
+  Phone,
+  Video,
+  PhoneMissed,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/date-utils";
 import type { ChatMessage } from "@/types";
+
+function formatCallDuration(totalSeconds: number) {
+  const m = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const s = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function callSummary(m: ChatMessage) {
+  const kind = m.call_type === "video" ? "Video call" : "Audio call";
+  if (m.call_outcome === "declined") return `${kind} · Declined`;
+  if (m.call_outcome === "canceled") return `${kind} · Missed`;
+  return `${kind} · ${formatCallDuration(m.call_duration_seconds ?? 0)}`;
+}
 
 interface Props {
   messages: ChatMessage[];
@@ -75,6 +97,26 @@ export default function ChatMessages({
                     className="mb-1 max-h-64 max-w-full rounded-lg object-cover"
                   />
                 </a>
+              )}
+              {m.attachment_type === "call" && (
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs",
+                    mine
+                      ? "border-primary-foreground/30"
+                      : "border-border bg-background/60",
+                  )}
+                >
+                  {m.call_outcome === "declined" ||
+                  m.call_outcome === "canceled" ? (
+                    <PhoneMissed className="h-4 w-4 shrink-0" />
+                  ) : m.call_type === "video" ? (
+                    <Video className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <Phone className="h-4 w-4 shrink-0" />
+                  )}
+                  <span>{callSummary(m)}</span>
+                </div>
               )}
               {m.attachment_type === "file" && m.attachment_url && (
                 <a

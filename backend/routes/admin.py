@@ -128,16 +128,33 @@ class TrainerAssignmentNoteSchema(BaseModel):
 @role_required('admin', 'dietitian', 'trainee')
 def list_categories():
     page, page_size, offset = parse_page_params(default_size=20, max_size=200)
+    search = request.args.get('search', '').strip()
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT COUNT(*) AS total FROM categories WHERE deleted_at IS NULL")
-        total = cursor.fetchone()['total']
-        cursor.execute(
-            "SELECT id, name, slug, description FROM categories "
-            "WHERE deleted_at IS NULL ORDER BY id LIMIT %s OFFSET %s",
-            (page_size, offset)
-        )
+        if search:
+            like = f"%{search}%"
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM categories WHERE deleted_at IS NULL "
+                "AND (name LIKE %s OR slug LIKE %s OR description LIKE %s)",
+                (like, like, like),
+            )
+            total = cursor.fetchone()['total']
+            cursor.execute(
+                "SELECT id, name, slug, description FROM categories "
+                "WHERE deleted_at IS NULL AND (name LIKE %s OR slug LIKE %s OR description LIKE %s) "
+                "ORDER BY id LIMIT %s OFFSET %s",
+                (like, like, like, page_size, offset),
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) AS total FROM categories WHERE deleted_at IS NULL")
+            total = cursor.fetchone()['total']
+            cursor.execute(
+                "SELECT id, name, slug, description FROM categories "
+                "WHERE deleted_at IS NULL ORDER BY id LIMIT %s OFFSET %s",
+                (page_size, offset)
+            )
         return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
         cursor.close()

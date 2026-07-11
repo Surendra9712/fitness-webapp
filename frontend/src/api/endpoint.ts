@@ -52,6 +52,7 @@ export const endpoint = {
   adminPromoCodes: "admin/promo-codes",
   adminGlobalDiscount: "admin/global-discount",
   publicGlobalDiscount: "public/global-discount",
+  publicFxRate: "public/fx-rate",
   userPromoValidate: "user/promo/validate",
   userPromoAvailable: "user/promo/available",
   userPoints: "user/points",

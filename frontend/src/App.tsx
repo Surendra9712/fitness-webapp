@@ -79,13 +79,22 @@ export default function App() {
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/payment/esewa/success" element={<PaymentReturn />} />
           <Route path="/payment/esewa/failure" element={<PaymentReturn />} />
-          <Route path="/payment/khalti/return" element={<PaymentReturn />} />
+          <Route path="/payment/stripe/return" element={<PaymentReturn />} />
+          <Route path="/payment/stripe/cancel" element={<PaymentReturn />} />
           <Route
             path="/payment/subscription/esewa/success"
             element={<SubscriptionPaymentReturn />}
           />
           <Route
             path="/payment/subscription/esewa/failure"
+            element={<SubscriptionPaymentReturn />}
+          />
+          <Route
+            path="/payment/subscription/stripe/return"
+            element={<SubscriptionPaymentReturn />}
+          />
+          <Route
+            path="/payment/subscription/stripe/cancel"
             element={<SubscriptionPaymentReturn />}
           />
           <Route path="/dashboard" element={<RoleRedirect />} />

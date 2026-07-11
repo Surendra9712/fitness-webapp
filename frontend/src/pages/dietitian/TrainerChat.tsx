@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, Phone, Video } from "lucide-react";
+import { ChevronLeft, MessageCircle, Phone, Video } from "lucide-react";
 import useChat from "@/hooks/useChat";
 import { useChatThread } from "@/hooks/useChatThread";
 import { useCallStore } from "@/store/callStore";
@@ -18,6 +18,7 @@ export default function TrainerChat() {
   const { data: threads, isLoading: threadsLoading } = GetThreads();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
   const callStatus = useCallStore((s) => s.status);
   const startCall = useCallStore((s) => s.startCall);
@@ -61,9 +62,14 @@ export default function TrainerChat() {
         </p>
       </div>
 
-      <Card className="flex h-[70vh] overflow-hidden p-0">
+      <Card className="flex h-[75vh] overflow-hidden p-0 sm:h-[70vh]">
         {/* Thread list */}
-        <div className="w-64 shrink-0 border-r overflow-y-auto">
+        <div
+          className={cn(
+            "w-full shrink-0 overflow-y-auto border-r sm:block sm:w-64",
+            mobileView === "chat" ? "hidden" : "block",
+          )}
+        >
           {threadsLoading && (
             <p className="p-4 text-sm text-muted-foreground">Loading…</p>
           )}
@@ -75,7 +81,10 @@ export default function TrainerChat() {
           {threads?.map((t) => (
             <button
               key={t.assignment_id}
-              onClick={() => setActiveId(t.assignment_id)}
+              onClick={() => {
+                setActiveId(t.assignment_id);
+                setMobileView("chat");
+              }}
               className={cn(
                 "flex w-full items-center gap-3 border-b px-3 py-3 text-left transition-colors hover:bg-muted/50",
                 activeId === t.assignment_id && "bg-muted",
@@ -107,30 +116,44 @@ export default function TrainerChat() {
         </div>
 
         {/* Active thread */}
-        <div className="flex flex-1 flex-col">
+        <div
+          className={cn(
+            "flex-1 flex-col sm:flex",
+            mobileView === "list" ? "hidden" : "flex",
+          )}
+        >
           {!activeThread ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+            <div className="hidden flex-1 flex-col items-center justify-center gap-2 text-muted-foreground sm:flex">
               <MessageCircle className="h-8 w-8" />
               <p className="text-sm">Select a client to start chatting</p>
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-3 border-b px-4 py-3">
-                <Avatar className="h-8 w-8">
+              <div className="flex items-center gap-2 border-b px-3 py-3 sm:gap-3 sm:px-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-ml-1 shrink-0 sm:hidden"
+                  aria-label="Back to conversations"
+                  onClick={() => setMobileView("list")}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Avatar className="h-8 w-8 shrink-0">
                   <AvatarImage src={activeThread.peer_image_url ?? undefined} />
                   <AvatarFallback className="text-xs">
                     {activeThread.peer_name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <p className="text-sm font-medium">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
                     {activeThread.peer_name}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {activeThread.peer_email}
                   </p>
                 </div>
-                <div className="ml-auto flex gap-1">
+                <div className="ml-auto flex shrink-0 gap-1">
                   <Button
                     variant="ghost"
                     size="icon"

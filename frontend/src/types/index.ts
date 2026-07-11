@@ -95,7 +95,7 @@ export interface Category {
 
 export type SubscriptionPlan = "free" | "pro";
 export type SubscriptionStatus = "active" | "pending" | "rejected";
-export type SubscriptionPaymentMethod = "cash" | "esewa";
+export type SubscriptionPaymentMethod = "cash" | "esewa" | "stripe";
 
 export interface EsewaParams {
   amount: string;
@@ -441,7 +441,8 @@ export interface Notification {
   created_at: string;
 }
 
-export type ChatAttachmentType = "image" | "file";
+export type ChatAttachmentType = "image" | "file" | "call";
+export type CallOutcome = "completed" | "declined" | "canceled";
 
 export interface ChatMessage {
   id: number;
@@ -453,6 +454,9 @@ export interface ChatMessage {
   attachment_url?: string | null;
   attachment_type?: ChatAttachmentType | null;
   attachment_name?: string | null;
+  call_type?: CallType | null;
+  call_outcome?: CallOutcome | null;
+  call_duration_seconds?: number | null;
 }
 
 export interface ChatThread {

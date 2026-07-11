@@ -5,7 +5,7 @@ import json
 import os
 from typing import Optional
 
-import requests as http_req
+import stripe
 from flask import Blueprint, jsonify, request
 from database.connection import get_connection
 from middleware.auth import role_required
@@ -14,6 +14,8 @@ payment_bp = Blueprint('payment', __name__)
 
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
 ESEWA_PRODUCT_CODE = os.getenv('ESEWA_PRODUCT_CODE', 'EPAYTEST')
+STRIPE_SECRET_KEY  = os.getenv('STRIPE_SECRET_KEY', '')
+stripe.api_key = STRIPE_SECRET_KEY
 
 def _order_id_from_ref(ref: str) -> Optional[int]:
     # format: "order-{id}-{timestamp_ms}"
@@ -81,6 +83,48 @@ def esewa_subscription_verify():
         conn.close()
 
 
+# ── Stripe subscription verify ───────────────────────────────────────────────
+
+@payment_bp.route('/subscription/stripe/verify', methods=['POST'])
+@role_required('trainee')
+def stripe_subscription_verify():
+    session_id = (request.get_json() or {}).get('session_id', '').strip()
+    if not session_id:
+        return jsonify({'error': 'Missing session_id'}), 400
+    if not STRIPE_SECRET_KEY:
+        return jsonify({'error': 'Stripe is not configured. Set STRIPE_SECRET_KEY in backend/.env.'}), 503
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        return jsonify({'error': f'Stripe error: {e}'}), 502
+
+    if session.payment_status != 'paid':
+        return jsonify({'error': f"Stripe payment status: {session.payment_status}"}), 400
+
+    user_id_raw = getattr(session.metadata, 'user_id', None)
+    if user_id_raw is None or int(user_id_raw) != request.user_id:
+        return jsonify({'error': 'Invalid transaction reference'}), 400
+    user_id = int(user_id_raw)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET subscription_plan='pro', subscription_status='active', "
+            "subscription_payment_method='stripe' WHERE id = %s",
+            (user_id,),
+        )
+        conn.commit()
+        return jsonify({'message': 'Subscription activated', 'subscription_plan': 'pro', 'subscription_status': 'active'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # ── eSewa verify ──────────────────────────────────────────────────────────────
 
 @payment_bp.route('/esewa/verify', methods=['POST'])
@@ -119,6 +163,32 @@ def esewa_verify():
         return jsonify({'error': 'Invalid transaction reference'}), 400
 
     return _mark_paid(order_id, payload.get('transaction_code', ''))
+
+
+# ── Stripe verify ─────────────────────────────────────────────────────────────
+
+@payment_bp.route('/stripe/verify', methods=['POST'])
+@role_required('trainee')
+def stripe_verify():
+    session_id = (request.get_json() or {}).get('session_id', '').strip()
+    if not session_id:
+        return jsonify({'error': 'Missing session_id'}), 400
+    if not STRIPE_SECRET_KEY:
+        return jsonify({'error': 'Stripe is not configured. Set STRIPE_SECRET_KEY in backend/.env.'}), 503
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        return jsonify({'error': f'Stripe error: {e}'}), 502
+
+    if session.payment_status != 'paid':
+        return jsonify({'error': f"Stripe payment status: {session.payment_status}"}), 400
+
+    order_id = getattr(session.metadata, 'order_id', None)
+    if not order_id:
+        return jsonify({'error': 'Missing order reference on Stripe session'}), 400
+
+    return _mark_paid(int(order_id), session.payment_intent or session.id)
 
 
 # ── Shared helper ─────────────────────────────────────────────────────────────

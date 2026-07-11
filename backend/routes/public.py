@@ -8,6 +8,7 @@ from middleware.auth import generate_token
 from routes.dietitian import CertificationSchema
 from utils.notify import push_to_admins
 from utils.validation import pydantic_errors
+from utils.fx import get_npr_to_usd_rate
 
 public_bp = Blueprint('public', __name__)
 
@@ -158,6 +159,11 @@ def get_global_discount():
     finally:
         cursor.close()
         conn.close()
+
+
+@public_bp.route('/fx-rate', methods=['GET'])
+def get_fx_rate():
+    return jsonify({'npr_to_usd_rate': get_npr_to_usd_rate()})
 
 
 @public_bp.route('/trainers', methods=['GET'])

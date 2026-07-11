@@ -88,6 +88,9 @@ interface UseUserReturn {
       payment_method?: string;
       esewa_url?: string;
       esewa_params?: import("@/types").EsewaParams;
+      stripe_url?: string;
+      session_id?: string;
+      usd_amount?: number;
     },
     Error,
     {
@@ -105,6 +108,9 @@ interface UseUserReturn {
     args?: QueryArgs,
   ) => UseQueryResult<import("@/types").PromoCode[]>;
   GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
+  GetFxRate: (
+    args?: QueryArgs,
+  ) => UseQueryResult<{ npr_to_usd_rate: number }>;
 }
 
 const useUser = (): UseUserReturn => {
@@ -278,6 +284,11 @@ const useUser = (): UseUserReturn => {
     queryKey: "publicGlobalDiscount",
   });
 
+  const { get: GetFxRate } = useApi({
+    endpoint: endpoint.publicFxRate,
+    queryKey: "publicFxRate",
+  });
+
   const { get: GetNotifications } = useApi({
     endpoint: endpoint.notifications,
     queryKey: "notifications",
@@ -350,6 +361,7 @@ const useUser = (): UseUserReturn => {
     GetPoints,
     GetAvailablePromos,
     GetGlobalDiscount,
+    GetFxRate,
     GetNotifications,
     GetUnreadCount,
     MarkRead,
