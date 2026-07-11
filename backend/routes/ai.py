@@ -2,7 +2,7 @@ import json
 import datetime
 import os
 import sys
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, Response
 from pydantic import BaseModel, ValidationError, field_validator
 from typing import Optional
 from database.connection import get_connection
@@ -18,7 +18,7 @@ from ai_engine.recommendation_engine import (
 )
 from ai_engine.universal_food_lookup import recognize_food
 from ai_engine.nutrition_calculator import calculate_nutrition_targets
-from ai_engine.integrations import exercisedb
+from ai_engine.integrations.exercisedb import fetch_gif_bytes
 
 try:
     from ai_engine.ml.predict import load_models
@@ -275,6 +275,35 @@ def recommend_meal():
         profile = _get_profile(cursor, request.user_id)
         if not profile:
             return jsonify({"error": "Complete your profile first"}), 400
+        # Build detailed food history for v3 ML variety features
+        # {food_name: {days_since, times_week, times_total}}
+        recently_eaten = set()
+        recently_eaten_detail = {}
+        try:
+            cursor.execute(
+                """SELECT food_name,
+                          MIN(DATEDIFF(CURDATE(), logged_date)) AS days_since,
+                          SUM(CASE WHEN logged_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                                   THEN 1 ELSE 0 END) AS times_week,
+                          COUNT(*) AS times_total
+                   FROM meal_logs
+                   WHERE user_id=%s
+                     AND logged_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                     AND deleted_at IS NULL
+                   GROUP BY food_name""",
+                (request.user_id,)
+            )
+            for row in cursor.fetchall():
+                fname = row["food_name"]
+                recently_eaten.add(fname)
+                recently_eaten_detail[fname] = {
+                    "days_since":  int(row["days_since"] or 999),
+                    "times_week":  int(row["times_week"] or 0),
+                    "times_total": int(row["times_total"] or 0),
+                }
+        except Exception:
+            pass
+
         result = recommend_daily_meals(
             weight_kg=float(profile.get("current_weight_kg") or 70),
             height_cm=float(profile.get("height_cm") or 170),
@@ -285,6 +314,8 @@ def recommend_meal():
             meals_per_day=int(profile.get("meals_per_day") or 3),
             dietary=profile.get("dietary", {}),
             preferred_cuisines=profile.get("cuisine_preferences") or ["nepali"],
+            recently_eaten=recently_eaten,
+            recently_eaten_detail=recently_eaten_detail,
         )
         if meal_type and meal_type in result.get("meal_plan", {}):
             return jsonify({
@@ -339,18 +370,16 @@ def recommend_exercise_endpoint():
         conn.close()
 
 
-@ai_bp.route("/exercise/gif/<exercise_id>", methods=["GET"])
-@role_required("trainee")
+@ai_bp.route("/exercise-gif/<exercise_id>", methods=["GET"])
 def exercise_gif(exercise_id):
-    """Proxies ExerciseDB's auth-required /image endpoint so the browser
-    never needs the RapidAPI key — the frontend just hits this route."""
+    """No auth - <img> tags can't send our JWT header, and gifs aren't
+    user-specific data anyway. Proxies ExerciseDB so our RapidAPI key
+    stays server-side."""
     resolution = request.args.get("resolution", "180")
-    result = exercisedb.get_exercise_gif(exercise_id, resolution)
-    if not result:
-        return jsonify({"error": "GIF not available"}), 404
-    content, content_type = result
-    resp = make_response(content)
-    resp.headers["Content-Type"] = content_type
+    content, content_type = fetch_gif_bytes(exercise_id, resolution)
+    if content is None:
+        return jsonify({"error": "gif not found"}), 404
+    resp = Response(content, mimetype=content_type)
     resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
 
@@ -462,6 +491,98 @@ def weekly_report():
                         "total_meals": sum(d["meal_count"] for d in daily_data)},
             "targets": targets_data,
         })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@ai_bp.route("/exercise/complete", methods=["POST"])
+@role_required("trainee")
+def complete_exercise():
+    """
+    Log a completed exercise and calculate calories burned.
+    Body: { exercise_id, exercise_name, body_part, duration_minutes, sets, reps }
+    Calories burned = MET * weight_kg * (duration_minutes / 60)
+    MET values: cardio=7, strength=5, yoga=3, rest=2
+    """
+    body = request.get_json() or {}
+    exercise_name    = body.get("exercise_name", "Unknown Exercise")
+    body_part        = body.get("body_part", "cardio")
+    duration_minutes = int(body.get("duration_minutes", 30))
+    sets             = int(body.get("sets", 0))
+    reps             = int(body.get("reps", 0))
+    exercise_id_ext  = body.get("exercise_id", "")  # ExerciseDB id (not our DB id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Get user weight for calorie calculation
+        cursor.execute(
+            "SELECT current_weight_kg FROM user_profiles WHERE user_id=%s",
+            (request.user_id,)
+        )
+        profile = cursor.fetchone() or {}
+        weight_kg = float(profile.get("current_weight_kg") or 70)
+
+        # MET-based calorie calculation
+        MET_MAP = {
+            "cardio":     7.0,
+            "upper arms": 4.5,
+            "upper legs": 5.0,
+            "chest":      5.0,
+            "back":       4.5,
+            "shoulders":  4.0,
+            "waist":      3.5,
+            "neck":       2.5,
+        }
+        met = MET_MAP.get(body_part.lower(), 5.0)
+        calories_burned = round(met * weight_kg * (duration_minutes / 60))
+
+        # Find or create a matching exercise in our exercises table
+        cursor.execute(
+            "SELECT id FROM exercises WHERE name = %s LIMIT 1",
+            (exercise_name,)
+        )
+        row = cursor.fetchone()
+        if row:
+            exercise_db_id = row["id"]
+        else:
+            # Insert a new exercise record
+            category_map = {
+                "cardio": "cardio", "chest": "strength", "back": "strength",
+                "shoulders": "strength", "upper legs": "strength", "upper arms": "strength",
+                "waist": "flexibility",
+            }
+            cat = category_map.get(body_part.lower(), "other")
+            cursor.execute(
+                "INSERT INTO exercises (name, category, calories_burned_per_hour, description) "
+                "VALUES (%s, %s, %s, %s)",
+                (exercise_name, cat, round(met * weight_kg), f"From ExerciseDB: {exercise_id_ext}")
+            )
+            exercise_db_id = cursor.lastrowid
+
+        # Log the exercise
+        today = datetime.date.today().isoformat()
+        cursor.execute(
+            "INSERT INTO exercise_logs (user_id, exercise_id, logged_date, duration_minutes, calories_burned, notes) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (request.user_id, exercise_db_id, today, duration_minutes, calories_burned,
+             f"Sets: {sets}, Reps: {reps}" if sets or reps else None)
+        )
+        log_id = cursor.lastrowid
+        conn.commit()
+
+        return jsonify({
+            "id":               log_id,
+            "exercise_name":    exercise_name,
+            "duration_minutes": duration_minutes,
+            "calories_burned":  calories_burned,
+            "logged_date":      today,
+            "message":          f"Great work! Burned ~{calories_burned} kcal in {duration_minutes} minutes.",
+        }), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         cursor.close()
         conn.close()

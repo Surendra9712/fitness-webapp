@@ -33,6 +33,7 @@ import {
   Percent,
   Gift,
   BadgePercent,
+  BarChart3, 
   MessageCircle,
   ChevronsUpDown,
 } from "lucide-react";
@@ -193,6 +194,11 @@ const navLinks: Record<Role, NavItem[]> = {
       to: "/customer/ai-recommendation",
       label: "AI Recommendation",
       icon: <Sparkles className="h-4 w-4" />,
+    },
+      {
+      to: "/customer/weekly-report",
+      label: "Weekly Report",
+      icon: <BarChart3 className="h-4 w-4" />,
     },
     {
       to: "/customer/rewards",

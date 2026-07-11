@@ -13,3 +13,6 @@ backend/.env
 
 # Virtual environments
 .venv/
+
+backend/ai_engine/ml/data/meal_training.csv
+backend/ai_engine/ml/data/exercise_training.csv
