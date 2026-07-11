@@ -1,16 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import {
-  Zap,
-  Clock,
-  ShoppingBag,
-  Bell,
-  Plus,
-  Trash2,
-  Search,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-} from "lucide-react";
+import { Zap, Clock, ShoppingBag, Bell, Plus, Trash2, Search, ChevronDown, ChevronUp, RefreshCw, Dumbbell } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -480,6 +470,7 @@ function MealSection({
 // ── Main UserDashboard ────────────────────────────────────────────────────────
 export default function UserDashboard() {
   const { user, loading: authLoading, refreshUser } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [todayMeals, setTodayMeals] = useState<TodayMeals | null>(null);
   const [error, setError] = useState("");
@@ -744,6 +735,24 @@ export default function UserDashboard() {
           </CardContent>
         </Card>
       )}
+      {/* End of Day — Check Exercise button */}
+      <div className="border-2 border-dashed border-emerald-200 rounded-2xl p-6 flex flex-col items-center gap-3 bg-emerald-50/40">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+          <Dumbbell className="h-6 w-6 text-emerald-600" />
+        </div>
+        <div className="text-center">
+          <h3 className="font-semibold text-gray-900">End of Day — Check Exercise</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Done with your meals for today? Let the AI recommend the right exercise based on what you ate.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate("/customer/ai-recommendation?tab=exercise")}
+          className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          🏋️ Check My Exercise Recommendation
+        </button>
+      </div>
     </div>
   );
 }
