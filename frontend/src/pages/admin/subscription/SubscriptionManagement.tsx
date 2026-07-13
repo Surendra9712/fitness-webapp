@@ -37,7 +37,7 @@ export default function SubscriptionManagement() {
   const [rejectTarget, setRejectTarget] = useState<SubUser | null>(null);
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
-    initialPageSize: 15,
+    initialPageSize: 20,
   });
 
   const { GetSubscriptions, ApproveSubscription, RejectSubscription } =

@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import type { User, Role } from "@/types";
 import { ROLE_LABELS } from "@/lib/constant";
 import { SearchInput } from "@/components/ui/search-input";
+import { TableBodySkeleton, TableSkeleton } from "@/components/TableSkeleton";
 
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
@@ -83,7 +84,7 @@ export default function UserManagement({ role }: Props) {
   });
 
   const { GetUsers, UpdateUser, DeleteUser } = useAdmin();
-  const { data, isPlaceholderData } = GetUsers({
+  const { data, isPlaceholderData, isFetching } = GetUsers({
     queryParams: {
       page,
       page_size: pageSize,
@@ -92,6 +93,7 @@ export default function UserManagement({ role }: Props) {
       ...(search ? { search } : {}),
     },
   });
+
   const users = data?.items ?? [];
   const total = data?.total ?? 0;
   const toggleActive = UpdateUser();
@@ -159,97 +161,103 @@ export default function UserManagement({ role }: Props) {
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {users.map((u: User) => (
-              <TableRow key={u.id}>
-                <TableCell className="font-medium">{u.name}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {u.email}
-                </TableCell>
-                {!role && (
-                  <TableCell>
-                    <Badge variant={roleBadge[u.role]}>
-                      {ROLE_LABELS[u.role]}
-                    </Badge>
+          {isFetching ? (
+            <TableBodySkeleton columns={5} />
+          ) : (
+            <TableBody>
+              {users.map((u: User) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium">{u.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {u.email}
                   </TableCell>
-                )}
-                <TableCell>
-                  {u.status === "pending" ? (
-                    <Badge variant="warning">Pending</Badge>
-                  ) : (
-                    <Badge
-                      variant={u.status === "active" ? "success" : "secondary"}
-                    >
-                      {u.status === "active" ? "Active" : "Inactive"}
-                    </Badge>
+                  {!role && (
+                    <TableCell>
+                      <Badge variant={roleBadge[u.role]}>
+                        {ROLE_LABELS[u.role]}
+                      </Badge>
+                    </TableCell>
                   )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {new Date(u.created_at!).toLocaleDateString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Actions</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => navigate(`/admin/users/${u.id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Detail
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setModal({ open: true, user: u })}
-                      >
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          setToggleConfirm({ open: true, user: u })
+                  <TableCell>
+                    {u.status === "pending" ? (
+                      <Badge variant="warning">Pending</Badge>
+                    ) : (
+                      <Badge
+                        variant={
+                          u.status === "active" ? "success" : "secondary"
                         }
                       >
-                        {u.status === "active" ? (
-                          <UserX className="h-4 w-4 mr-2" />
-                        ) : (
-                          <UserCheck className="h-4 w-4 mr-2" />
-                        )}
-                        {u.status === "active"
-                          ? "Disable"
-                          : u.status === "pending"
-                            ? "Approve"
-                            : "Enable"}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() =>
-                          setDeleteConfirm({ open: true, id: u.id })
-                        }
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-            {!users.length && (
-              <TableRow>
-                <TableCell
-                  colSpan={role ? 5 : 6}
-                  className="text-center text-muted-foreground py-8"
-                >
-                  No {entityLabel.toLowerCase()}s found
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
+                        {u.status === "active" ? "Active" : "Inactive"}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {new Date(u.created_at!).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Actions</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => navigate(`/admin/users/${u.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Detail
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setModal({ open: true, user: u })}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setToggleConfirm({ open: true, user: u })
+                          }
+                        >
+                          {u.status === "active" ? (
+                            <UserX className="h-4 w-4 mr-2" />
+                          ) : (
+                            <UserCheck className="h-4 w-4 mr-2" />
+                          )}
+                          {u.status === "active"
+                            ? "Disable"
+                            : u.status === "pending"
+                              ? "Approve"
+                              : "Enable"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() =>
+                            setDeleteConfirm({ open: true, id: u.id })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!users.length && (
+                <TableRow>
+                  <TableCell
+                    colSpan={role ? 5 : 6}
+                    className="text-center text-muted-foreground py-8"
+                  >
+                    No {entityLabel.toLowerCase()}s found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          )}
         </Table>
       </CardContent>
     </Card>

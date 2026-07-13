@@ -35,6 +35,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { Product } from "@/types";
 import { SearchInput } from "@/components/ui/search-input";
+import { TableBodySkeleton, TableSkeleton } from "@/components/TableSkeleton";
 
 export default function ProductManagement() {
   const [search, setSearch] = useState("");
@@ -48,7 +49,7 @@ export default function ProductManagement() {
 
   const { GetProducts, GetCategories, UpdateProduct, DeleteProduct } =
     useAdmin();
-  const { data, isPlaceholderData } = GetProducts({
+  const { data, isPlaceholderData, isFetching } = GetProducts({
     queryParams: {
       page,
       page_size: pageSize,
@@ -150,86 +151,96 @@ export default function ProductManagement() {
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {items.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="capitalize">
-                      {p.category_name ?? p.category}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">{p.price}</TableCell>
-                  <TableCell
-                    className={
-                      p.stock_quantity === 0
-                        ? "text-destructive font-medium"
-                        : ""
-                    }
-                  >
-                    {p.stock_quantity}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={p.status === "active" ? "success" : "secondary"}
-                      className="capitalize"
+            {isFetching ? (
+              <TableBodySkeleton />
+            ) : (
+              <TableBody>
+                {items.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {p.category_name ?? p.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{p.price}</TableCell>
+                    <TableCell
+                      className={
+                        p.stock_quantity === 0
+                          ? "text-destructive font-medium"
+                          : ""
+                      }
                     >
-                      {p.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Actions</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(p)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toggleStatus(p)}>
-                          {p.status === "active" ? (
-                            <>
-                              <ToggleLeft className="h-4 w-4 mr-2" />
-                              Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <ToggleRight className="h-4 w-4 mr-2 text-emerald-600" />
-                              Activate
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => handleDeleteClick(p.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!items.length && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    <Package className="mx-auto mb-2 h-10 w-10 opacity-30" />
-                    {search
-                      ? "No products match your search"
-                      : "No products yet"}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
+                      {p.stock_quantity}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          p.status === "active" ? "success" : "secondary"
+                        }
+                        className="capitalize"
+                      >
+                        {p.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEdit(p)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleStatus(p)}>
+                            {p.status === "active" ? (
+                              <>
+                                <ToggleLeft className="h-4 w-4 mr-2" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <ToggleRight className="h-4 w-4 mr-2 text-emerald-600" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDeleteClick(p.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!items.length && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-muted-foreground"
+                    >
+                      <Package className="mx-auto mb-2 h-10 w-10 opacity-30" />
+                      {search
+                        ? "No products match your search"
+                        : "No products yet"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            )}
           </Table>
         </CardContent>
       </Card>

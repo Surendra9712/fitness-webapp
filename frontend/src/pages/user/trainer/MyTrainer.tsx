@@ -6,7 +6,10 @@ import { useAuth } from "@/context/AuthContext";
 import useUser from "@/hooks/useUser";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { AssignmentStatusCard, STATUS_META } from "@/components/trainer/AssignmentStatusCard";
+import {
+  AssignmentStatusCard,
+  STATUS_META,
+} from "@/components/trainer/AssignmentStatusCard";
 import { TrainerProfileSummary } from "@/components/trainer/TrainerProfileSummary";
 import { TrainerReviewSection } from "@/components/trainer/TrainerReviewSection";
 import { TrainerDetailModal } from "@/components/trainer/TrainerDetailModal";
@@ -31,10 +34,16 @@ function AssignmentDetail({
 }) {
   return (
     <div className="space-y-3">
-      <AssignmentStatusCard assignment={assignment} onCancel={() => onCancel(assignment.id)} />
+      <AssignmentStatusCard
+        assignment={assignment}
+        onCancel={() => onCancel(assignment.id)}
+      />
       <TrainerProfileSummary trainerId={assignment.trainer_id} />
       {assignment.status === "approved" && (
-        <TrainerReviewSection trainerId={assignment.trainer_id} customerId={userId} />
+        <TrainerReviewSection
+          trainerId={assignment.trainer_id}
+          customerId={userId}
+        />
       )}
     </div>
   );
@@ -50,10 +59,13 @@ export default function MyTrainer() {
 
   const { GetTrainerAssignments, CancelTrainerAssignment } = useUser();
   const { data: allAssignments, isLoading } = GetTrainerAssignments();
-  const assignments = (allAssignments ?? []).filter((a) => a.status !== "rejected");
+  const assignments = (allAssignments ?? []).filter(
+    (a) => a.status !== "rejected",
+  );
   const cancelMutation = CancelTrainerAssignment();
 
-  const isPro = user?.subscription_plan === "pro" && user?.subscription_status === "active";
+  const isPro =
+    user?.subscription_plan === "pro" && user?.subscription_status === "active";
   const userId = (user as unknown as { id: number } | null)?.id ?? 0;
 
   async function cancelRequest() {
@@ -87,7 +99,8 @@ export default function MyTrainer() {
         <h2 className="text-xl font-bold">Pro Feature</h2>
         <p className="text-sm text-muted-foreground">
           The Trainer feature is available exclusively on the Pro plan.
-          {user?.subscription_plan === "pro" && user?.subscription_status === "pending"
+          {user?.subscription_plan === "pro" &&
+          user?.subscription_status === "pending"
             ? " Your upgrade request is pending admin approval."
             : " Upgrade to connect with a certified trainer."}
         </p>
@@ -107,7 +120,9 @@ export default function MyTrainer() {
       <Tabs
         value={tab}
         onValueChange={(v) =>
-          setSearchParams(v === "find" ? { tab: "find" } : {}, { replace: true })
+          setSearchParams(v === "find" ? { tab: "find" } : {}, {
+            replace: true,
+          })
         }
       >
         <TabsList>
@@ -163,7 +178,9 @@ export default function MyTrainer() {
                 </p>
                 <Button
                   className="mt-2"
-                  onClick={() => setSearchParams({ tab: "find" }, { replace: true })}
+                  onClick={() =>
+                    setSearchParams({ tab: "find" }, { replace: true })
+                  }
                 >
                   Find a Trainer
                 </Button>
@@ -179,12 +196,16 @@ export default function MyTrainer() {
 
       <TrainerDetailModal
         trainerId={detailTarget}
-        onOpenChange={(open) => { if (!open) setDetailTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) setDetailTarget(null);
+        }}
       />
 
       <ConfirmDialog
         open={cancelTarget != null}
-        onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
         title="Cancel trainer request?"
         description="Your pending request will be withdrawn. You can send a new request anytime."
         confirmLabel="Cancel Request"

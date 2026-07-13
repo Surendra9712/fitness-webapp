@@ -26,7 +26,7 @@ export default function Home() {
   return (
     <PublicLayout>
       <HeroSection />
-      <BigStatsSection />
+      {/* <BigStatsSection /> */}
       <WhyChooseUsSection />
       <ExerciseSection />
       <HowItWorksSection />

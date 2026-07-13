@@ -33,7 +33,7 @@ import {
   Percent,
   Gift,
   BadgePercent,
-  BarChart3, 
+  BarChart3,
   MessageCircle,
   ChevronsUpDown,
 } from "lucide-react";
@@ -54,7 +54,7 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "Dashboard",
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
-    { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
+    // { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
     {
       to: "/admin/trainees",
       label: "Trainees",
@@ -195,7 +195,7 @@ const navLinks: Record<Role, NavItem[]> = {
       label: "AI Recommendation",
       icon: <Sparkles className="h-4 w-4" />,
     },
-      {
+    {
       to: "/customer/weekly-report",
       label: "Weekly Report",
       icon: <BarChart3 className="h-4 w-4" />,

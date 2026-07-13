@@ -33,6 +33,7 @@ interface Props {
   onCancel: (trainer: TrainerInfo) => void;
   onViewDetail: (trainer: TrainerInfo) => void;
   onSearch: (e: string) => void;
+  total: number;
 }
 
 export function TrainerList({
@@ -41,6 +42,7 @@ export function TrainerList({
   onCancel,
   onViewDetail,
   onSearch,
+  total,
 }: Props) {
   return (
     <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
@@ -56,7 +58,7 @@ export function TrainerList({
         </div>
         <div className="flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-sm font-semibold text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
-          {trainers.length} trainer{trainers.length !== 1 ? "s" : ""}
+          {total} trainer{total !== 1 ? "s" : ""}
         </div>
       </div>
 
@@ -113,10 +115,10 @@ export function TrainerList({
                     ) : (
                       <>
                         <span
-                          className={`h-2 w-2 rounded-full ${available ? "bg-emerald-500" : "bg-secondary-500"}`}
+                          className={`h-2 w-2 rounded-full ${available ? "bg-primary-500" : "bg-secondary-500"}`}
                         />
                         <span
-                          className={`text-xs font-semibold ${available ? "text-emerald-600" : "text-secondary-600"}`}
+                          className={`text-xs font-semibold ${available ? "text-primary-600" : "text-secondary-600"}`}
                         >
                           {available ? "Available" : "Active"}
                         </span>

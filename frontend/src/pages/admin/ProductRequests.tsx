@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, XCircle, Bell } from "lucide-react";
+import { CheckCircle, XCircle, Bell, MoreHorizontal } from "lucide-react";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogBody,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -32,6 +33,14 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import type { ProductRequest } from "@/types";
+import { TableBodySkeleton } from "@/components/TableSkeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const statusVariant: Record<string, "info" | "success" | "destructive"> = {
   pending: "info",
@@ -63,7 +72,7 @@ export default function ProductRequests() {
     RejectProductRequest,
     GetCategories,
   } = useAdmin();
-  const { data, isPlaceholderData } = GetProductRequests({
+  const { data, isPlaceholderData, isFetching } = GetProductRequests({
     queryParams: { status: filter, page, page_size: pageSize },
   });
   const requests = data?.items ?? [];
@@ -145,94 +154,106 @@ export default function ProductRequests() {
                 <TableHead>Reason</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-32" />
+                <TableHead />
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {requests.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell>
-                    <div className="font-medium">{r.product_name}</div>
-                    {r.description && (
-                      <div className="max-w-xs truncate text-xs text-muted-foreground">
-                        {r.description}
+            {isFetching ? (
+              <TableBodySkeleton />
+            ) : (
+              <TableBody>
+                {requests.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <div className="font-medium">{r.product_name}</div>
+                      {r.description && (
+                        <div className="max-w-xs truncate text-xs text-muted-foreground">
+                          {r.description}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{r.user_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {r.user_email}
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{r.user_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {r.user_email}
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
-                    {r.reason ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(r.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={statusVariant[r.status]}
-                      className="capitalize"
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                      {r.reason ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(r.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={statusVariant[r.status]}
+                        className="capitalize"
+                      >
+                        {r.status}
+                      </Badge>
+                      {r.admin_note && (
+                        <div className="mt-1 text-xs text-muted-foreground italic">
+                          {r.admin_note}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {r.status === "pending" && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setApproveForm({
+                                  price: "",
+                                  stock_quantity: "",
+                                  category: categories[0]?.slug ?? "",
+                                  admin_note: "",
+                                });
+                                setApproveDialog(r);
+                              }}
+                            >
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" />{" "}
+                              Approve
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => {
+                                setRejectNote("");
+                                setRejectDialog(r);
+                              }}
+                            >
+                              <XCircle className="h-3.5 w-3.5 mr-1" />
+                              Reject
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!requests.length && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-muted-foreground"
                     >
-                      {r.status}
-                    </Badge>
-                    {r.admin_note && (
-                      <div className="mt-1 text-xs text-muted-foreground italic">
-                        {r.admin_note}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {r.status === "pending" && (
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => {
-                            setApproveForm({
-                              price: "",
-                              stock_quantity: "",
-                              category: categories[0]?.slug ?? "",
-                              admin_note: "",
-                            });
-                            setApproveDialog(r);
-                          }}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 border-destructive text-destructive hover:bg-red-50"
-                          onClick={() => {
-                            setRejectNote("");
-                            setRejectDialog(r);
-                          }}
-                        >
-                          <XCircle className="h-3.5 w-3.5 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!requests.length && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    <Bell className="mx-auto mb-2 h-10 w-10 opacity-30" />
-                    No {filter === "all" ? "" : filter} requests
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
+                      <Bell className="mx-auto mb-2 h-10 w-10 opacity-30" />
+                      No {filter === "all" ? "" : filter} requests
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            )}
           </Table>
         </CardContent>
       </Card>
@@ -253,70 +274,75 @@ export default function ProductRequests() {
           <DialogHeader>
             <DialogTitle>Approve & Add to Catalog</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Adding <strong>{approveDialog?.product_name}</strong> as a new
-            product.
-          </p>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Price (Rs.) *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={approveForm.price}
-                  onChange={(e) =>
-                    setApproveForm((p) => ({ ...p, price: e.target.value }))
-                  }
-                />
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">
+              Adding <strong>{approveDialog?.product_name}</strong> as a new
+              product.
+            </p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Price (Rs.) *</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={approveForm.price}
+                    onChange={(e) =>
+                      setApproveForm((p) => ({ ...p, price: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Initial Stock</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={approveForm.stock_quantity}
+                    onChange={(e) =>
+                      setApproveForm((p) => ({
+                        ...p,
+                        stock_quantity: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Initial Stock</Label>
+                <Label>Category</Label>
+                <Select
+                  value={approveForm.category}
+                  onValueChange={(v) =>
+                    setApproveForm((p) => ({ ...p, category: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.slug} value={c.slug}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Note to Customer (optional)</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  value={approveForm.stock_quantity}
+                  placeholder="e.g. Now available in the shop!"
+                  value={approveForm.admin_note}
                   onChange={(e) =>
                     setApproveForm((p) => ({
                       ...p,
-                      stock_quantity: e.target.value,
+                      admin_note: e.target.value,
                     }))
                   }
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select
-                value={approveForm.category}
-                onValueChange={(v) =>
-                  setApproveForm((p) => ({ ...p, category: v }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.slug} value={c.slug}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Note to Customer (optional)</Label>
-              <Input
-                placeholder="e.g. Now available in the shop!"
-                value={approveForm.admin_note}
-                onChange={(e) =>
-                  setApproveForm((p) => ({ ...p, admin_note: e.target.value }))
-                }
-              />
-            </div>
-          </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApproveDialog(null)}>
               Cancel
@@ -333,17 +359,20 @@ export default function ProductRequests() {
           <DialogHeader>
             <DialogTitle>Reject Request</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Rejecting request for <strong>{rejectDialog?.product_name}</strong>.
-          </p>
-          <div className="space-y-1.5">
-            <Label>Reason for Rejection (optional)</Label>
-            <Input
-              placeholder="e.g. Not within our product range"
-              value={rejectNote}
-              onChange={(e) => setRejectNote(e.target.value)}
-            />
-          </div>
+          <DialogBody>
+            <p className="text-sm text-muted-foreground">
+              Rejecting request for{" "}
+              <strong>{rejectDialog?.product_name}</strong>.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Reason for Rejection (optional)</Label>
+              <Input
+                placeholder="e.g. Not within our product range"
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value)}
+              />
+            </div>
+          </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialog(null)}>
               Cancel

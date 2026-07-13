@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, XCircle, UserCheck } from "lucide-react";
+import { CheckCircle, XCircle, UserCheck, MoreHorizontal } from "lucide-react";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
@@ -33,6 +33,14 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import type { TrainerAssignment } from "@/types";
+import { TableBodySkeleton } from "@/components/TableSkeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const STATUS_BADGE: Record<string, string> = {
   pending_trainer: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -67,7 +75,7 @@ export default function TrainerAssignments() {
     ApproveTrainerAssignment,
     RejectTrainerAssignment,
   } = useAdmin();
-  const { data, isPlaceholderData } = GetTrainerAssignments({
+  const { data, isPlaceholderData, isFetching } = GetTrainerAssignments({
     queryParams: { status: filter, page, page_size: pageSize },
   });
   const assignments = data?.items ?? [];
@@ -143,82 +151,93 @@ export default function TrainerAssignments() {
                 <TableHead>Trainer Note</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-36" />
+                <TableHead className="w-36">Actions</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {assignments.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell>
-                    <div className="font-medium">{a.customer_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {a.customer_email}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{a.trainer_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {a.trainer_email}
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
-                    {a.customer_note ?? "—"}
-                  </TableCell>
-                  <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
-                    {a.trainer_note ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(a.created_at).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={STATUS_BADGE[a.status] ?? ""}>
-                      {STATUS_LABEL[a.status] ?? a.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {a.status === "pending_admin" && (
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => {
-                            setAdminNote("");
-                            setApproveTarget(a);
-                          }}
-                        >
-                          <CheckCircle className="mr-1 h-3.5 w-3.5" />
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 border-destructive text-destructive hover:bg-red-50"
-                          onClick={() => {
-                            setAdminNote("");
-                            setRejectTarget(a);
-                          }}
-                        >
-                          <XCircle className="mr-1 h-3.5 w-3.5" />
-                          Reject
-                        </Button>
+            {isFetching ? (
+              <TableBodySkeleton columns={7} />
+            ) : (
+              <TableBody>
+                {assignments.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <div className="font-medium">{a.customer_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {a.customer_email}
                       </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!assignments.length && (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="py-12 text-center text-muted-foreground"
-                  >
-                    <UserCheck className="mx-auto mb-2 h-10 w-10 opacity-30" />
-                    No assignments found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{a.trainer_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {a.trainer_email}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
+                      {a.customer_note ?? "—"}
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
+                      {a.trainer_note ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(a.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={STATUS_BADGE[a.status] ?? ""}>
+                        {STATUS_LABEL[a.status] ?? a.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {/* {a.status === "pending_admin" && ( */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Actions</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setAdminNote("");
+                              setApproveTarget(a);
+                            }}
+                          >
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => {
+                              setAdminNote("");
+                              setRejectTarget(a);
+                            }}
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Reject
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {/* )} */}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!assignments.length && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-12 text-center text-muted-foreground"
+                    >
+                      <UserCheck className="mx-auto mb-2 h-10 w-10 opacity-30" />
+                      No assignments found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            )}
           </Table>
         </CardContent>
       </Card>

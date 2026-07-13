@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserCheck } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
@@ -23,7 +22,7 @@ export default function TrainerRequest({
   const [searchQuery, setSearchQuery] = useState("");
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
-    initialPageSize: 12,
+    initialPageSize: 10,
   });
 
   const { GetTrainers, CancelTrainerAssignment } = useUser();
@@ -51,10 +50,10 @@ export default function TrainerRequest({
     }
   }
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
     resetPage();
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -73,19 +72,15 @@ export default function TrainerRequest({
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
         </div>
-      ) : trainers.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-20 text-center">
-          <UserCheck className="h-12 w-12 text-muted-foreground/30" />
-          <p className="font-medium text-muted-foreground">No trainers found</p>
-        </div>
       ) : (
         <>
           <TrainerList
+            total={total}
             trainers={trainers}
             onRequest={(t) => setRequestTarget(t)}
             onCancel={(t) => setCancelTarget(t)}
             onViewDetail={(t) => setDetailTarget(t.id)}
-            onSearch={setSearchQuery}
+            onSearch={handleSearch}
           />
           <AppPagination
             page={page}

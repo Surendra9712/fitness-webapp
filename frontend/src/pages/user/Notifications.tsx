@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { PromoCode, Notification, NotificationType } from "@/types";
 import { daysLeft, timeAgo } from "@/lib/date-utils";
+import { NotificationSkeleton } from "@/components/NotificationSkeleton";
 
 function PromoCard({ promo }: { promo: PromoCode }) {
   const [copied, setCopied] = useState(false);
@@ -269,14 +270,14 @@ function NotificationItem({
           {!isRead && (
             <button
               onClick={() => onRead(notification.id)}
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-primary hover:underline cursor-pointer"
             >
               Mark as read
             </button>
           )}
           <button
             onClick={() => onDelete(notification.id)}
-            className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-0.5"
+            className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-0.5 cursor-pointer"
           >
             <Trash2 className="h-3 w-3" />
             Delete
@@ -309,7 +310,7 @@ export default function Notifications() {
     enabled: !isAdmin,
   });
 
-  const { data: notifData, isLoading: notifsLoading } = GetNotifications({});
+  const { data: notifData, isFetching: notifsLoading } = GetNotifications({});
   const notifications: Notification[] = (notifData as any)?.items ?? [];
   const unread = notifications.filter((n) => !n.is_read).length;
 
@@ -331,6 +332,7 @@ export default function Notifications() {
   function handleMarkAllRead() {
     markAllRead.mutate(undefined, {
       onSuccess: () => {
+        invalidateQueries();
         toast.success("All notifications marked as read");
       },
     });
@@ -405,9 +407,7 @@ export default function Notifications() {
       {tab === "notifications" && (
         <>
           {notifsLoading ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
+            <NotificationSkeleton />
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-24 text-center rounded-xl border bg-muted/20">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">

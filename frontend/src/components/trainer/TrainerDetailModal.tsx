@@ -5,7 +5,13 @@ import useUser from "@/hooks/useUser";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from "@/components/ui/dialog";
 import { StarRating } from "@/components/ui/star-rating";
 import { AssignmentStatusCard } from "./AssignmentStatusCard";
 import { TrainerProfileSummary } from "./TrainerProfileSummary";
@@ -27,7 +33,12 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
   const queryClient = useQueryClient();
   const userId = (user as unknown as { id: number } | null)?.id ?? 0;
 
-  const { GetTrainer, GetTrainerReviews, GetTrainerAssignments, CancelTrainerAssignment } = useUser();
+  const {
+    GetTrainer,
+    GetTrainerReviews,
+    GetTrainerAssignments,
+    CancelTrainerAssignment,
+  } = useUser();
   const { data: trainer, isLoading } = GetTrainer(trainerId ?? undefined);
   const { data: reviews } = GetTrainerReviews(trainer?.id);
   const { data: assignments } = GetTrainerAssignments();
@@ -61,13 +72,15 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
   return (
     <>
       <Dialog open={trainerId != null} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
             </div>
           ) : !trainer ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Trainer not found</p>
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Trainer not found
+            </p>
           ) : (
             <>
               <DialogHeader>
@@ -79,8 +92,12 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <DialogTitle className="truncate">{trainer.name}</DialogTitle>
-                    <p className="truncate text-xs text-muted-foreground">{trainer.email}</p>
+                    <DialogTitle className="truncate">
+                      {trainer.name}
+                    </DialogTitle>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {trainer.email}
+                    </p>
                   </div>
                 </div>
               </DialogHeader>
@@ -89,20 +106,27 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3 rounded-lg bg-muted/40 py-3 text-center">
                   <div>
-                    <p className="text-lg font-black text-foreground">{trainer.customer_count ?? 0}</p>
+                    <p className="text-lg font-black text-foreground">
+                      {trainer.customer_count ?? 0}
+                    </p>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" /> Clients
                     </p>
                   </div>
                   <div>
-                    <p className="text-lg font-black text-foreground">{trainer.avg_rating || "—"}</p>
+                    <p className="text-lg font-black text-foreground">
+                      {trainer.avg_rating || "—"}
+                    </p>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                      <Star className="h-3 w-3" /> Rating ({trainer.review_count ?? 0})
+                      <Star className="h-3 w-3" /> Rating (
+                      {trainer.review_count ?? 0})
                     </p>
                   </div>
                   <div>
                     <p className="text-lg font-black text-foreground">
-                      {(trainer.experience_years ?? 0) > 0 ? trainer.experience_years : "—"}
+                      {(trainer.experience_years ?? 0) > 0
+                        ? trainer.experience_years
+                        : "—"}
                     </p>
                     <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <Briefcase className="h-3 w-3" /> Yrs exp.
@@ -117,7 +141,10 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
                     onCancel={() => setCancelTarget(assignment.id)}
                   />
                 ) : (
-                  <Button className="w-full gap-2" onClick={() => setRequestOpen(true)}>
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => setRequestOpen(true)}
+                  >
                     <Send className="h-4 w-4" />
                     Request this Trainer
                   </Button>
@@ -128,29 +155,43 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
 
                 {/* Reviews — interactive (write/edit) once approved, read-only otherwise */}
                 {assignment?.status === "approved" ? (
-                  <TrainerReviewSection trainerId={trainer.id} customerId={userId} />
+                  <TrainerReviewSection
+                    trainerId={trainer.id}
+                    customerId={userId}
+                  />
                 ) : (
                   <div className="space-y-2">
-                    <h3 className="text-sm font-bold tracking-tight">Reviews</h3>
+                    <h3 className="text-sm font-bold tracking-tight">
+                      Reviews
+                    </h3>
                     {reviews && reviews.count > 0 ? (
                       <div className="space-y-2">
                         {reviews.reviews.map((r: Review) => (
-                          <div key={r.id} className="rounded-lg border bg-background p-3 space-y-1.5">
+                          <div
+                            key={r.id}
+                            className="rounded-lg border bg-background p-3 space-y-1.5"
+                          >
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">{r.user_name}</span>
+                              <span className="text-sm font-medium">
+                                {r.user_name}
+                              </span>
                               <span className="text-xs text-muted-foreground">
                                 {new Date(r.created_at).toLocaleDateString()}
                               </span>
                             </div>
                             <StarRating value={r.rating} size="sm" />
                             {r.comment && (
-                              <p className="text-xs text-muted-foreground">{r.comment}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {r.comment}
+                              </p>
                             )}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No reviews yet.</p>
+                      <p className="text-sm text-muted-foreground">
+                        No reviews yet.
+                      </p>
                     )}
                   </div>
                 )}
@@ -173,7 +214,9 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
 
       <ConfirmDialog
         open={cancelTarget != null}
-        onOpenChange={(open) => { if (!open) setCancelTarget(null); }}
+        onOpenChange={(open) => {
+          if (!open) setCancelTarget(null);
+        }}
         title="Cancel trainer request?"
         description="Your pending request will be withdrawn. You can send a new request anytime."
         confirmLabel="Cancel Request"
