@@ -440,6 +440,104 @@ CREATE TABLE IF NOT EXISTS weekly_reports (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+USE smartdiet_fitness;
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    assignment_id INT NOT NULL,
+    sender_id     INT NOT NULL,
+    content       TEXT NOT NULL,
+    is_read       TINYINT(1) NOT NULL DEFAULT 0,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at    TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (assignment_id) REFERENCES trainer_assignments(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id)     REFERENCES users(id) ON DELETE CASCADE
+);
+
+ALTER TABLE chat_messages
+    ADD COLUMN attachment_url  VARCHAR(500) NULL,
+    ADD COLUMN attachment_type VARCHAR(20)  NULL,
+    ADD COLUMN attachment_name VARCHAR(255) NULL;
+    
+    ALTER TABLE meal_logs
+    MODIFY COLUMN food_source ENUM('nepali_kb','usda','nutritionix','manual','ai') DEFAULT 'manual';
+ALTER TABLE chat_messages
+    ADD COLUMN call_type             VARCHAR(10) NULL,
+    ADD COLUMN call_outcome          VARCHAR(20) NULL,
+    ADD COLUMN call_duration_seconds INT         NULL;
+ALTER TABLE users MODIFY COLUMN subscription_payment_method ENUM('cash','esewa','stripe') DEFAULT NULL;
+
+ALTER TABLE chat_messages ADD INDEX idx_chat_messages_assignment (assignment_id, created_at);
+
+
+USE smartdiet_fitness;
+
+--  Add meal completion tracking to meal_logs
+ALTER TABLE meal_logs
+  ADD COLUMN  is_consumed   TINYINT(1) DEFAULT 1,
+  ADD COLUMN  is_recommended TINYINT(1) DEFAULT 0,
+  ADD COLUMN  ai_explanation TEXT NULL,
+  ADD COLUMN  cuisine       VARCHAR(50) NULL;
+
+-- Add daily meal summary table (End Meal Today tracking)
+CREATE TABLE IF NOT EXISTS daily_meal_summaries (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    user_id             INT NOT NULL,
+    summary_date        DATE NOT NULL,
+    total_calories      DECIMAL(8,2) DEFAULT 0,
+    total_protein_g     DECIMAL(7,2) DEFAULT 0,
+    total_carbs_g       DECIMAL(7,2) DEFAULT 0,
+    total_fat_g         DECIMAL(7,2) DEFAULT 0,
+    target_calories     DECIMAL(8,2) DEFAULT 0,
+    target_protein_g    DECIMAL(7,2) DEFAULT 0,
+    target_carbs_g      DECIMAL(7,2) DEFAULT 0,
+    target_fat_g        DECIMAL(7,2) DEFAULT 0,
+    meal_count          INT DEFAULT 0,
+    is_completed        TINYINT(1) DEFAULT 0,
+    completed_at        TIMESTAMP NULL,
+    adherence_pct       DECIMAL(5,2) DEFAULT 0,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_date (user_id, summary_date),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+--  Expand weekly_reports with exercise summary
+ALTER TABLE weekly_reports
+  ADD COLUMN  total_calories      DECIMAL(8,2) DEFAULT 0,
+  ADD COLUMN  total_protein_g     DECIMAL(7,2) DEFAULT 0,
+  ADD COLUMN  total_carbs_g       DECIMAL(7,2) DEFAULT 0,
+  ADD COLUMN  total_fat_g         DECIMAL(7,2) DEFAULT 0,
+  ADD COLUMN  total_exercise_mins  INT DEFAULT 0,
+  ADD COLUMN  total_calories_burned DECIMAL(8,2) DEFAULT 0,
+  ADD COLUMN  workout_count        INT DEFAULT 0,
+  ADD COLUMN  most_done_exercise   VARCHAR(255) NULL,
+  ADD COLUMN is_finalized         TINYINT(1) DEFAULT 0,
+  ADD COLUMN  finalized_at         TIMESTAMP NULL;
+
+--  Water intake tracking
+CREATE TABLE IF NOT EXISTS water_logs (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL,
+    logged_date  DATE NOT NULL,
+    amount_ml    INT NOT NULL DEFAULT 250,
+    logged_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_date (user_id, logged_date)
+) ENGINE=InnoDB;
+
+--  Add daily water target to user_profiles
+ALTER TABLE user_profiles
+  ADD COLUMN daily_water_target_ml INT DEFAULT 2500;
+  
+ 
+
+
+
+
+
+
+
 
 
 

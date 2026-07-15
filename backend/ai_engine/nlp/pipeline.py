@@ -13,7 +13,12 @@ Pipeline stages:
   6. Meal-type detection
   7. Intent detection (log_meal / get_recommendation / ask_nutrition_info)
 """
-import spacy
+try:
+    import spacy
+    _SPACY_AVAILABLE = True
+except ImportError:
+    _SPACY_AVAILABLE = False
+    spacy = None
 from ai_engine.nlp.fuzzy_matcher import (
     normalize_text, fuzzy_match_multiple, detect_cuisine, detect_meal_type,
 )
@@ -22,10 +27,13 @@ from ai_engine.knowledge_base.nepali_foods import get_all_tags_index
 # Load spaCy model once at module level (small English model — fast, CPU-friendly)
 try:
     _nlp = spacy.load("en_core_web_sm")
-except OSError:
-    # Model not downloaded yet — fallback to blank pipeline so imports don't crash.
-    # Run: python -m spacy download en_core_web_sm
-    _nlp = spacy.blank("en")
+except (OSError, Exception):
+    # Model not downloaded or spacy not installed
+    # Run: pip install spacy && python -m spacy download en_core_web_sm
+    try:
+        _nlp = spacy.blank("en") if _SPACY_AVAILABLE else None
+    except Exception:
+        _nlp = None
 
 _FOOD_TAG_INDEX = get_all_tags_index()
 
@@ -128,7 +136,7 @@ def process_text(text: str) -> NLPResult:
     normalized = normalize_text(text)
     result.normalized_text = normalized
 
-    doc = _nlp(normalized)
+    doc = _nlp(normalized) if _nlp else None
     result.tokens = [t.text for t in doc if not t.is_space]
     result.lemmas = [
         t.lemma_ for t in doc
