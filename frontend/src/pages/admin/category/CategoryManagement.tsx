@@ -81,16 +81,9 @@ export default function CategoryManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage product categories used in the store.
-          </p>
-        </div>
-        <Button onClick={openAdd}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Category
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          Manage product categories used in the store.
+        </p>
       </div>
 
       <div className="flex items-center justify-between gap-4">
@@ -101,9 +94,10 @@ export default function CategoryManagement() {
             placeholder="Search categories…"
           />
         </div>
-        <p className="shrink-0 text-sm text-muted-foreground">
-          {total} {total === 1 ? "category" : "categories"}
-        </p>
+        <Button onClick={openAdd}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Category
+        </Button>
       </div>
 
       <Card>

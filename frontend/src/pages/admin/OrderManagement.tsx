@@ -124,9 +124,9 @@ export default function OrderManagement() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
         <p className="text-sm text-muted-foreground">
-          {total} {total === 1 ? "order" : "orders"}
+          View, manage, and update customer orders, payments, and delivery
+          information in one place.{" "}
         </p>
       </div>
 

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Plus,
-  Search,
   Edit2,
   Trash2,
   Percent,
@@ -28,6 +27,7 @@ import {
 import { toast } from "sonner";
 import type { PromoCode } from "@/types";
 import { DatePicker } from "@/components/ui/date-picker";
+import { SearchInput } from "@/components/ui/search-input";
 
 type PromoForm = {
   code: string;
@@ -55,7 +55,6 @@ const EMPTY_FORM: PromoForm = {
 
 export default function PromoCodeManagement() {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PromoCode | null>(null);
@@ -64,7 +63,7 @@ export default function PromoCodeManagement() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
-    initialPageSize: 15,
+    initialPageSize: 20,
   });
   const { GetPromoCodes, CreatePromoCode, UpdatePromoCode, DeletePromoCode } =
     useAdmin();
@@ -80,9 +79,8 @@ export default function PromoCodeManagement() {
   const rows: PromoCode[] = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setSearchQuery(search.trim());
+  function handleSearch(value: string) {
+    setSearchQuery(value);
     resetPage();
   }
 
@@ -94,7 +92,6 @@ export default function PromoCodeManagement() {
 
   function openEdit(p: PromoCode) {
     setEditing(p);
-    console.log(p);
     setForm({
       code: p.code,
       description: p.description ?? "",
@@ -171,32 +168,16 @@ export default function PromoCodeManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Promo Codes</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create discount codes with conditions and limits.
-          </p>
-        </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Create discount codes with conditions and limits.
+      </p>
+
+      <div className="flex justify-between gap-4 items-center">
+        <SearchInput placeholder="Search codes…" onSearch={handleSearch} />
         <Button onClick={openCreate} className="gap-2">
           <Plus className="h-4 w-4" /> New Code
         </Button>
       </div>
-
-      <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search codes…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Button type="submit" variant="outline">
-          Search
-        </Button>
-      </form>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">

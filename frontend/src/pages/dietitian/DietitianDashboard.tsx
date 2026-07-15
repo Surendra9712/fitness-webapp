@@ -17,9 +17,7 @@ export default function DietitianDashboard() {
   const { data: stats = { customers: 0, pending_requests: 0 } } = GetStats();
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Trainer Dashboard</h1>
-
+    <div className="space-y-6 pt-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

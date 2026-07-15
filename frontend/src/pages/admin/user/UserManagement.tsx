@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -38,19 +38,12 @@ import { toast } from "sonner";
 import type { User, Role } from "@/types";
 import { ROLE_LABELS } from "@/lib/constant";
 import { SearchInput } from "@/components/ui/search-input";
-import { TableBodySkeleton, TableSkeleton } from "@/components/TableSkeleton";
+import { TableBodySkeleton } from "@/components/TableSkeleton";
 
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
   dietitian: "info",
   trainee: "success",
-};
-
-type StatusFilter = "all" | "active" | "inactive" | "pending";
-
-const PAGE_TITLES: Record<string, string> = {
-  trainee: "Trainee Management",
-  dietitian: "Trainer Management",
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -64,8 +57,7 @@ interface Props {
 
 export default function UserManagement({ role }: Props) {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({ search: "", role, status: "all" });
   const [modal, setModal] = useState<{ open: boolean; user?: User }>({
     open: false,
   });
@@ -79,7 +71,7 @@ export default function UserManagement({ role }: Props) {
   }>({ open: false, user: null });
 
   const queryClient = useQueryClient();
-  const { page, goToPage, setPageSize, pageSize } = usePagination({
+  const { page, goToPage, setPageSize, pageSize, resetPage } = usePagination({
     initialPageSize: 20,
   });
 
@@ -88,22 +80,26 @@ export default function UserManagement({ role }: Props) {
     queryParams: {
       page,
       page_size: pageSize,
-      ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-      ...(role ? { role } : {}),
-      ...(search ? { search } : {}),
+      ...(filters.status !== "all" && { status: filters.status }),
+      ...(filters.role && { role: filters.role }),
+      ...(filters.search && { search: filters.search }),
     },
   });
+
+  useEffect(() => {
+    resetPage();
+    setFilters({ status: "all", search: "", role });
+  }, [role]);
 
   const users = data?.items ?? [];
   const total = data?.total ?? 0;
   const toggleActive = UpdateUser();
   const deleteUser = DeleteUser();
 
-  const title = role ? PAGE_TITLES[role] : "User Management";
   const entityLabel = role ? ENTITY_LABELS[role] : "User";
 
   function handleTabChange(val: string) {
-    setStatusFilter(val as StatusFilter);
+    setFilters((prev) => ({ ...prev, status: val, search: "" }));
     goToPage(1);
   }
 
@@ -143,7 +139,7 @@ export default function UserManagement({ role }: Props) {
   }
 
   const handleSearch = (value: string) => {
-    setSearch(value);
+    setFilters((prev) => ({ ...prev, search: value }));
     goToPage(1);
   };
 
@@ -266,29 +262,31 @@ export default function UserManagement({ role }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        <Button onClick={() => setModal({ open: true })}>
-          <Plus className="h-4 w-4" />
-          Add {entityLabel}
-        </Button>
+        {/* <h1 className="text-2xl font-bold tracking-tight">{title}</h1> */}
       </div>
 
-      <Tabs value={statusFilter} onValueChange={handleTabChange}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="inactive">Inactive</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-        </TabsList>
+      <Tabs value={filters?.status} onValueChange={handleTabChange}>
+        <div className="flex justify-between items-center gap-4 flex-wrap">
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="inactive">Inactive</TabsTrigger>
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+          </TabsList>
+          <Button onClick={() => setModal({ open: true })}>
+            <Plus className="h-4 w-4" />
+            Add {entityLabel}
+          </Button>
+        </div>
         <div className="py-4 max-w-md">
           <SearchInput
-            value={search}
+            value={filters.search}
             onSearch={handleSearch}
             placeholder="Search users..."
           />
         </div>
 
-        <TabsContent value={statusFilter}>{tableContent}</TabsContent>
+        <TabsContent value={filters.status}>{tableContent}</TabsContent>
       </Tabs>
 
       <AppPagination

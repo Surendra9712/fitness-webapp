@@ -71,9 +71,7 @@ export default function MyOrders() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">My Orders</h1>
-
+    <div className="space-y-6 pt-4">
       {orders.length === 0 ? (
         <div className="py-20 text-center text-muted-foreground">
           <ShoppingBag className="mx-auto mb-3 h-12 w-12 opacity-30" />

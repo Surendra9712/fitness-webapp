@@ -59,7 +59,6 @@ export default function TrainerRequest({
     <div className="space-y-6">
       {!embedded && (
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Trainer Request</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Browse verified trainers and send a request to get started.
           </p>

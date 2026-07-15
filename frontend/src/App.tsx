@@ -1,8 +1,14 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
-import { getDashboardPath } from "@/lib/constant";
+import { getDashboardPath, toTitleCase } from "@/lib/constant";
 import { Toaster } from "@/components/ui/sonner";
 import IncomingCallDialog from "@/components/call/IncomingCallDialog";
 import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
@@ -32,7 +38,7 @@ import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
 import TrainerProfile from "@/pages/dietitian/TrainerProfile";
 import TrainerChat from "@/pages/dietitian/TrainerChat";
 
-import UserDashboard from "@/pages/user/UserDashboard";
+import UserDashboard, { getGreeting } from "@/pages/user/UserDashboard";
 import MyOrders from "@/pages/user/MyOrders";
 import RequestProduct from "@/pages/user/RequestProduct";
 import Profile from "@/pages/user/Profile";
@@ -45,6 +51,9 @@ import WeeklyReport from "@/pages/user/WeeklyReport";
 import Rewards from "@/pages/user/Rewards";
 import Notifications from "@/pages/user/Notifications";
 import AuthLayout from "./pages/auth/AuthLayout";
+import { useState } from "react";
+import { Button } from "./components/ui/button";
+import { Menu } from "lucide-react";
 
 function RoleRedirect() {
   const { user } = useAuth();
@@ -53,12 +62,36 @@ function RoleRedirect() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  const location = useLocation();
+  const pathSegments = location.pathname.split("/");
+  const lastElement = pathSegments[pathSegments?.length - 1] || "Dashboard";
+  const title =
+    lastElement === "my-dashboard" || lastElement === "trainer-dashboard"
+      ? `${getGreeting()}, ${user?.name?.split(" ")[0] || "there"} 👋`
+      : lastElement;
+
+  const [isOpen, setIsOpen] = useState(false);
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
+      <Sidebar open={isOpen} setOpen={setIsOpen} />
       <main className="flex-1 overflow-y-auto lg:pl-60 pl-0">
-        <div className="mx-auto max-w-5xl px-6 py-6 pt-14 lg:pt-6">
-          {children}
+        <div className="mx-auto max-w-5xl px-6 py-4">
+          <div className="flex gap-2 mb-2 max-md:border-b max-md:pb-2">
+            <Button
+              size={"icon"}
+              className="lg:hidden"
+              onClick={() => setIsOpen((v) => !v)}
+              aria-label="Toggle sidebar"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold tracking-tight ">
+              {toTitleCase(title)}
+            </h1>
+          </div>
+          <div>{children}</div>
         </div>
       </main>
       <IncomingCallDialog />
@@ -97,7 +130,7 @@ export default function App() {
             path="/payment/subscription/stripe/cancel"
             element={<SubscriptionPaymentReturn />}
           />
-          <Route path="/dashboard" element={<RoleRedirect />} />
+          <Route path="/admin" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
           <Route
             path="/register"
@@ -106,7 +139,7 @@ export default function App() {
 
           {/* Admin */}
           <Route
-            path="/admin"
+            path="/dashboard"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -126,7 +159,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/trainees"
+            path="/admin/trainee-management"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -136,7 +169,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/trainers"
+            path="/admin/trainer-management"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -166,7 +199,7 @@ export default function App() {
             }
           /> */}
           <Route
-            path="/admin/products"
+            path="/admin/product-management"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -186,7 +219,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/orders"
+            path="/admin/order-management"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -196,7 +229,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/categories"
+            path="/admin/category-management"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -226,7 +259,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/subscriptions"
+            path="/admin/subscription-plans"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -246,7 +279,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/discounts"
+            path="/admin/discount-management"
             element={
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
@@ -268,7 +301,7 @@ export default function App() {
 
           {/* Trainer */}
           <Route
-            path="/trainer"
+            path="/trainer-dashboard"
             element={
               <ProtectedRoute roles={["dietitian", "admin"]}>
                 <Layout>
@@ -278,7 +311,7 @@ export default function App() {
             }
           />
           <Route
-            path="/trainer/assignments"
+            path="/trainer/assignment-requests"
             element={
               <ProtectedRoute roles={["dietitian"]}>
                 <Layout>
@@ -288,7 +321,7 @@ export default function App() {
             }
           />
           <Route
-            path="/trainer/profile"
+            path="/trainer/my-profile"
             element={
               <ProtectedRoute roles={["dietitian"]}>
                 <Layout>
@@ -308,7 +341,7 @@ export default function App() {
             }
           />
           <Route
-            path="/trainer/orders"
+            path="/trainer/my-orders"
             element={
               <ProtectedRoute roles={["dietitian"]}>
                 <Layout>
@@ -318,7 +351,7 @@ export default function App() {
             }
           />
           <Route
-            path="/trainer/rewards"
+            path="/trainer/my-rewards"
             element={
               <ProtectedRoute roles={["dietitian"]}>
                 <Layout>
@@ -340,7 +373,7 @@ export default function App() {
 
           {/* Customer */}
           <Route
-            path="/customer"
+            path="/my-dashboard"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -350,11 +383,11 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/shop"
+            path="/trainee/shop"
             element={<Navigate to="/products" replace />}
           />
           <Route
-            path="/customer/orders"
+            path="/trainee/my-orders"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -364,7 +397,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/trainer"
+            path="/trainee/trainers"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -374,7 +407,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/chat"
+            path="/trainee/chat"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -384,7 +417,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/become-trainer"
+            path="/trainee/become-trainer"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -394,15 +427,15 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/trainers"
-            element={<Navigate to="/customer/trainer?tab=find" replace />}
+            path="/trainee/trainers"
+            element={<Navigate to="/trainee/trainers?tab=find" replace />}
           />
           <Route
-            path="/customer/trainers/:id"
-            element={<Navigate to="/customer/trainer?tab=find" replace />}
+            path="/trainee/trainers/:id"
+            element={<Navigate to="/trainee/trainers?tab=find" replace />}
           />
           <Route
-            path="/customer/request-product"
+            path="/trainee/request-product"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -412,7 +445,7 @@ export default function App() {
             }
           />
           {/* <Route
-            path="/customer/log-exercise"
+            path="/trainee/log-exercise"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -422,7 +455,7 @@ export default function App() {
             }
           /> */}
           <Route
-            path="/customer/profile"
+            path="/trainee/my-profile"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -432,7 +465,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/subscription"
+            path="/trainee/subscription"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -442,7 +475,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/ai-recommendation"
+            path="/trainee/ai-recommendations"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -451,8 +484,8 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-           <Route
-            path="/customer/weekly-report"
+          <Route
+            path="/trainee/weekly-report"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -462,7 +495,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/rewards"
+            path="/trainee/my-rewards"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -472,7 +505,7 @@ export default function App() {
             }
           />
           <Route
-            path="/customer/notifications"
+            path="/trainee/notifications"
             element={
               <ProtectedRoute roles={["trainee"]}>
                 <Layout>
@@ -483,7 +516,10 @@ export default function App() {
           />
 
           {/* Legacy redirects */}
-          <Route path="/user" element={<Navigate to="/customer" replace />} />
+          <Route
+            path="/user"
+            element={<Navigate to="/my-dashboard" replace />}
+          />
           <Route
             path="/dietitian"
             element={<Navigate to="/trainer" replace />}

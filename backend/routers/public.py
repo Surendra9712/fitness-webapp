@@ -1,16 +1,18 @@
-import bcrypt
 import json
-from flask import Blueprint, request, jsonify
-from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
+
+import bcrypt
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import List, Optional
+
 from database.connection import get_connection
 from middleware.auth import generate_token
-from routes.dietitian import CertificationSchema
+from routers.dietitian import CertificationSchema
 from utils.notify import push_to_admins
-from utils.validation import pydantic_errors
 from utils.fx import get_npr_to_usd_rate
 
-public_bp = Blueprint('public', __name__)
+router = APIRouter()
 
 
 class PublicBecomeTrainerSchema(BaseModel):
@@ -50,24 +52,24 @@ def _compute_discounted_price(price, discount_type, discount_value):
     return round(max(0.0, price - dv), 2)
 
 
-@public_bp.route('/categories', methods=['GET'])
+@router.get('/categories')
 def list_categories():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT id, name, slug FROM categories WHERE deleted_at IS NULL ORDER BY id")
-        return jsonify(cursor.fetchall())
+        return cursor.fetchall()
     finally:
         cursor.close()
         conn.close()
 
 
-@public_bp.route('/products', methods=['GET'])
-def list_products():
-    category_slug = request.args.get('category', '').strip()
-    search    = request.args.get('q', '').strip()
-    page      = max(1, int(request.args.get('page', 1)))
-    page_size = max(1, min(50, int(request.args.get('page_size', 12))))
+@router.get('/products')
+def list_products(request: Request):
+    category_slug = request.query_params.get('category', '').strip()
+    search    = request.query_params.get('q', '').strip()
+    page      = max(1, int(request.query_params.get('page', 1)))
+    page_size = max(1, min(50, int(request.query_params.get('page_size', 12))))
     offset    = (page - 1) * page_size
 
     conn = get_connection()
@@ -104,20 +106,20 @@ def list_products():
             row['discounted_price'] = _compute_discounted_price(
                 row['price'], row.get('discount_type'), row.get('discount_value')
             )
-        return jsonify({
+        return {
             'items': rows,
             'total': total,
             'page': page,
             'page_size': page_size,
             'total_pages': max(1, -(-total // page_size)),
-        })
+        }
     finally:
         cursor.close()
         conn.close()
 
 
-@public_bp.route('/products/<int:product_id>', methods=['GET'])
-def get_product(product_id):
+@router.get('/products/{product_id}')
+def get_product(product_id: int):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -131,17 +133,17 @@ def get_product(product_id):
         )
         product = cursor.fetchone()
         if not product:
-            return jsonify({'error': 'Product not found'}), 404
+            return JSONResponse({'error': 'Product not found'}, status_code=404)
         product['discounted_price'] = _compute_discounted_price(
             product['price'], product.get('discount_type'), product.get('discount_value')
         )
-        return jsonify(product)
+        return product
     finally:
         cursor.close()
         conn.close()
 
 
-@public_bp.route('/global-discount', methods=['GET'])
+@router.get('/global-discount')
 def get_global_discount():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -151,24 +153,24 @@ def get_global_discount():
             "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active')"
         )
         s = {row['key']: row['value'] for row in cursor.fetchall()}
-        return jsonify({
+        return {
             'discount_type':  s.get('global_discount_type', 'percentage'),
             'discount_value': float(s.get('global_discount_value', '0') or '0'),
             'is_active':      s.get('global_discount_active', '0') == '1',
-        })
+        }
     finally:
         cursor.close()
         conn.close()
 
 
-@public_bp.route('/fx-rate', methods=['GET'])
+@router.get('/fx-rate')
 def get_fx_rate():
-    return jsonify({'npr_to_usd_rate': get_npr_to_usd_rate()})
+    return {'npr_to_usd_rate': get_npr_to_usd_rate()}
 
 
-@public_bp.route('/trainers', methods=['GET'])
-def list_trainers():
-    page_size = max(1, min(20, int(request.args.get('page_size', 6))))
+@router.get('/trainers')
+def list_trainers(request: Request):
+    page_size = max(1, min(20, int(request.query_params.get('page_size', 6))))
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -190,14 +192,14 @@ def list_trainers():
             "LIMIT %s",
             (page_size,)
         )
-        return jsonify(cursor.fetchall())
+        return cursor.fetchall()
     finally:
         cursor.close()
         conn.close()
 
 
-@public_bp.route('/products/<int:product_id>/reviews', methods=['GET'])
-def list_product_reviews(product_id):
+@router.get('/products/{product_id}/reviews')
+def list_product_reviews(product_id: int):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -209,30 +211,25 @@ def list_product_reviews(product_id):
         )
         reviews = cursor.fetchall()
         avg = sum(r['rating'] for r in reviews) / len(reviews) if reviews else 0
-        return jsonify({'reviews': reviews, 'avg_rating': round(avg, 1), 'count': len(reviews)})
+        return {'reviews': reviews, 'avg_rating': round(avg, 1), 'count': len(reviews)}
     finally:
         cursor.close()
         conn.close()
 
 
-@public_bp.route('/become-trainer', methods=['POST'])
-def become_trainer_public():
-    try:
-        body = PublicBecomeTrainerSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
+@router.post('/become-trainer')
+def become_trainer_public(body: PublicBecomeTrainerSchema):
     if not body.available_time:
-        return jsonify({'error': 'At least one availability slot is required'}), 422
+        return JSONResponse({'error': 'At least one availability slot is required'}, status_code=422)
     if not body.certifications:
-        return jsonify({'error': 'At least one certification is required'}), 422
+        return JSONResponse({'error': 'At least one certification is required'}, status_code=422)
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("SELECT id FROM users WHERE email = %s", (body.email,))
         if cursor.fetchone():
-            return jsonify({'errors': {'email': 'Email already registered'}}), 422
+            return JSONResponse({'errors': {'email': 'Email already registered'}}, status_code=422)
 
         password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
         cursor.execute(
@@ -277,13 +274,13 @@ def become_trainer_public():
         conn.commit()
 
         token = generate_token(user_id, 'dietitian')
-        return jsonify({
+        return JSONResponse({
             'token': token,
             'user': {'id': user_id, 'name': body.name, 'email': body.email, 'role': 'dietitian'},
-        }), 201
+        }, status_code=201)
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()

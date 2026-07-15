@@ -119,14 +119,9 @@ export default function TrainerAssignments() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Trainer Assignments
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Review and approve customer–trainer assignments.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Review and approve customer–trainer assignments.
+        </p>
         <Select value={filter} onValueChange={handleFilterChange}>
           <SelectTrigger className="w-44">
             <SelectValue />

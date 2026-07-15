@@ -235,7 +235,6 @@ export default function Subscription() {
 
       <div className="space-y-6 max-w-3xl">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Subscription</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Choose a plan that fits your fitness journey.
           </p>

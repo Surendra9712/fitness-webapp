@@ -116,15 +116,7 @@ export default function ProductManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Product
-        </Button>
-      </div>
-
+    <div className="space-y-6 pt-4">
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <SearchInput
@@ -133,9 +125,10 @@ export default function ProductManagement() {
             placeholder="Search products…"
           />
         </div>
-        <p className="shrink-0 text-sm text-muted-foreground">
-          {total} {total === 1 ? "product" : "products"}
-        </p>
+        <Button onClick={openAdd}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Product
+        </Button>
       </div>
 
       <Card className={isPlaceholderData ? "opacity-70" : ""}>

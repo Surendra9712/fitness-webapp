@@ -55,12 +55,9 @@ export default function TrainerChat() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Chat</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Message your approved clients in real time.
-        </p>
-      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Message your approved clients in real time.
+      </p>
 
       <Card className="flex h-[75vh] overflow-hidden p-0 sm:h-[70vh]">
         {/* Thread list */}

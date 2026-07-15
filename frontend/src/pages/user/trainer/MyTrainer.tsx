@@ -115,7 +115,7 @@ export default function MyTrainer() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Trainers</h1>
+      {/* <h1 className="text-2xl font-bold tracking-tight">Trainers</h1> */}
 
       <Tabs
         value={tab}

@@ -399,9 +399,6 @@ export default function AiRecommendation() {
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              AI Recommendations
-            </h1>
             <p className="text-sm text-muted-foreground">
               Personalised meal plans &amp; animated exercise recommendations
               powered by AI

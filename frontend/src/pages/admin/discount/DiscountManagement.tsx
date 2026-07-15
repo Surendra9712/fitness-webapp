@@ -8,14 +8,9 @@ import ProductDiscountsSection from "./ProductDiscountsSection";
 export default function DiscountManagement() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          Discount Management
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Configure product-level discounts and a global sitewide discount.
-        </p>
-      </div>
+      <p className="text-muted-foreground text-sm mt-1">
+        Configure product-level discounts and a global sitewide discount.
+      </p>
 
       <Tabs defaultValue="global">
         <TabsList>

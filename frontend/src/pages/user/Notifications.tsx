@@ -351,10 +351,6 @@ export default function Notifications() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Bell className="h-6 w-6" />
-            Notifications
-          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Stay updated on your orders, subscriptions, and more.
           </p>

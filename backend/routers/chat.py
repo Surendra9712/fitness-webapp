@@ -1,15 +1,17 @@
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+
 from database.connection import get_connection
-from middleware.auth import role_required
+from dependencies import CurrentUser, require_roles
 from utils.pagination import parse_page_params
-from extensions import socketio
+from extensions import emit_sync
 
-chat_bp = Blueprint('chat', __name__)
+router = APIRouter()
 
 
-def _my_and_peer_columns():
+def _my_and_peer_columns(role: str):
     """Which trainer_assignments column is "me" vs the chat partner, based on role."""
-    if request.user_role == 'dietitian':
+    if role == 'dietitian':
         return 'trainer_id', 'customer_id'
     return 'customer_id', 'trainer_id'
 
@@ -27,10 +29,9 @@ def _is_member(assignment, user_id):
     return assignment is not None and user_id in (assignment['customer_id'], assignment['trainer_id'])
 
 
-@chat_bp.route('/threads', methods=['GET'])
-@role_required('trainee', 'dietitian')
-def list_threads():
-    my_col, peer_col = _my_and_peer_columns()
+@router.get('/threads')
+def list_threads(user: CurrentUser = Depends(require_roles('trainee', 'dietitian'))):
+    my_col, peer_col = _my_and_peer_columns(user.role)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -56,26 +57,26 @@ def list_threads():
             f"WHERE ta.{my_col} = %s AND ta.status = 'approved' "
             f"AND ta.deleted_at IS NULL AND u.deleted_at IS NULL "
             f"ORDER BY last_message_at IS NULL, last_message_at DESC",
-            (request.user_id, request.user_id),
+            (user.user_id, user.user_id),
         )
-        return jsonify(cursor.fetchall())
+        return cursor.fetchall()
     finally:
         cursor.close()
         conn.close()
 
 
-@chat_bp.route('/<int:assignment_id>/messages', methods=['GET'])
-@role_required('trainee', 'dietitian')
-def get_messages(assignment_id):
-    _, page_size, _ = parse_page_params(default_size=50, max_size=100)
-    before_id = request.args.get('before_id', type=int)
+@router.get('/{assignment_id}/messages')
+def get_messages(assignment_id: int, request: Request, user: CurrentUser = Depends(require_roles('trainee', 'dietitian'))):
+    _, page_size, _ = parse_page_params(request, default_size=50, max_size=100)
+    before_id_raw = request.query_params.get('before_id')
+    before_id = int(before_id_raw) if before_id_raw else None
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         assignment = _get_assignment(cursor, assignment_id)
-        if not _is_member(assignment, request.user_id) or assignment['status'] != 'approved':
-            return jsonify({'error': 'Thread not found'}), 404
+        if not _is_member(assignment, user.user_id) or assignment['status'] != 'approved':
+            return JSONResponse({'error': 'Thread not found'}, status_code=404)
 
         params = [assignment_id]
         where_before = ''
@@ -95,21 +96,20 @@ def get_messages(assignment_id):
         messages.reverse()
         for m in messages:
             m['created_at'] = m['created_at'].isoformat()
-        return jsonify(messages)
+        return messages
     finally:
         cursor.close()
         conn.close()
 
 
-@chat_bp.route('/<int:assignment_id>/messages/<int:message_id>', methods=['DELETE'])
-@role_required('trainee', 'dietitian')
-def delete_message(assignment_id, message_id):
+@router.delete('/{assignment_id}/messages/{message_id}')
+def delete_message(assignment_id: int, message_id: int, user: CurrentUser = Depends(require_roles('trainee', 'dietitian'))):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         assignment = _get_assignment(cursor, assignment_id)
-        if not _is_member(assignment, request.user_id):
-            return jsonify({'error': 'Thread not found'}), 404
+        if not _is_member(assignment, user.user_id):
+            return JSONResponse({'error': 'Thread not found'}, status_code=404)
 
         cursor.execute(
             "SELECT id, sender_id FROM chat_messages "
@@ -118,60 +118,58 @@ def delete_message(assignment_id, message_id):
         )
         message = cursor.fetchone()
         if not message:
-            return jsonify({'error': 'Message not found'}), 404
-        if message['sender_id'] != request.user_id:
-            return jsonify({'error': 'You can only delete your own messages'}), 403
+            return JSONResponse({'error': 'Message not found'}, status_code=404)
+        if message['sender_id'] != user.user_id:
+            return JSONResponse({'error': 'You can only delete your own messages'}, status_code=403)
 
         cursor.execute("UPDATE chat_messages SET deleted_at = NOW() WHERE id = %s", (message_id,))
         conn.commit()
 
         recipient_id = (
             assignment['trainer_id']
-            if request.user_id == assignment['customer_id']
+            if user.user_id == assignment['customer_id']
             else assignment['customer_id']
         )
         payload = {'id': message_id, 'assignment_id': assignment_id}
-        socketio.emit('message_deleted', payload, room=f"user:{request.user_id}")
-        socketio.emit('message_deleted', payload, room=f"user:{recipient_id}")
+        emit_sync('message_deleted', payload, room=f"user:{user.user_id}")
+        emit_sync('message_deleted', payload, room=f"user:{recipient_id}")
 
-        return jsonify({'message': 'Deleted'})
+        return {'message': 'Deleted'}
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()
 
 
-@chat_bp.route('/<int:assignment_id>/read', methods=['PUT'])
-@role_required('trainee', 'dietitian')
-def mark_thread_read(assignment_id):
+@router.put('/{assignment_id}/read')
+def mark_thread_read(assignment_id: int, user: CurrentUser = Depends(require_roles('trainee', 'dietitian'))):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         assignment = _get_assignment(cursor, assignment_id)
-        if not _is_member(assignment, request.user_id):
-            return jsonify({'error': 'Thread not found'}), 404
+        if not _is_member(assignment, user.user_id):
+            return JSONResponse({'error': 'Thread not found'}, status_code=404)
 
         cursor.execute(
             "UPDATE chat_messages SET is_read = 1 "
             "WHERE assignment_id = %s AND sender_id != %s AND is_read = 0",
-            (assignment_id, request.user_id),
+            (assignment_id, user.user_id),
         )
         conn.commit()
-        return jsonify({'message': 'Marked read'})
+        return {'message': 'Marked read'}
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()
 
 
-@chat_bp.route('/unread-count', methods=['GET'])
-@role_required('trainee', 'dietitian')
-def unread_count():
-    my_col, _ = _my_and_peer_columns()
+@router.get('/unread-count')
+def unread_count(user: CurrentUser = Depends(require_roles('trainee', 'dietitian'))):
+    my_col, _ = _my_and_peer_columns(user.role)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -180,9 +178,9 @@ def unread_count():
             f"JOIN trainer_assignments ta ON ta.id = cm.assignment_id "
             f"WHERE ta.{my_col} = %s AND ta.status = 'approved' AND ta.deleted_at IS NULL "
             f"AND cm.sender_id != %s AND cm.is_read = 0 AND cm.deleted_at IS NULL",
-            (request.user_id, request.user_id),
+            (user.user_id, user.user_id),
         )
-        return jsonify(cursor.fetchone())
+        return cursor.fetchone()
     finally:
         cursor.close()
         conn.close()

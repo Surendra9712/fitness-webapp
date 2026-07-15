@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState, useId } from "react";
 import {
-  User, Save, Loader2, Plus, X, Upload,
-  Clock, Award, FileBadge, Briefcase,
+  User,
+  Save,
+  Loader2,
+  Plus,
+  X,
+  Upload,
+  Clock,
+  Award,
+  FileBadge,
+  Briefcase,
 } from "lucide-react";
 import useDietitian from "@/hooks/useDietitian";
 import type { AddCertPayload } from "@/hooks/useDietitian";
@@ -13,7 +21,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
@@ -34,7 +46,9 @@ interface ProfileForm {
   profile_image_url: string;
 }
 
-interface Slot extends AvailableSlot { _id: string }
+interface Slot extends AvailableSlot {
+  _id: string;
+}
 
 interface NewCert {
   _id: string;
@@ -45,19 +59,46 @@ interface NewCert {
   _uploadError: string;
 }
 
-const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 const EMPTY: ProfileForm = {
-  name: "", full_name: "", date_of_birth: "", bio: "",
-  specialization: "", experience_years: "",
-  phone_number: "", city: "", country: "Nepal", profile_image_url: "",
+  name: "",
+  full_name: "",
+  date_of_birth: "",
+  bio: "",
+  specialization: "",
+  experience_years: "",
+  phone_number: "",
+  city: "",
+  country: "Nepal",
+  profile_image_url: "",
 };
 
 function makeSlot(): Slot {
-  return { _id: Math.random().toString(36).slice(2), day: "Monday", from: "08:00", to: "17:00" };
+  return {
+    _id: Math.random().toString(36).slice(2),
+    day: "Monday",
+    from: "08:00",
+    to: "17:00",
+  };
 }
 function makeNewCert(): NewCert {
-  return { _id: Math.random().toString(36).slice(2), name: "", file_url: "", file_type: "url", _uploading: false, _uploadError: "" };
+  return {
+    _id: Math.random().toString(36).slice(2),
+    name: "",
+    file_url: "",
+    file_type: "url",
+    _uploading: false,
+    _uploadError: "",
+  };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -66,43 +107,63 @@ export default function TrainerProfile() {
   const fileInputId = useId();
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const [form, setForm]               = useState<ProfileForm>(EMPTY);
-  const [slots, setSlots]             = useState<Slot[]>([makeSlot()]);
+  const [form, setForm] = useState<ProfileForm>(EMPTY);
+  const [slots, setSlots] = useState<Slot[]>([makeSlot()]);
   // Existing certs (already saved, have real id)
-  const [savedCerts, setSavedCerts]   = useState<TrainerCertification[]>([]);
-  const [deletedIds, setDeletedIds]   = useState<number[]>([]);
+  const [savedCerts, setSavedCerts] = useState<TrainerCertification[]>([]);
+  const [deletedIds, setDeletedIds] = useState<number[]>([]);
   // Pending new certs (not yet in DB)
-  const [newCerts, setNewCerts]       = useState<NewCert[]>([]);
+  const [newCerts, setNewCerts] = useState<NewCert[]>([]);
 
-  const { GetProfile, UpdateProfile, UploadImage, AddCertification, DeleteCertification, UploadCert } = useDietitian();
+  const {
+    GetProfile,
+    UpdateProfile,
+    UploadImage,
+    AddCertification,
+    DeleteCertification,
+    UploadCert,
+  } = useDietitian();
   const { data: profile, isLoading } = GetProfile();
-  const update     = UpdateProfile();
-  const upload     = UploadImage();
-  const addCert    = AddCertification();
+  const update = UpdateProfile();
+  const upload = UploadImage();
+  const addCert = AddCertification();
   const deleteCert = DeleteCertification();
   const uploadCert = UploadCert();
 
-  const isSaving = update.isPending || addCert.isPending || deleteCert.isPending;
+  const isSaving =
+    update.isPending || addCert.isPending || deleteCert.isPending;
 
   useEffect(() => {
     if (!profile) return;
     setForm({
-      name:             profile.name ?? "",
-      full_name:        profile.full_name ?? "",
-      date_of_birth:    profile.date_of_birth ? String(profile.date_of_birth).slice(0, 10) : "",
-      bio:              profile.bio ?? "",
-      specialization:   profile.specialization ?? "",
-      experience_years: profile.experience_years != null ? String(profile.experience_years) : "",
-      phone_number:     profile.phone_number ?? "",
-      city:             profile.city ?? "",
-      country:          profile.country ?? "Nepal",
+      name: profile.name ?? "",
+      full_name: profile.full_name ?? "",
+      date_of_birth: profile.date_of_birth
+        ? String(profile.date_of_birth).slice(0, 10)
+        : "",
+      bio: profile.bio ?? "",
+      specialization: profile.specialization ?? "",
+      experience_years:
+        profile.experience_years != null
+          ? String(profile.experience_years)
+          : "",
+      phone_number: profile.phone_number ?? "",
+      city: profile.city ?? "",
+      country: profile.country ?? "Nepal",
       profile_image_url: profile.profile_image_url ?? "",
     });
-    if (Array.isArray(profile.available_time) && profile.available_time.length) {
-      setSlots(profile.available_time.map((s) => ({
-        _id: Math.random().toString(36).slice(2),
-        day: s.day, from: s.from, to: s.to,
-      })));
+    if (
+      Array.isArray(profile.available_time) &&
+      profile.available_time.length
+    ) {
+      setSlots(
+        profile.available_time.map((s) => ({
+          _id: Math.random().toString(36).slice(2),
+          day: s.day,
+          from: s.from,
+          to: s.to,
+        })),
+      );
     }
     if (Array.isArray(profile.certifications)) {
       setSavedCerts(profile.certifications);
@@ -120,52 +181,82 @@ export default function TrainerProfile() {
 
   // Upload cert file immediately (to get URL), but don't save to DB yet
   async function handleCertFileChange(certId: string, file: File) {
-    setNewCerts((prev) => prev.map((c) =>
-      c._id === certId ? { ...c, _uploading: true, _uploadError: "" } : c,
-    ));
+    setNewCerts((prev) =>
+      prev.map((c) =>
+        c._id === certId ? { ...c, _uploading: true, _uploadError: "" } : c,
+      ),
+    );
     try {
       const res = await uploadCert.mutateAsync(file);
-      setNewCerts((prev) => prev.map((c) =>
-        c._id === certId ? { ...c, file_url: res.url, file_type: res.file_type, _uploading: false } : c,
-      ));
+      setNewCerts((prev) =>
+        prev.map((c) =>
+          c._id === certId
+            ? {
+                ...c,
+                file_url: res.url,
+                file_type: res.file_type,
+                _uploading: false,
+              }
+            : c,
+        ),
+      );
     } catch {
-      setNewCerts((prev) => prev.map((c) =>
-        c._id === certId ? { ...c, _uploading: false, _uploadError: "Upload failed. Try again." } : c,
-      ));
+      setNewCerts((prev) =>
+        prev.map((c) =>
+          c._id === certId
+            ? {
+                ...c,
+                _uploading: false,
+                _uploadError: "Upload failed. Try again.",
+              }
+            : c,
+        ),
+      );
     }
   }
 
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!form.date_of_birth) { toast.error("Date of birth is required."); return; }
-    if (!form.experience_years || isNaN(Number(form.experience_years))) {
-      toast.error("Experience years is required."); return;
+    if (!form.date_of_birth) {
+      toast.error("Date of birth is required.");
+      return;
     }
-    if (slots.length === 0) { toast.error("Add at least one availability time slot."); return; }
+    if (!form.experience_years || isNaN(Number(form.experience_years))) {
+      toast.error("Experience years is required.");
+      return;
+    }
+    if (slots.length === 0) {
+      toast.error("Add at least one availability time slot.");
+      return;
+    }
     if (slots.some((s) => !s.day || !s.from || !s.to)) {
-      toast.error("Fill in day, from, and to for every availability slot."); return;
+      toast.error("Fill in day, from, and to for every availability slot.");
+      return;
     }
     // Validate new certs
     const incompleteCert = newCerts.find((c) => !c.name.trim() || !c.file_url);
     if (incompleteCert) {
-      toast.error("Each certification needs a name and a file."); return;
+      toast.error("Each certification needs a name and a file.");
+      return;
     }
 
     try {
       // 1. Update profile fields + availability
       await update.mutateAsync({
-        name:             form.name,
-        full_name:        form.full_name || undefined,
-        date_of_birth:    form.date_of_birth || undefined,
-        bio:              form.bio || undefined,
-        specialization:   form.specialization || undefined,
-        experience_years: form.experience_years ? Number(form.experience_years) : undefined,
-        phone_number:     form.phone_number || undefined,
-        city:             form.city || undefined,
-        country:          form.country || undefined,
+        name: form.name,
+        full_name: form.full_name || undefined,
+        date_of_birth: form.date_of_birth || undefined,
+        bio: form.bio || undefined,
+        specialization: form.specialization || undefined,
+        experience_years: form.experience_years
+          ? Number(form.experience_years)
+          : undefined,
+        phone_number: form.phone_number || undefined,
+        city: form.city || undefined,
+        country: form.country || undefined,
         profile_image_url: form.profile_image_url || undefined,
-        available_time:   slots.map(({ day, from, to }) => ({ day, from, to })),
+        available_time: slots.map(({ day, from, to }) => ({ day, from, to })),
       } as any);
 
       // 2. Delete removed existing certs
@@ -177,8 +268,8 @@ export default function TrainerProfile() {
       const saved: TrainerCertification[] = [];
       for (const cert of newCerts) {
         const payload: AddCertPayload = {
-          name:      cert.name.trim(),
-          file_url:  cert.file_url,
+          name: cert.name.trim(),
+          file_url: cert.file_url,
           file_type: cert.file_type,
         };
         const result = await addCert.mutateAsync(payload);
@@ -212,15 +303,11 @@ export default function TrainerProfile() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          This information is visible to customers browsing trainers.
-        </p>
-      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        This information is visible to customers browsing trainers.
+      </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-
         {/* ── Profile photo ── */}
         <Card>
           <CardHeader>
@@ -246,7 +333,9 @@ export default function TrainerProfile() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="full_name">Full Name <span className="text-destructive">*</span></Label>
+                <Label htmlFor="full_name">
+                  Full Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="full_name"
                   value={form.full_name}
@@ -255,7 +344,9 @@ export default function TrainerProfile() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Date of Birth <span className="text-destructive">*</span></Label>
+                <Label>
+                  Date of Birth <span className="text-destructive">*</span>
+                </Label>
                 <DatePicker
                   value={form.date_of_birth}
                   onChange={(v) => set("date_of_birth", v)}
@@ -366,14 +457,22 @@ export default function TrainerProfile() {
                 <Select
                   value={slot.day}
                   onValueChange={(v) =>
-                    setSlots((prev) => prev.map((s) => s._id === slot._id ? { ...s, day: v } : s))
+                    setSlots((prev) =>
+                      prev.map((s) =>
+                        s._id === slot._id ? { ...s, day: v } : s,
+                      ),
+                    )
                   }
                 >
                   <SelectTrigger className="w-36 bg-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    {DAYS.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
@@ -382,7 +481,11 @@ export default function TrainerProfile() {
                   type="time"
                   value={slot.from}
                   onChange={(e) =>
-                    setSlots((prev) => prev.map((s) => s._id === slot._id ? { ...s, from: e.target.value } : s))
+                    setSlots((prev) =>
+                      prev.map((s) =>
+                        s._id === slot._id ? { ...s, from: e.target.value } : s,
+                      ),
+                    )
                   }
                   className="w-32 bg-white"
                 />
@@ -391,13 +494,19 @@ export default function TrainerProfile() {
                   type="time"
                   value={slot.to}
                   onChange={(e) =>
-                    setSlots((prev) => prev.map((s) => s._id === slot._id ? { ...s, to: e.target.value } : s))
+                    setSlots((prev) =>
+                      prev.map((s) =>
+                        s._id === slot._id ? { ...s, to: e.target.value } : s,
+                      ),
+                    )
                   }
                   className="w-32 bg-white"
                 />
                 <button
                   type="button"
-                  onClick={() => setSlots((prev) => prev.filter((s) => s._id !== slot._id))}
+                  onClick={() =>
+                    setSlots((prev) => prev.filter((s) => s._id !== slot._id))
+                  }
                   className="ml-auto text-gray-400 hover:text-red-500 transition-colors"
                 >
                   <X className="h-4 w-4" />
@@ -433,7 +542,9 @@ export default function TrainerProfile() {
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <FileBadge className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground truncate">{cert.name}</span>
+                  <span className="text-sm font-medium text-foreground truncate">
+                    {cert.name}
+                  </span>
                   {cert.file_url && (
                     <a
                       href={cert.file_url}
@@ -467,13 +578,19 @@ export default function TrainerProfile() {
                     value={cert.name}
                     onChange={(e) =>
                       setNewCerts((prev) =>
-                        prev.map((c) => c._id === cert._id ? { ...c, name: e.target.value } : c)
+                        prev.map((c) =>
+                          c._id === cert._id
+                            ? { ...c, name: e.target.value }
+                            : c,
+                        ),
                       )
                     }
                   />
                   <div className="flex items-center gap-3">
                     <input
-                      ref={(el) => { fileRefs.current[cert._id] = el; }}
+                      ref={(el) => {
+                        fileRefs.current[cert._id] = el;
+                      }}
                       id={`${fileInputId}-${cert._id}`}
                       type="file"
                       accept=".pdf,.png,.jpg,.jpeg,.webp"
@@ -491,9 +608,11 @@ export default function TrainerProfile() {
                       onClick={() => fileRefs.current[cert._id]?.click()}
                       className="gap-1.5 text-xs"
                     >
-                      {cert._uploading
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <Upload className="h-3.5 w-3.5" />}
+                      {cert._uploading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
                       {cert._uploading ? "Uploading…" : "Choose File"}
                     </Button>
                     {cert.file_url && !cert._uploading && (
@@ -503,13 +622,19 @@ export default function TrainerProfile() {
                       </span>
                     )}
                     {cert._uploadError && (
-                      <span className="text-xs text-destructive">{cert._uploadError}</span>
+                      <span className="text-xs text-destructive">
+                        {cert._uploadError}
+                      </span>
                     )}
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setNewCerts((prev) => prev.filter((c) => c._id !== cert._id))}
+                  onClick={() =>
+                    setNewCerts((prev) =>
+                      prev.filter((c) => c._id !== cert._id),
+                    )
+                  }
                   className="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
                 >
                   <X className="h-4 w-4" />
@@ -518,7 +643,9 @@ export default function TrainerProfile() {
             ))}
 
             {visibleSaved.length === 0 && newCerts.length === 0 && (
-              <p className="text-sm text-muted-foreground">No certifications added yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No certifications added yet.
+              </p>
             )}
 
             <Button
@@ -543,11 +670,20 @@ export default function TrainerProfile() {
               {profile?.email}
             </p>
             <p>
-              <span className="font-medium text-foreground">Role:</span> Trainer / Dietitian
+              <span className="font-medium text-foreground">Role:</span> Trainer
+              / Dietitian
             </p>
             <p>
-              <span className="font-medium text-foreground">Account status:</span>{" "}
-              <span className={profile?.status === "active" ? "text-emerald-600" : "text-destructive"}>
+              <span className="font-medium text-foreground">
+                Account status:
+              </span>{" "}
+              <span
+                className={
+                  profile?.status === "active"
+                    ? "text-emerald-600"
+                    : "text-destructive"
+                }
+              >
                 {profile?.status === "active" ? "Active" : "Disabled"}
               </span>
             </p>
@@ -556,12 +692,15 @@ export default function TrainerProfile() {
 
         <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
           {isSaving ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</>
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…
+            </>
           ) : (
-            <><Save className="mr-2 h-4 w-4" /> Save Changes</>
+            <>
+              <Save className="mr-2 h-4 w-4" /> Save Changes
+            </>
           )}
         </Button>
-
       </form>
     </div>
   );

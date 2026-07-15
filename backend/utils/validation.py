@@ -1,11 +1,21 @@
 from pydantic import ValidationError
 
+# FastAPI's RequestValidationError wraps the same per-error dicts as a plain
+# pydantic ValidationError, but prefixes `loc` with where the value came from
+# (e.g. ('body', 'email')). Skipping that prefix keeps the reported field name
+# identical whether the error came from FastAPI's automatic body validation
+# or from a manual model_validate() call.
+_LOC_PREFIXES = {'body', 'query', 'path', 'header', 'cookie'}
 
-def pydantic_errors(exc: ValidationError) -> dict:
-    """Convert a Pydantic v2 ValidationError into {field: first_message} dict."""
+
+def pydantic_errors(exc) -> dict:
+    """Convert a Pydantic v2 ValidationError (or FastAPI's RequestValidationError,
+    which exposes the same .errors() shape) into a {field: first_message} dict."""
     out = {}
     for err in exc.errors():
-        field = str(err['loc'][0]) if err['loc'] else '__root__'
+        loc = err['loc']
+        start = 1 if loc and loc[0] in _LOC_PREFIXES else 0
+        field = str(loc[start]) if len(loc) > start else '__root__'
         if field in out:
             continue
         msg = err['msg']

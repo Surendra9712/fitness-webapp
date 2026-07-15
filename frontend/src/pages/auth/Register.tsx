@@ -41,7 +41,7 @@ export const RegisterForm = () => {
     setServerError("");
     try {
       await registerUser(data.name, data.email, data.password);
-      navigate("/customer");
+      navigate("/my-dashboard");
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors) {
         Object.entries(err.fieldErrors).forEach(([field, message]) => {

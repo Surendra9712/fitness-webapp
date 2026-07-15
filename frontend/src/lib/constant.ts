@@ -13,20 +13,20 @@ export const GENDER: Record<Gender, string> = {
 };
 
 export function getDashboardPath(role: Role): string {
-  if (role === "admin") return "/admin";
-  if (role === "dietitian") return "/trainer";
-  if (role === "trainee") return "/customer";
-  return "/customer";
+  if (role === "admin") return "/dashboard";
+  if (role === "dietitian") return "/trainer-dashboard";
+  // if (role === "trainee") return "/my-dashboard";
+  return "/my-dashboard";
 }
 
 export function getOrdersPath(role: Role): string {
-  if (role === "dietitian") return "/trainer/orders";
-  return "/customer/orders";
+  if (role === "dietitian") return "/trainer/my-orders";
+  return "/trainee/my-orders";
 }
 
 export function getProfilePath(role: Role): string | null {
-  if (role === "dietitian") return "/trainer/profile";
-  if (role === "trainee") return "/customer/profile";
+  if (role === "dietitian") return "/trainer/my-profile";
+  if (role === "trainee") return "/trainee/my-profile";
   return null;
 }
 
@@ -61,4 +61,11 @@ export function calcCalorieTarget(
   if (goal === "lose_weight") return Math.round(tdee - 500);
   if (goal === "gain_muscle") return Math.round(tdee + 300);
   return Math.round(tdee);
+}
+
+export function toTitleCase(str: string) {
+  return str
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }

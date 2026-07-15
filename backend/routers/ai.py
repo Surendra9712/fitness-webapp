@@ -2,11 +2,14 @@ import json
 import datetime
 import os
 import sys
-from flask import Blueprint, request, jsonify, Response
-from pydantic import BaseModel, ValidationError, field_validator
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, field_validator
 from typing import Optional
+
 from database.connection import get_connection
-from middleware.auth import role_required
+from dependencies import CurrentUser, require_roles
 
 _backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _backend_dir not in sys.path:
@@ -26,11 +29,7 @@ try:
 except Exception as e:
     print(f"  AI models not loaded ({e}) - using rule-based fallback")
 
-ai_bp = Blueprint("ai", __name__)
-
-
-def _pydantic_errors(exc):
-    return [{"field": e["loc"][-1], "message": e["msg"]} for e in exc.errors()]
+router = APIRouter()
 
 
 def _get_profile(cursor, user_id):
@@ -77,7 +76,7 @@ def _get_profile(cursor, user_id):
     return row
 
 
-FOOD_SOURCES = {"nepali_kb", "usda", "nutritionix", "manual","ai"}
+FOOD_SOURCES = {"nepali_kb", "usda", "nutritionix", "manual", "ai"}
 
 
 class LogMealSchema(BaseModel):
@@ -105,15 +104,10 @@ class NLQuerySchema(BaseModel):
     text: str
 
 
-@ai_bp.route("/meals/log", methods=["POST"])
-@role_required("trainee")
-def log_meal():
-    try:
-        body = LogMealSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({"errors": _pydantic_errors(exc)}), 422
+@router.post("/meals/log")
+def log_meal(body: LogMealSchema, user: CurrentUser = Depends(require_roles("trainee"))):
     if body.meal_type not in ("breakfast", "lunch", "snack", "dinner"):
-        return jsonify({"error": "meal_type must be breakfast, lunch, snack, or dinner"}), 400
+        return JSONResponse({"error": "meal_type must be breakfast, lunch, snack, or dinner"}, status_code=400)
     today = datetime.date.today().isoformat()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -124,26 +118,25 @@ def log_meal():
             "quantity, unit, portion_g, calories, protein_g, carbs_g, "
             "fat_g, fiber_g, sugar_g, sodium_mg) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-            (request.user_id, today, body.meal_type, body.food_name,
+            (user.user_id, today, body.meal_type, body.food_name,
              body.food_source, body.quantity, body.unit, body.portion_g,
              body.calories, body.protein_g, body.carbs_g, body.fat_g,
              body.fiber_g, body.sugar_g, body.sodium_mg)
         )
         log_id = cursor.lastrowid
         conn.commit()
-        return jsonify({"id": log_id, "message": f"Logged {body.food_name} to {body.meal_type}"}), 201
+        return JSONResponse({"id": log_id, "message": f"Logged {body.food_name} to {body.meal_type}"}, status_code=201)
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse({"error": str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/meals/today", methods=["GET"])
-@role_required("trainee")
-def get_todays_meals():
-    date_str = request.args.get("date", datetime.date.today().isoformat())
+@router.get("/meals/today")
+def get_todays_meals(request: Request, user: CurrentUser = Depends(require_roles("trainee"))):
+    date_str = request.query_params.get("date", datetime.date.today().isoformat())
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -153,7 +146,7 @@ def get_todays_meals():
             "FROM meal_logs "
             "WHERE user_id=%s AND logged_date=%s AND deleted_at IS NULL "
             "ORDER BY FIELD(meal_type,'breakfast','lunch','snack','dinner'), created_at",
-            (request.user_id, date_str)
+            (user.user_id, date_str)
         )
         logs = cursor.fetchall()
         grouped = {"breakfast": [], "lunch": [], "snack": [], "dinner": []}
@@ -164,7 +157,7 @@ def get_todays_meals():
                 grouped[mt].append(log)
             for k in totals:
                 totals[k] += float(log.get(k) or 0)
-        profile = _get_profile(cursor, request.user_id)
+        profile = _get_profile(cursor, user.user_id)
         targets = {"calories": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65}
         if profile.get("current_weight_kg") and profile.get("height_cm"):
             try:
@@ -182,70 +175,61 @@ def get_todays_meals():
                 }
             except Exception:
                 pass
-        return jsonify({
+        return {
             "date": date_str,
             "meals": grouped,
             "totals": {k: round(v, 1) for k, v in totals.items()},
             "targets": targets,
             "total_entries": len(logs),
-        })
+        }
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/meals/log/<int:log_id>", methods=["DELETE"])
-@role_required("trainee")
-def delete_meal_log(log_id):
+@router.delete("/meals/log/{log_id}")
+def delete_meal_log(log_id: int, user: CurrentUser = Depends(require_roles("trainee"))):
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "UPDATE meal_logs SET deleted_at=NOW() WHERE id=%s AND user_id=%s",
-            (log_id, request.user_id)
+            (log_id, user.user_id)
         )
         conn.commit()
-        return jsonify({"message": "Meal log deleted"})
+        return {"message": "Meal log deleted"}
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse({"error": str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/food/search", methods=["GET"])
-@role_required("trainee")
-def food_search():
-    q = request.args.get("q", "").strip()
+@router.get("/food/search")
+def food_search(request: Request, user: CurrentUser = Depends(require_roles("trainee"))):
+    q = request.query_params.get("q", "").strip()
     if not q or len(q) < 2:
-        return jsonify({"results": []})
-    return jsonify({"results": search_food_unified(q, limit=8), "query": q})
+        return {"results": []}
+    return {"results": search_food_unified(q, limit=8), "query": q}
 
 
-@ai_bp.route("/food/recognize", methods=["POST"])
-@role_required("trainee")
-def food_recognize():
-    body = request.get_json() or {}
-    text = (body.get("text") or "").strip()
+@router.post("/food/recognize")
+def food_recognize(body: dict, user: CurrentUser = Depends(require_roles("trainee"))):
+    text = ((body or {}).get("text") or "").strip()
     if not text:
-        return jsonify({"error": "text is required"}), 400
-    return jsonify(recognize_food(text))
+        return JSONResponse({"error": "text is required"}, status_code=400)
+    return recognize_food(text)
 
 
-@ai_bp.route("/nlp/query", methods=["POST"])
-@role_required("trainee")
-def nlp_query():
-    try:
-        body = NLQuerySchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({"errors": _pydantic_errors(exc)}), 422
+@router.post("/nlp/query")
+def nlp_query(body: NLQuerySchema, user: CurrentUser = Depends(require_roles("trainee"))):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT dietary_restrictions, diet_type FROM user_profiles WHERE user_id=%s",
-            (request.user_id,)
+            (user.user_id,)
         )
         profile = cursor.fetchone() or {}
         dietary = {}
@@ -262,19 +246,18 @@ def nlp_query():
     finally:
         cursor.close()
         conn.close()
-    return jsonify(handle_natural_language_query(body.text, dietary=dietary))
+    return handle_natural_language_query(body.text, dietary=dietary)
 
 
-@ai_bp.route("/recommend/meal", methods=["GET"])
-@role_required("trainee")
-def recommend_meal():
-    meal_type = request.args.get("meal_type")
+@router.get("/recommend/meal")
+def recommend_meal(request: Request, user: CurrentUser = Depends(require_roles("trainee"))):
+    meal_type = request.query_params.get("meal_type")
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        profile = _get_profile(cursor, request.user_id)
+        profile = _get_profile(cursor, user.user_id)
         if not profile:
-            return jsonify({"error": "Complete your profile first"}), 400
+            return JSONResponse({"error": "Complete your profile first"}, status_code=400)
         # Build detailed food history for v3 ML variety features
         # {food_name: {days_since, times_week, times_total}}
         recently_eaten = set()
@@ -291,7 +274,7 @@ def recommend_meal():
                      AND logged_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
                      AND deleted_at IS NULL
                    GROUP BY food_name""",
-                (request.user_id,)
+                (user.user_id,)
             )
             for row in cursor.fetchall():
                 fname = row["food_name"]
@@ -318,20 +301,19 @@ def recommend_meal():
             recently_eaten_detail=recently_eaten_detail,
         )
         if meal_type and meal_type in result.get("meal_plan", {}):
-            return jsonify({
+            return {
                 "nutrition_targets": result["nutrition_targets"],
                 "meal_type": meal_type,
                 "recommendation": result["meal_plan"][meal_type],
-            })
-        return jsonify(result)
+            }
+        return result
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/recommend/exercise", methods=["GET"])
-@role_required("trainee")
-def recommend_exercise_endpoint():
+@router.get("/recommend/exercise")
+def recommend_exercise_endpoint(user: CurrentUser = Depends(require_roles("trainee"))):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -339,12 +321,12 @@ def recommend_exercise_endpoint():
         cursor.execute(
             "SELECT COALESCE(SUM(calories),0) AS consumed FROM meal_logs "
             "WHERE user_id=%s AND logged_date=%s AND deleted_at IS NULL",
-            (request.user_id, today)
+            (user.user_id, today)
         )
         consumed = float((cursor.fetchone() or {}).get("consumed", 0))
-        profile = _get_profile(cursor, request.user_id)
+        profile = _get_profile(cursor, user.user_id)
         if not profile:
-            return jsonify({"error": "Complete your profile first"}), 400
+            return JSONResponse({"error": "Complete your profile first"}, status_code=400)
         t = calculate_nutrition_targets(
             weight_kg=float(profile.get("current_weight_kg") or 70),
             height_cm=float(profile.get("height_cm") or 170),
@@ -363,37 +345,38 @@ def recommend_exercise_endpoint():
             activity_level=profile.get("activity_level", "moderate"),
             today_calories=consumed,
         )
-        return jsonify({**result, "today_calories": consumed,
-                        "target_calories": t.daily_calories, "calorie_ratio": calorie_ratio})
+        return {**result, "today_calories": consumed,
+                "target_calories": t.daily_calories, "calorie_ratio": calorie_ratio}
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/exercise-gif/<exercise_id>", methods=["GET"])
-def exercise_gif(exercise_id):
+@router.get("/exercise-gif/{exercise_id}")
+def exercise_gif(exercise_id: str, request: Request):
     """No auth - <img> tags can't send our JWT header, and gifs aren't
     user-specific data anyway. Proxies ExerciseDB so our RapidAPI key
     stays server-side."""
-    resolution = request.args.get("resolution", "180")
+    resolution = request.query_params.get("resolution", "180")
     content, content_type = fetch_gif_bytes(exercise_id, resolution)
     if content is None:
-        return jsonify({"error": "gif not found"}), 404
-    resp = Response(content, mimetype=content_type)
-    resp.headers["Cache-Control"] = "public, max-age=86400"
-    return resp
+        return JSONResponse({"error": "gif not found"}, status_code=404)
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
-@ai_bp.route("/report/weekly", methods=["GET"])
-@role_required("trainee")
-def weekly_report():
+@router.get("/report/weekly")
+def weekly_report(request: Request, user: CurrentUser = Depends(require_roles("trainee"))):
     today = datetime.date.today()
-    ws_str = request.args.get("week_start")
+    ws_str = request.query_params.get("week_start")
     if ws_str:
         try:
             week_start = datetime.date.fromisoformat(ws_str)
         except Exception:
-            return jsonify({"error": "Invalid week_start (YYYY-MM-DD)"}), 400
+            return JSONResponse({"error": "Invalid week_start (YYYY-MM-DD)"}, status_code=400)
     else:
         week_start = today - datetime.timedelta(days=today.weekday())
     week_end = week_start + datetime.timedelta(days=6)
@@ -408,7 +391,7 @@ def weekly_report():
             "FROM meal_logs WHERE user_id=%s "
             "AND logged_date BETWEEN %s AND %s AND deleted_at IS NULL "
             "GROUP BY logged_date ORDER BY logged_date",
-            (request.user_id, week_start.isoformat(), week_end.isoformat())
+            (user.user_id, week_start.isoformat(), week_end.isoformat())
         )
         daily_rows = cursor.fetchall()
         exercise_by_day = {}
@@ -418,13 +401,13 @@ def weekly_report():
                 "COALESCE(SUM(duration_minutes),0) AS total_minutes "
                 "FROM exercise_logs WHERE user_id=%s AND logged_date BETWEEN %s AND %s "
                 "GROUP BY logged_date",
-                (request.user_id, week_start.isoformat(), week_end.isoformat())
+                (user.user_id, week_start.isoformat(), week_end.isoformat())
             )
             for r in cursor.fetchall():
                 exercise_by_day[str(r["logged_date"])] = r
         except Exception:
             pass
-        profile = _get_profile(cursor, request.user_id)
+        profile = _get_profile(cursor, user.user_id)
         target_calories = 2000
         targets_data = {"calories": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65}
         if profile.get("current_weight_kg") and profile.get("height_cm"):
@@ -474,14 +457,14 @@ def weekly_report():
                 "avg_protein_g=VALUES(avg_protein_g),avg_carbs_g=VALUES(avg_carbs_g),"
                 "avg_fat_g=VALUES(avg_fat_g),total_meals=VALUES(total_meals),"
                 "adherence_pct=VALUES(adherence_pct)",
-                (request.user_id, week_start.isoformat(), week_end.isoformat(),
+                (user.user_id, week_start.isoformat(), week_end.isoformat(),
                  avg_cal, avg_prot, avg_carb, avg_fat,
                  sum(d["meal_count"] for d in daily_data), target_calories, adherence)
             )
             conn.commit()
         except Exception:
             conn.rollback()
-        return jsonify({
+        return {
             "week_start": week_start.isoformat(), "week_end": week_end.isoformat(),
             "daily_data": daily_data,
             "summary": {"avg_calories": avg_cal, "avg_protein_g": avg_prot,
@@ -490,22 +473,21 @@ def weekly_report():
                         "days_logged": len(logged),
                         "total_meals": sum(d["meal_count"] for d in daily_data)},
             "targets": targets_data,
-        })
+        }
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/exercise/complete", methods=["POST"])
-@role_required("trainee")
-def complete_exercise():
+@router.post("/exercise/complete")
+def complete_exercise(body: dict, user: CurrentUser = Depends(require_roles("trainee"))):
     """
     Log a completed exercise and calculate calories burned.
     Body: { exercise_id, exercise_name, body_part, duration_minutes, sets, reps }
     Calories burned = MET * weight_kg * (duration_minutes / 60)
     MET values: cardio=7, strength=5, yoga=3, rest=2
     """
-    body = request.get_json() or {}
+    body = body or {}
     exercise_name    = body.get("exercise_name", "Unknown Exercise")
     body_part        = body.get("body_part", "cardio")
     duration_minutes = int(body.get("duration_minutes", 30))
@@ -519,7 +501,7 @@ def complete_exercise():
         # Get user weight for calorie calculation
         cursor.execute(
             "SELECT current_weight_kg FROM user_profiles WHERE user_id=%s",
-            (request.user_id,)
+            (user.user_id,)
         )
         profile = cursor.fetchone() or {}
         weight_kg = float(profile.get("current_weight_kg") or 70)
@@ -566,37 +548,36 @@ def complete_exercise():
         cursor.execute(
             "INSERT INTO exercise_logs (user_id, exercise_id, logged_date, duration_minutes, calories_burned, notes) "
             "VALUES (%s, %s, %s, %s, %s, %s)",
-            (request.user_id, exercise_db_id, today, duration_minutes, calories_burned,
+            (user.user_id, exercise_db_id, today, duration_minutes, calories_burned,
              f"Sets: {sets}, Reps: {reps}" if sets or reps else None)
         )
         log_id = cursor.lastrowid
         conn.commit()
 
-        return jsonify({
+        return JSONResponse({
             "id":               log_id,
             "exercise_name":    exercise_name,
             "duration_minutes": duration_minutes,
             "calories_burned":  calories_burned,
             "logged_date":      today,
             "message":          f"Great work! Burned ~{calories_burned} kcal in {duration_minutes} minutes.",
-        }), 201
+        }, status_code=201)
     except Exception as e:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse({"error": str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()
 
 
-@ai_bp.route("/plan/weekly", methods=["GET"])
-@role_required("trainee")
-def weekly_meal_plan():
+@router.get("/plan/weekly")
+def weekly_meal_plan(user: CurrentUser = Depends(require_roles("trainee"))):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        profile = _get_profile(cursor, request.user_id)
+        profile = _get_profile(cursor, user.user_id)
         if not profile:
-            return jsonify({"error": "Complete your profile first"}), 400
+            return JSONResponse({"error": "Complete your profile first"}, status_code=400)
         result = generate_weekly_plan(
             weight_kg=float(profile.get("current_weight_kg") or 70),
             height_cm=float(profile.get("height_cm") or 170),
@@ -608,7 +589,7 @@ def weekly_meal_plan():
             dietary=profile.get("dietary", {}),
             preferred_cuisines=profile.get("cuisine_preferences") or ["nepali"],
         )
-        return jsonify(result)
+        return result
     finally:
         cursor.close()
         conn.close()

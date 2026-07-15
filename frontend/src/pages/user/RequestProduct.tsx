@@ -96,7 +96,6 @@ export default function RequestProduct() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Request a Product</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Can't find what you're looking for? Submit a request and our admin
           will review it.

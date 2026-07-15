@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ShieldCheck, ShieldOff, Award, Search, ExternalLink, Briefcase } from "lucide-react";
+import {
+  ShieldCheck,
+  ShieldOff,
+  Award,
+  Search,
+  ExternalLink,
+  Briefcase,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
@@ -23,7 +30,9 @@ export default function TrainerVerification() {
   const [searchQuery, setSearchQuery] = useState("");
   const [verifying, setVerifying] = useState<number | null>(null);
 
-  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({ initialPageSize: 15 });
+  const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
+    initialPageSize: 15,
+  });
 
   const { GetUsers, VerifyTrainer } = useAdmin();
   const verifyMutation = VerifyTrainer();
@@ -63,12 +72,9 @@ export default function TrainerVerification() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Trainer Requests</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Trainers pending verification — verify to make them visible to trainees.
-        </p>
-      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Trainers pending verification — verify to make them visible to trainees.
+      </p>
 
       {/* Search */}
       <form onSubmit={handleSearch} className="flex gap-2 max-w-sm">
@@ -91,7 +97,9 @@ export default function TrainerVerification() {
         <div className="flex flex-col items-center gap-3 py-20 text-center">
           <ShieldCheck className="h-12 w-12 text-emerald-300" />
           <p className="font-semibold text-muted-foreground">
-            {searchQuery ? "No matching trainers found" : "All trainers are verified"}
+            {searchQuery
+              ? "No matching trainers found"
+              : "All trainers are verified"}
           </p>
         </div>
       ) : (
@@ -110,9 +118,13 @@ export default function TrainerVerification() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{trainer.name}</span>
-                  <Badge variant="warning" className="text-xs">Unverified</Badge>
+                  <Badge variant="warning" className="text-xs">
+                    Unverified
+                  </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{trainer.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {trainer.email}
+                </p>
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
                   {trainer.specialization && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -122,7 +134,8 @@ export default function TrainerVerification() {
                   )}
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Award className="h-3 w-3" />
-                    {trainer.cert_count ?? 0} cert{trainer.cert_count !== 1 ? "s" : ""}
+                    {trainer.cert_count ?? 0} cert
+                    {trainer.cert_count !== 1 ? "s" : ""}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Joined {new Date(trainer.created_at!).toLocaleDateString()}

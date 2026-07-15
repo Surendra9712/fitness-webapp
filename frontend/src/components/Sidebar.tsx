@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getDashboardPath, getProfilePath } from "@/lib/constant";
@@ -14,16 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard,
-  Users,
   ShoppingBag,
   Package,
   Tag,
   ShoppingCart,
   Bell,
   LogOut,
-  Leaf,
   User,
-  Menu,
   X,
   UserCheck,
   UserRound,
@@ -40,6 +37,7 @@ import {
 import type { Role } from "@/types";
 import useUser from "@/hooks/useUser";
 import useChat from "@/hooks/useChat";
+import { Button } from "./ui/button";
 
 interface NavItem {
   to: string;
@@ -50,28 +48,28 @@ interface NavItem {
 const navLinks: Record<Role, NavItem[]> = {
   admin: [
     {
-      to: "/admin",
+      to: "/dashboard",
       label: "Dashboard",
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     // { to: "/admin/users", label: "Users", icon: <Users className="h-4 w-4" /> },
     {
-      to: "/admin/trainees",
+      to: "/admin/trainee-management",
       label: "Trainees",
       icon: <UserRound className="h-4 w-4" />,
     },
     {
-      to: "/admin/trainers",
+      to: "/admin/trainer-management",
       label: "Trainers",
       icon: <UserCheck className="h-4 w-4" />,
     },
     {
-      to: "/admin/products",
+      to: "/admin/product-management",
       label: "Products",
       icon: <Package className="h-4 w-4" />,
     },
     {
-      to: "/admin/categories",
+      to: "/admin/category-management",
       label: "Categories",
       icon: <Tag className="h-4 w-4" />,
     },
@@ -81,7 +79,7 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <Bell className="h-4 w-4" />,
     },
     {
-      to: "/admin/orders",
+      to: "/admin/order-management",
       label: "Orders",
       icon: <ShoppingBag className="h-4 w-4" />,
     },
@@ -96,7 +94,7 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <ShieldCheck className="h-4 w-4" />,
     },
     {
-      to: "/admin/subscriptions",
+      to: "/admin/subscription-plans",
       label: "Subscriptions",
       icon: <Crown className="h-4 w-4" />,
     },
@@ -106,7 +104,7 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <Percent className="h-4 w-4" />,
     },
     {
-      to: "/admin/discounts",
+      to: "/admin/discount-management",
       label: "Discounts",
       icon: <BadgePercent className="h-4 w-4" />,
     },
@@ -118,12 +116,12 @@ const navLinks: Record<Role, NavItem[]> = {
   ],
   dietitian: [
     {
-      to: "/trainer",
+      to: "/trainer-dashboard",
       label: "Dashboard",
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
     {
-      to: "/trainer/assignments",
+      to: "/trainer/assignment-requests",
       label: "Assignments",
       icon: <UserCheck className="h-4 w-4" />,
     },
@@ -133,12 +131,12 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <ShoppingCart className="h-4 w-4" />,
     },
     {
-      to: "/trainer/orders",
+      to: "/trainer/my-orders",
       label: "My Orders",
       icon: <ShoppingBag className="h-4 w-4" />,
     },
     {
-      to: "/trainer/rewards",
+      to: "/trainer/my-rewards",
       label: "Rewards",
       icon: <Gift className="h-4 w-4" />,
     },
@@ -155,7 +153,7 @@ const navLinks: Record<Role, NavItem[]> = {
   ],
   trainee: [
     {
-      to: "/customer",
+      to: "/my-dashboard",
       label: "Dashboard",
       icon: <LayoutDashboard className="h-4 w-4" />,
     },
@@ -165,48 +163,48 @@ const navLinks: Record<Role, NavItem[]> = {
       icon: <ShoppingCart className="h-4 w-4" />,
     },
     {
-      to: "/customer/orders",
+      to: "/trainee/my-orders",
       label: "My Orders",
       icon: <ShoppingBag className="h-4 w-4" />,
     },
     {
-      to: "/customer/trainer",
+      to: "/trainee/trainers",
       label: "Trainers",
       icon: <UserCheck className="h-4 w-4" />,
     },
     {
-      to: "/customer/chat",
+      to: "/trainee/chat",
       label: "Chat",
       icon: <MessageCircle className="h-4 w-4" />,
     },
     {
-      to: "/customer/request-product",
+      to: "/trainee/request-product",
       label: "Request",
       icon: <Bell className="h-4 w-4" />,
     },
 
     {
-      to: "/customer/subscription",
+      to: "/trainee/subscription",
       label: "Subscription",
       icon: <Crown className="h-4 w-4" />,
     },
     {
-      to: "/customer/ai-recommendation",
+      to: "/trainee/ai-recommendations",
       label: "AI Recommendation",
       icon: <Sparkles className="h-4 w-4" />,
     },
     {
-      to: "/customer/weekly-report",
+      to: "/trainee/weekly-report",
       label: "Weekly Report",
       icon: <BarChart3 className="h-4 w-4" />,
     },
     {
-      to: "/customer/rewards",
+      to: "/trainee/my-rewards",
       label: "Rewards",
       icon: <Gift className="h-4 w-4" />,
     },
     {
-      to: "/customer/notifications",
+      to: "/trainee/notifications",
       label: "Notifications",
       icon: <Bell className="h-4 w-4" />,
     },
@@ -219,10 +217,14 @@ const roleLabel: Record<Role, string> = {
   trainee: "Trainee",
 };
 
-export default function Sidebar() {
+interface SidebarProps {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+}
+
+export default function Sidebar({ open, setOpen }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
   const { GetUnreadCount } = useUser();
   const { data: unreadData } = GetUnreadCount();
   const unreadCount = unreadData?.count ?? 0;
@@ -267,6 +269,14 @@ export default function Sidebar() {
             className="h-14 w-auto"
           />
         </NavLink>
+        <Button
+          size={"icon"}
+          className=" size-8 min-w-8"
+          onClick={() => setOpen(false)}
+          aria-label="Close sidebar"
+        >
+          <X className="h-3 w-3" />
+        </Button>
       </div>
 
       <Separator className="bg-white/10" />
@@ -370,13 +380,13 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile toggle button */}
-      <button
+      {/* <button
         className={`fixed ${open ? "left-50" : "left-4"} top-3.5 z-50 flex h-7 w-7 items-center justify-center rounded-md bg-primary-900 text-white lg:hidden`}
         onClick={() => setOpen((v) => !v)}
         aria-label="Toggle sidebar"
       >
         {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-      </button>
+      </button> */}
 
       {/* Mobile overlay */}
       {open && (

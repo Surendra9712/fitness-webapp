@@ -1,5 +1,17 @@
 import { useEffect, useState, useRef } from "react";
-import { Zap, Clock, ShoppingBag, Bell, Plus, Trash2, Search, ChevronDown, ChevronUp, RefreshCw, Dumbbell } from "lucide-react";
+import {
+  Zap,
+  Clock,
+  ShoppingBag,
+  Bell,
+  Plus,
+  Trash2,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Dumbbell,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +25,7 @@ import type { DashboardStats } from "@/types";
 
 const today = new Date().toISOString().split("T")[0];
 
-function getGreeting() {
+export function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
@@ -557,9 +569,9 @@ export default function UserDashboard() {
     <div className="space-y-6 pt-1">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight leading-snug">
+          {/* <h1 className="text-2xl font-bold tracking-tight leading-snug">
             {getGreeting()}, {user?.name?.split(" ")[0] || "there"} 👋
-          </h1>
+          </h1> */}
           <p className="text-sm text-foreground/60 mt-1.5 leading-relaxed">
             Log your meals through the day — breakfast, lunch, snacks, then
             dinner
@@ -741,9 +753,12 @@ export default function UserDashboard() {
           <Dumbbell className="h-6 w-6 text-emerald-600" />
         </div>
         <div className="text-center">
-          <h3 className="font-semibold text-gray-900">End of Day — Check Exercise</h3>
+          <h3 className="font-semibold text-gray-900">
+            End of Day — Check Exercise
+          </h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Done with your meals for today? Let the AI recommend the right exercise based on what you ate.
+            Done with your meals for today? Let the AI recommend the right
+            exercise based on what you ate.
           </p>
         </div>
         <button

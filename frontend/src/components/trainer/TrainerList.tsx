@@ -47,23 +47,23 @@ export function TrainerList({
   return (
     <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-6 py-5 border-b">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-5 border-b sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Dumbbell className="h-5 w-5 text-primary" />
           </div>
           <h2 className="text-lg font-bold tracking-tight">
             Available <span className="text-primary">Trainers</span>
           </h2>
         </div>
-        <div className="flex items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-sm font-semibold text-muted-foreground">
+        <div className="flex shrink-0 items-center gap-2 rounded-full bg-muted px-3.5 py-1.5 text-sm font-semibold text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
           {total} trainer{total !== 1 ? "s" : ""}
         </div>
       </div>
 
       {/* ── Search ── */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b bg-muted/20">
+      <div className="flex items-center gap-3 px-4 py-4 border-b bg-muted/20 sm:px-6">
         <div className="relative flex-1">
           <SearchInput onSearch={onSearch} />
         </div>
@@ -82,81 +82,83 @@ export function TrainerList({
             return (
               <div
                 key={t.id}
-                className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
+                className="flex flex-col gap-3 px-4 py-4 hover:bg-muted/30 transition-colors sm:flex-row sm:items-center sm:gap-4 sm:px-6"
               >
-                {/* Avatar */}
-                <Avatar className="h-12 w-12 shrink-0">
-                  <AvatarFallback
-                    className={`bg-gradient-to-br ${avatarGradient(t.name)} text-white font-black text-lg`}
-                  >
-                    {t.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                  <AvatarImage src={t.profile_image_url} />
-                </Avatar>
+                {/* Avatar + Name + status */}
+                <div className="flex items-center gap-3 sm:w-44 sm:shrink-0">
+                  <Avatar className="h-12 w-12 shrink-0">
+                    <AvatarFallback
+                      className={`bg-gradient-to-br ${avatarGradient(t.name)} text-white font-black text-lg`}
+                    >
+                      {t.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                    <AvatarImage src={t.profile_image_url} />
+                  </Avatar>
 
-                {/* Name + status */}
-                <div className="w-44 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onViewDetail(t)}
-                    className="font-bold text-foreground hover:text-primary transition-colors leading-snug line-clamp-1 text-left"
-                  >
-                    {t.name}
-                  </button>
-                  <div className="mt-0.5 flex items-center gap-1.5">
-                    {isPending ? (
-                      <>
-                        <Clock className="h-3 w-3 text-amber-500" />
-                        <span className="text-xs font-semibold text-amber-600">
-                          {PENDING_STATUS_LABEL[t.my_pending_status ?? ""] ??
-                            "Requested"}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span
-                          className={`h-2 w-2 rounded-full ${available ? "bg-primary-500" : "bg-secondary-500"}`}
-                        />
-                        <span
-                          className={`text-xs font-semibold ${available ? "text-primary-600" : "text-secondary-600"}`}
-                        >
-                          {available ? "Available" : "Active"}
-                        </span>
-                      </>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => onViewDetail(t)}
+                      className="font-bold text-foreground hover:text-primary transition-colors leading-snug line-clamp-1 text-left"
+                    >
+                      {t.name}
+                    </button>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      {isPending ? (
+                        <>
+                          <Clock className="h-3 w-3 shrink-0 text-amber-500" />
+                          <span className="text-xs font-semibold text-amber-600">
+                            {PENDING_STATUS_LABEL[t.my_pending_status ?? ""] ??
+                              "Requested"}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${available ? "bg-primary-500" : "bg-secondary-500"}`}
+                          />
+                          <span
+                            className={`text-xs font-semibold ${available ? "text-primary-600" : "text-secondary-600"}`}
+                          >
+                            {available ? "Available" : "Active"}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Email */}
-                <div className="flex flex-1 min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground sm:flex-1">
                   <Mail className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{t.email}</span>
                 </div>
 
-                {/* Rating */}
-                <div className="shrink-0 w-28">
-                  {t.avg_rating && t.avg_rating > 0 ? (
-                    <StarDisplay
-                      value={t.avg_rating}
-                      count={t.review_count}
-                      size="sm"
-                    />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      No reviews
-                    </span>
-                  )}
-                </div>
+                {/* Rating + Clients pill */}
+                <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                  <div className="sm:w-28">
+                    {t.avg_rating && t.avg_rating > 0 ? (
+                      <StarDisplay
+                        value={t.avg_rating}
+                        count={t.review_count}
+                        size="sm"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No reviews
+                      </span>
+                    )}
+                  </div>
 
-                {/* Clients pill */}
-                <div className="shrink-0 flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-sm font-semibold">
-                  <Users className="h-3.5 w-3.5 text-primary" />
-                  Clients
-                  <span className="ml-0.5">{t.customer_count ?? 0}</span>
+                  <div className="flex shrink-0 items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-sm font-semibold">
+                    <Users className="h-3.5 w-3.5 text-primary" />
+                    Clients
+                    <span className="ml-0.5">{t.customer_count ?? 0}</span>
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"

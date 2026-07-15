@@ -62,28 +62,28 @@ export function AssignmentStatusCard({ assignment, onCancel }: Props) {
         <div className="rounded-lg bg-white/60 p-3 space-y-1.5 text-sm">
           <div className="flex gap-2">
             <span className="font-medium w-24 shrink-0">Trainer</span>
-            <span>{assignment.trainer_name}</span>
+            <span className="min-w-0 break-words">{assignment.trainer_name}</span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium w-24 shrink-0">Email</span>
-            <span className="text-muted-foreground">{assignment.trainer_email}</span>
+            <span className="min-w-0 break-words text-muted-foreground">{assignment.trainer_email}</span>
           </div>
           {assignment.customer_note && (
             <div className="flex gap-2">
               <span className="font-medium w-24 shrink-0">Your note</span>
-              <span className="text-muted-foreground">{assignment.customer_note}</span>
+              <span className="min-w-0 break-words text-muted-foreground">{assignment.customer_note}</span>
             </div>
           )}
           {assignment.trainer_note && (
             <div className="flex gap-2">
               <span className="font-medium w-24 shrink-0">Trainer note</span>
-              <span className="text-muted-foreground">{assignment.trainer_note}</span>
+              <span className="min-w-0 break-words text-muted-foreground">{assignment.trainer_note}</span>
             </div>
           )}
           {assignment.admin_note && (
             <div className="flex gap-2">
               <span className="font-medium w-24 shrink-0">Admin note</span>
-              <span className="text-muted-foreground">{assignment.admin_note}</span>
+              <span className="min-w-0 break-words text-muted-foreground">{assignment.admin_note}</span>
             </div>
           )}
           <div className="flex gap-2">

@@ -128,9 +128,8 @@ export default function ProductRequests() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Product Requests</h1>
         <Select value={filter} onValueChange={handleFilterChange}>
           <SelectTrigger className="w-36">
             <SelectValue />

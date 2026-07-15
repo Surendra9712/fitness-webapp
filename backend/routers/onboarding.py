@@ -1,13 +1,15 @@
-from flask import Blueprint, request, jsonify
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from typing import Optional, Literal, List
 import json
 from datetime import date
-from database.connection import get_connection
-from middleware.auth import token_required
-from utils.validation import pydantic_errors
 
-onboarding_bp = Blueprint('onboarding', __name__)
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Literal, List
+
+from database.connection import get_connection
+from dependencies import CurrentUser, get_current_user
+
+router = APIRouter()
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -204,6 +206,7 @@ def _calc_weight_recommendation(weight_kg, height_cm, goal):
 
 _JSON_FIELDS = {'dietary_restrictions', 'allergens', 'cuisine_preferences', 'health_conditions'}
 
+
 def _upsert_profile(cursor, user_id, fields: dict):
     cols = ', '.join(fields.keys())
     placeholders = ', '.join(['%s'] * len(fields))
@@ -217,14 +220,8 @@ def _upsert_profile(cursor, user_id, fields: dict):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@onboarding_bp.route('/complete', methods=['POST'])
-@token_required
-def complete():
-    try:
-        body = ProfileSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
+@router.post('/complete')
+def complete(body: ProfileSchema, user: CurrentUser = Depends(get_current_user)):
     fields = {
         'full_name':            body.full_name,
         'date_of_birth':        body.date_of_birth,
@@ -264,7 +261,7 @@ def complete():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        _upsert_profile(cursor, request.user_id, fields)
+        _upsert_profile(cursor, user.user_id, fields)
         conn.commit()
 
         macros = _calc_macros(
@@ -280,27 +277,21 @@ def complete():
             height_cm=body.height_cm,
             goal=body.primary_goal,
         )
-        return jsonify({
+        return JSONResponse({
             'message': 'Profile saved',
             'daily_targets': macros,
             'weight_recommendation': weight_recommendation,
-        }), 201
+        }, status_code=201)
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()
 
 
-@onboarding_bp.route('/profile', methods=['PUT'])
-@token_required
-def update_profile():
-    try:
-        body = UpdateProfileSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
+@router.put('/profile')
+def update_profile(body: UpdateProfileSchema, user: CurrentUser = Depends(get_current_user)):
     updates = {}
     for k, v in body.model_dump().items():
         if v is None:
@@ -308,10 +299,10 @@ def update_profile():
         updates[k] = json.dumps(v) if k in _JSON_FIELDS else v
 
     if not updates:
-        return jsonify({'error': 'No fields provided'}), 400
+        return JSONResponse({'error': 'No fields provided'}, status_code=400)
 
     set_clause = ', '.join(f"{k} = %s" for k in updates)
-    values = list(updates.values()) + [request.user_id]
+    values = list(updates.values()) + [user.user_id]
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -328,7 +319,7 @@ def update_profile():
             cursor.execute(
                 "SELECT current_weight_kg, height_cm, date_of_birth, gender, activity_level, primary_goal "
                 "FROM user_profiles WHERE user_id = %s",
-                (request.user_id,)
+                (user.user_id,)
             )
             profile = cursor.fetchone() or {}
             weight_kg = float(profile.get('current_weight_kg') or 70)
@@ -347,16 +338,16 @@ def update_profile():
                 height_cm=height_cm,
                 goal=goal,
             )
-            return jsonify({
+            return {
                 'message': 'Profile updated',
                 'daily_targets': macros,
                 'weight_recommendation': weight_recommendation,
-            })
+            }
 
-        return jsonify({'message': 'Profile updated'})
+        return {'message': 'Profile updated'}
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
     finally:
         cursor.close()
         conn.close()

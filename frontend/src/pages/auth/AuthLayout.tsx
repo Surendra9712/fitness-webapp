@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Dumbbell } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link, useSearchParams } from "react-router-dom";
 import { LoginForm } from "./Login";
@@ -11,13 +10,14 @@ const headings = {
   login: { title: "Welcome back", sub: "Sign in to your account to continue" },
   register: {
     title: "Create account",
-    sub: "Join FitStore and start your fitness journey",
+    sub: "Join SmartDiet Pro and start your fitness journey",
   },
 };
 
 export default function AuthLayout() {
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") === "register" ? "register" : "login";
+  const initialTab =
+    searchParams.get("tab") === "register" ? "register" : "login";
   const [tab, setTab] = useState<"login" | "register">(initialTab);
 
   useEffect(() => {
@@ -35,12 +35,11 @@ export default function AuthLayout() {
 
         {/* Brand */}
         <Link to="/" className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 ring-1 ring-emerald-500/30">
-            <Dumbbell className="h-5 w-5 text-emerald-400" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">
-            SmartDiet Pro
-          </span>
+          <img
+            src="/smart-diet-pro-dark.svg"
+            alt="SmartDiet Pro"
+            className="h-20 w-auto"
+          />
         </Link>
 
         {/* Hero copy */}
@@ -91,8 +90,13 @@ export default function AuthLayout() {
         <div className="mx-auto w-full max-w-sm ">
           {/* Mobile brand */}
           <div className="mb-8 flex items-center gap-2 lg:hidden absolute top-8">
-            <Dumbbell className="h-5 w-5 text-emerald-600" />
-            <span className="text-lg font-bold">SmartDiet Pro</span>
+            <Link to="/" className="flex items-center gap-2">
+              <img
+                src="/smart-diet-pro-light.svg"
+                alt="SmartDiet Pro"
+                className="h-10 w-auto"
+              />
+            </Link>
           </div>
 
           <Tabs
