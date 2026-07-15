@@ -38,7 +38,7 @@ import AssignmentRequests from "@/pages/dietitian/AssignmentRequests";
 import TrainerProfile from "@/pages/dietitian/TrainerProfile";
 import TrainerChat from "@/pages/dietitian/TrainerChat";
 
-import UserDashboard, { getGreeting } from "@/pages/user/UserDashboard";
+import UserDashboard from "@/pages/user/UserDashboard";
 import MyOrders from "@/pages/user/MyOrders";
 import RequestProduct from "@/pages/user/RequestProduct";
 import Profile from "@/pages/user/Profile";
@@ -54,7 +54,23 @@ import AuthLayout from "./pages/auth/AuthLayout";
 import { useState } from "react";
 import { Button } from "./components/ui/button";
 import { Menu } from "lucide-react";
+export const getGreeting = (date: Date = new Date()): string => {
+  const hour = date.getHours();
 
+  if (hour >= 5 && hour < 12) {
+    return "Good Morning";
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return "Good Afternoon";
+  }
+
+  if (hour >= 17 && hour < 21) {
+    return "Good Evening";
+  }
+
+  return "Good Night";
+};
 function RoleRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
