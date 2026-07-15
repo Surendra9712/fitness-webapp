@@ -1,6 +1,5 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-python-multipart>=0.0.12
+flask==3.1.0
+flask-cors==5.0.0
 mysql-connector-python==9.3.0
 bcrypt==4.2.1
 PyJWT==2.10.1
@@ -10,7 +9,11 @@ requests>=2.32.0
 stripe>=11.0.0
 joblib==1.5.3
 lightgbm==4.6.0
-pandas==3.0.3
-scikit-learn==1.9.0
+pandas==2.3.3
+scikit-learn==1.6.1
+rapidfuzz>=3.0.0
+spacy>=3.7.0
+flask-socketio==5.6.1
 python-socketio==5.16.3
 python-engineio==4.13.3
+simple-websocket==1.1.0

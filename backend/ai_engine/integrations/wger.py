@@ -9,6 +9,7 @@ equipment) from wger.de.
 
 API docs: https://wger.de/en/software/api
 """
+from __future__ import annotations
 import requests
 
 WGER_BASE_URL = "https://wger.de/api/v2"

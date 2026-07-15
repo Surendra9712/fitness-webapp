@@ -1,4 +1,4 @@
-import { RefreshCw, CalendarDays } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,19 +9,28 @@ export function ExerciseTab({
   exercise,
   loading,
   onRefresh,
+  completed,
+  onExerciseComplete,
 }: {
   exercise: ExerciseRec | null;
   loading: boolean;
   onRefresh: () => void;
+  completed: { calories_burned: number; exercise_name: string }[];
+  onExerciseComplete: (result: {
+    calories_burned: number;
+    exercise_name: string;
+  }) => void;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 mt-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-          <CalendarDays className="h-4 w-4" />
-          Based on today's logged calories — recalculated daily
-        </p>
-        <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+        <div />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={loading}
+        >
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -52,16 +61,18 @@ export function ExerciseTab({
               </div>
               <div className="flex gap-4 text-sm">
                 <span>
-                  🔥 Consumed: <strong>{Math.round(exercise.today_calories)} kcal</strong>
+                  🔥 Consumed:{" "}
+                  <strong>{Math.round(exercise.today_calories)} kcal</strong>
                 </span>
                 <span>
-                  🎯 Target: <strong>{Math.round(exercise.target_calories)} kcal</strong>
+                  🎯 Target:{" "}
+                  <strong>{Math.round(exercise.target_calories)} kcal</strong>
                 </span>
               </div>
               {!exercise.exercisedb_configured && (
                 <p className="text-xs text-muted-foreground border-t pt-2">
-                  ℹ️ Showing static exercise images. Add{" "}
-                  <code>EXERCISEDB_API_KEY</code> to .env for animated GIFs.
+                  ℹ️ Add <code>EXERCISEDB_API_KEY</code> to .env to enable real
+                  animated GIFs from ExerciseDB.
                 </p>
               )}
             </CardContent>
@@ -69,8 +80,29 @@ export function ExerciseTab({
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {exercise.exercises.map((ex, i) => (
-              <ExerciseCard key={i} ex={ex} />
+              <ExerciseCard
+                key={i}
+                ex={ex}
+                onComplete={onExerciseComplete}
+                onRefreshExercise={onRefresh}
+              />
             ))}
+            {completed.length > 0 && (
+              <div className="col-span-full bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-emerald-700 mb-2">
+                  ✅ Exercises completed today:
+                </p>
+                {completed.map((r, i) => (
+                  <p key={i} className="text-xs text-emerald-600">
+                    • {r.exercise_name}: ~{r.calories_burned} kcal burned
+                  </p>
+                ))}
+                <p className="text-xs font-bold text-emerald-700 mt-2 border-t border-emerald-200 pt-2">
+                  Total burned: ~
+                  {completed.reduce((s, r) => s + r.calories_burned, 0)} kcal
+                </p>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

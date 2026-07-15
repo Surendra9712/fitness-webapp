@@ -1,34 +1,26 @@
-import { useState } from "react";
 import { Send } from "lucide-react";
-import { api } from "@/api/client";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { FoodCard } from "./FoodCard";
-import type { NlpQueryResponse } from "./types";
+import type { NlpResponse } from "./types";
 
-export function AskAiTab({ onError }: { onError: (message: string) => void }) {
-  const [text, setText] = useState("");
-  const [result, setResult] = useState<NlpQueryResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleAsk = async () => {
-    if (!text.trim()) return;
-    setLoading(true);
-    setResult(null);
-    try {
-      const res = await api.post<NlpQueryResponse>("/ai/nlp/query", { text });
-      setResult(res);
-    } catch (e) {
-      onError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export function AskAiTab({
+  text,
+  onTextChange,
+  result,
+  loading,
+  onSubmit,
+}: {
+  text: string;
+  onTextChange: (text: string) => void;
+  result: NlpResponse | null;
+  loading: boolean;
+  onSubmit: () => void;
+}) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 mt-4">
       <p className="text-sm text-muted-foreground">
         Tell the AI what you ate or ask for a recommendation in plain English.
         Examples: "I ate chiya and pauroti for breakfast" — "suggest high
@@ -38,10 +30,10 @@ export function AskAiTab({ onError }: { onError: (message: string) => void }) {
         <Input
           placeholder="I ate daal bhat and chicken curry..."
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+          onChange={(e) => onTextChange(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onSubmit()}
         />
-        <Button onClick={handleAsk} disabled={loading || !text.trim()}>
+        <Button onClick={onSubmit} disabled={loading || !text.trim()}>
           <Send className="h-4 w-4 mr-1" />
           {loading ? "..." : "Ask"}
         </Button>
@@ -52,16 +44,16 @@ export function AskAiTab({ onError }: { onError: (message: string) => void }) {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">
               AI detected: {result.nlp_analysis.intent}
-              {(result.nlp_analysis.foods_detected?.length ?? 0) > 0 && (
+              {result.nlp_analysis.foods_detected.length > 0 && (
                 <span className="font-normal text-muted-foreground">
                   {" "}
-                  — {result.nlp_analysis.foods_detected!.join(", ")}
+                  — {result.nlp_analysis.foods_detected.join(", ")}
                 </span>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {result.result.type === "logged_meal_nutrition" && (
+            {result.result?.type === "logged_meal_nutrition" && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">
                   Nutrition totals:
@@ -78,22 +70,15 @@ export function AskAiTab({ onError }: { onError: (message: string) => void }) {
                 ))}
               </div>
             )}
-            {result.result.type === "recommendation" && (
+            {result.result?.type === "recommendation" && (
               <div className="space-y-2">
                 {result.result.options.map((food, i) => (
                   <FoodCard key={i} food={food} rank={i + 1} />
                 ))}
               </div>
             )}
-            {result.result.type === "nutrition_info" && (
-              <div className="space-y-2">
-                {result.result.foods.map((food, i) => (
-                  <FoodCard key={i} food={food} rank={i + 1} />
-                ))}
-              </div>
-            )}
-            {(result.result.type === "not_found" ||
-              result.result.type === "unrecognized") && (
+            {(result.result?.type === "not_found" ||
+              result.result?.type === "unrecognized") && (
               <p className="text-sm text-muted-foreground">
                 {result.result.message}
               </p>

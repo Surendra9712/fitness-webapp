@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 exercisedb.py — ExerciseDB API Integration
 Used as the EXERCISE KNOWLEDGE BASE only — never used to train the AI.

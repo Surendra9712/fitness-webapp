@@ -2,13 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { MacroPill } from "./MacroPill";
 import type { FoodResult } from "./types";
 
-function formatServing(size: number, unit?: string) {
-  // Some knowledge-base entries already embed a quantity in serving_unit
-  // (e.g. "1 cup", "1 full plate") rather than a bare unit like "g" or "ml".
-  if (unit && /^\d/.test(unit)) return `${unit} (${size}g)`;
-  return `${size}${unit || "g"}`;
-}
-
 export function FoodCard({
   food,
   rank,
@@ -25,7 +18,8 @@ export function FoodCard({
             <p className="font-medium text-sm truncate">{food.name}</p>
             {food.serving_size && (
               <p className="text-xs text-muted-foreground">
-                per {formatServing(food.serving_size, food.serving_unit)}
+                per {food.serving_size}
+                {food.serving_unit || "g"}
               </p>
             )}
           </div>
@@ -33,7 +27,7 @@ export function FoodCard({
         <div className="flex items-center gap-2 shrink-0">
           {food.ai_score !== undefined && (
             <Badge variant="secondary" className="text-xs">
-              {Math.round(Math.min(1, Math.max(0, food.ai_score)) * 100)}% match
+              {Math.round(food.ai_score * 100)}% match
             </Badge>
           )}
           {food.source && (

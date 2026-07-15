@@ -1,16 +1,15 @@
 import json
-
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, field_validator
+from flask import Blueprint, request, jsonify
+from pydantic import BaseModel, ValidationError, field_validator
+from pydantic import ConfigDict
 from typing import Optional, List
-
 from database.connection import get_connection
-from dependencies import CurrentUser, require_roles
+from middleware.auth import role_required
+from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_admins
 
-router = APIRouter()
+dietitian_bp = Blueprint('dietitian', __name__)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -60,8 +59,9 @@ class CertificationSchema(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get('/profile')
-def get_profile(user: CurrentUser = Depends(require_roles('dietitian', 'admin'))):
+@dietitian_bp.route('/profile', methods=['GET'])
+@role_required('dietitian', 'admin')
+def get_profile():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -72,7 +72,7 @@ def get_profile(user: CurrentUser = Depends(require_roles('dietitian', 'admin'))
             "p.experience_years, p.phone_number, p.city, p.country, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s",
-            (user.user_id,),
+            (request.user_id,),
         )
         row = cursor.fetchone()
         if row:
@@ -93,7 +93,7 @@ def get_profile(user: CurrentUser = Depends(require_roles('dietitian', 'admin'))
             cursor.execute(
                 "SELECT id, name, issued_by, issued_date, file_url, file_type, created_at "
                 "FROM trainer_certifications WHERE user_id = %s ORDER BY created_at",
-                (user.user_id,),
+                (request.user_id,),
             )
             certs = cursor.fetchall()
             for c in certs:
@@ -102,17 +102,23 @@ def get_profile(user: CurrentUser = Depends(require_roles('dietitian', 'admin'))
                 if hasattr(c.get('created_at'), 'isoformat'):
                     c['created_at'] = c['created_at'].isoformat()
             row['certifications'] = certs
-        return row
+        return jsonify(row)
     finally:
         cursor.close()
         conn.close()
 
 
-@router.put('/profile')
-def update_profile(body: UpdateTrainerProfileSchema, user: CurrentUser = Depends(require_roles('dietitian'))):
+@dietitian_bp.route('/profile', methods=['PUT'])
+@role_required('dietitian')
+def update_profile():
+    try:
+        body = UpdateTrainerProfileSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     updates = body.model_dump(exclude_unset=True)
     if not updates:
-        return JSONResponse({'error': 'No valid fields'}, status_code=400)
+        return jsonify({'error': 'No valid fields'}), 400
 
     user_fields    = {k: v for k, v in updates.items() if k in ('name', 'profile_image_url')}
     profile_fields = {k: v for k, v in updates.items() if k not in ('name',)}
@@ -128,26 +134,32 @@ def update_profile(body: UpdateTrainerProfileSchema, user: CurrentUser = Depends
             set_clause = ', '.join(f"{k} = %s" for k in user_fields)
             cursor.execute(
                 f"UPDATE users SET {set_clause} WHERE id = %s",
-                list(user_fields.values()) + [user.user_id],
+                list(user_fields.values()) + [request.user_id],
             )
         if profile_fields:
             set_clause = ', '.join(f"{k} = %s" for k in profile_fields)
             cursor.execute(
                 f"UPDATE user_profiles SET {set_clause} WHERE user_id = %s",
-                list(profile_fields.values()) + [user.user_id],
+                list(profile_fields.values()) + [request.user_id],
             )
         conn.commit()
-        return {'message': 'Profile updated'}
+        return jsonify({'message': 'Profile updated'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.post('/certifications')
-def add_certification(body: CertificationSchema, user: CurrentUser = Depends(require_roles('dietitian'))):
+@dietitian_bp.route('/certifications', methods=['POST'])
+@role_required('dietitian')
+def add_certification():
+    try:
+        body = CertificationSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -155,7 +167,7 @@ def add_certification(body: CertificationSchema, user: CurrentUser = Depends(req
             "INSERT INTO trainer_certifications (user_id, name, issued_by, issued_date, file_url, file_type) "
             "VALUES (%s, %s, %s, %s, %s, %s)",
             (
-                user.user_id,
+                request.user_id,
                 body.name,
                 body.issued_by or None,
                 body.issued_date or None,
@@ -175,41 +187,43 @@ def add_certification(body: CertificationSchema, user: CurrentUser = Depends(req
             for field in ('issued_date', 'created_at'):
                 if hasattr(cert.get(field), 'isoformat'):
                     cert[field] = cert[field].isoformat()
-        return JSONResponse(cert, status_code=201)
+        return jsonify(cert), 201
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.delete('/certifications/{cert_id}')
-def delete_certification(cert_id: int, user: CurrentUser = Depends(require_roles('dietitian'))):
+@dietitian_bp.route('/certifications/<int:cert_id>', methods=['DELETE'])
+@role_required('dietitian')
+def delete_certification(cert_id):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT id FROM trainer_certifications WHERE id = %s AND user_id = %s",
-            (cert_id, user.user_id),
+            (cert_id, request.user_id),
         )
         if not cursor.fetchone():
-            return JSONResponse({'error': 'Certification not found'}, status_code=404)
+            return jsonify({'error': 'Certification not found'}), 404
         cursor.execute("DELETE FROM trainer_certifications WHERE id = %s", (cert_id,))
         conn.commit()
-        return {'message': 'Deleted'}
+        return jsonify({'message': 'Deleted'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.get('/users')
-def list_users(request: Request, user: CurrentUser = Depends(require_roles('admin', 'dietitian'))):
+@dietitian_bp.route('/users', methods=['GET'])
+@role_required('admin', 'dietitian')
+def list_users():
     """Approved customers for this trainer."""
-    page, page_size, offset = parse_page_params(request, default_size=20, max_size=100)
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -218,7 +232,7 @@ def list_users(request: Request, user: CurrentUser = Depends(require_roles('admi
             "JOIN users u ON ta.customer_id = u.id "
             "WHERE ta.trainer_id = %s AND ta.status = 'approved' "
             "AND ta.deleted_at IS NULL AND u.deleted_at IS NULL",
-            (user.user_id,)
+            (request.user_id,)
         )
         total = cursor.fetchone()['total']
         cursor.execute(
@@ -228,7 +242,7 @@ def list_users(request: Request, user: CurrentUser = Depends(require_roles('admi
             "WHERE ta.trainer_id = %s AND ta.status = 'approved' "
             "AND ta.deleted_at IS NULL AND u.deleted_at IS NULL "
             "ORDER BY u.name LIMIT %s OFFSET %s",
-            (user.user_id, page_size, offset),
+            (request.user_id, page_size, offset),
         )
         return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
@@ -236,33 +250,35 @@ def list_users(request: Request, user: CurrentUser = Depends(require_roles('admi
         conn.close()
 
 
-@router.get('/stats')
-def stats(user: CurrentUser = Depends(require_roles('dietitian'))):
+@dietitian_bp.route('/stats', methods=['GET'])
+@role_required('dietitian')
+def stats():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT COUNT(*) AS total FROM trainer_assignments "
             "WHERE trainer_id = %s AND status = 'approved' AND deleted_at IS NULL",
-            (user.user_id,),
+            (request.user_id,),
         )
         customers = cursor.fetchone()['total']
         cursor.execute(
             "SELECT COUNT(*) AS total FROM trainer_assignments "
             "WHERE trainer_id = %s AND status = 'pending_trainer' AND deleted_at IS NULL",
-            (user.user_id,),
+            (request.user_id,),
         )
         pending = cursor.fetchone()['total']
-        return {'customers': int(customers), 'pending_requests': int(pending)}
+        return jsonify({'customers': int(customers), 'pending_requests': int(pending)})
     finally:
         cursor.close()
         conn.close()
 
 
-@router.get('/assignment-requests')
-def list_assignment_requests(request: Request, user: CurrentUser = Depends(require_roles('dietitian'))):
-    status_filter = request.query_params.get('status', 'pending_trainer')
-    page, page_size, offset = parse_page_params(request, default_size=20, max_size=100)
+@dietitian_bp.route('/assignment-requests', methods=['GET'])
+@role_required('dietitian')
+def list_assignment_requests():
+    status_filter = request.args.get('status', 'pending_trainer')
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -270,7 +286,7 @@ def list_assignment_requests(request: Request, user: CurrentUser = Depends(requi
         if status_filter == 'all':
             cursor.execute(
                 "SELECT COUNT(*) AS total FROM trainer_assignments ta " + base_where,
-                (user.user_id,)
+                (request.user_id,)
             )
             total = cursor.fetchone()['total']
             cursor.execute(
@@ -278,12 +294,12 @@ def list_assignment_requests(request: Request, user: CurrentUser = Depends(requi
                 "FROM trainer_assignments ta "
                 "JOIN users u ON ta.customer_id = u.id "
                 + base_where + "ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
-                (user.user_id, page_size, offset)
+                (request.user_id, page_size, offset)
             )
         else:
             cursor.execute(
                 "SELECT COUNT(*) AS total FROM trainer_assignments ta " + base_where + "AND ta.status = %s",
-                (user.user_id, status_filter)
+                (request.user_id, status_filter)
             )
             total = cursor.fetchone()['total']
             cursor.execute(
@@ -291,7 +307,7 @@ def list_assignment_requests(request: Request, user: CurrentUser = Depends(requi
                 "FROM trainer_assignments ta "
                 "JOIN users u ON ta.customer_id = u.id "
                 + base_where + "AND ta.status = %s ORDER BY ta.created_at DESC LIMIT %s OFFSET %s",
-                (user.user_id, status_filter, page_size, offset)
+                (request.user_id, status_filter, page_size, offset)
             )
         return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
@@ -299,20 +315,26 @@ def list_assignment_requests(request: Request, user: CurrentUser = Depends(requi
         conn.close()
 
 
-@router.put('/assignment-requests/{aid}/approve')
-def approve_assignment(aid: int, body: AssignmentNoteSchema, user: CurrentUser = Depends(require_roles('dietitian'))):
+@dietitian_bp.route('/assignment-requests/<int:aid>/approve', methods=['PUT'])
+@role_required('dietitian')
+def approve_assignment(aid):
+    try:
+        body = AssignmentNoteSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT * FROM trainer_assignments WHERE id = %s AND trainer_id = %s",
-            (aid, user.user_id),
+            (aid, request.user_id),
         )
         row = cursor.fetchone()
         if not row:
-            return JSONResponse({'error': 'Assignment not found'}, status_code=404)
+            return jsonify({'error': 'Assignment not found'}), 404
         if row['status'] != 'pending_trainer':
-            return JSONResponse({'error': 'Assignment is not pending your review'}, status_code=400)
+            return jsonify({'error': 'Assignment is not pending your review'}), 400
 
         cursor.execute(
             "UPDATE trainer_assignments SET status='pending_admin', trainer_note=%s, "
@@ -328,29 +350,35 @@ def approve_assignment(aid: int, body: AssignmentNoteSchema, user: CurrentUser =
                        'A trainer has accepted a client request. Please review and approve.',
                        aid)
         conn.commit()
-        return {'message': 'Approved — awaiting admin confirmation'}
+        return jsonify({'message': 'Approved — awaiting admin confirmation'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.put('/assignment-requests/{aid}/reject')
-def reject_assignment(aid: int, body: AssignmentNoteSchema, user: CurrentUser = Depends(require_roles('dietitian'))):
+@dietitian_bp.route('/assignment-requests/<int:aid>/reject', methods=['PUT'])
+@role_required('dietitian')
+def reject_assignment(aid):
+    try:
+        body = AssignmentNoteSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT * FROM trainer_assignments WHERE id = %s AND trainer_id = %s",
-            (aid, user.user_id),
+            (aid, request.user_id),
         )
         row = cursor.fetchone()
         if not row:
-            return JSONResponse({'error': 'Assignment not found'}, status_code=404)
+            return jsonify({'error': 'Assignment not found'}), 404
         if row['status'] != 'pending_trainer':
-            return JSONResponse({'error': 'Assignment is not pending your review'}, status_code=400)
+            return jsonify({'error': 'Assignment is not pending your review'}), 400
 
         cursor.execute(
             "UPDATE trainer_assignments SET status='rejected', trainer_note=%s, "
@@ -362,10 +390,10 @@ def reject_assignment(aid: int, body: AssignmentNoteSchema, user: CurrentUser = 
              'Your trainer request was declined by the trainer. You may choose a different trainer.',
              aid)
         conn.commit()
-        return {'message': 'Assignment rejected'}
+        return jsonify({'message': 'Assignment rejected'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

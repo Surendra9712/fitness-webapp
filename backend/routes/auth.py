@@ -1,17 +1,14 @@
-import datetime
-import json
-
+from flask import Blueprint, request, jsonify
 import bcrypt
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, EmailStr, Field, field_validator
+import json
+import datetime
+from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 from typing import Literal, Optional, List
-
 from database.connection import get_connection
-from dependencies import CurrentUser, get_current_user
-from middleware.auth import generate_token
+from middleware.auth import generate_token, token_required
+from utils.validation import pydantic_errors
 
-router = APIRouter()
+auth_bp = Blueprint('auth', __name__)
 
 
 def _serialize_row(row: dict) -> dict:
@@ -58,8 +55,14 @@ class LoginSchema(BaseModel):
         return str(v).strip().lower() if v else v
 
 
-@router.post('/register')
-def register(body: RegisterSchema):
+
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    try:
+        body = RegisterSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     name, email, password = body.name, body.email, body.password
     role = 'trainee'
 
@@ -70,7 +73,7 @@ def register(body: RegisterSchema):
     try:
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         if cursor.fetchone():
-            return JSONResponse({'errors': {'email': 'Email already registered'}}, status_code=422)
+            return jsonify({'errors': {'email': 'Email already registered'}}), 422
 
         cursor.execute(
             "INSERT INTO users (name, email, password_hash, role, status) VALUES (%s, %s, %s, %s, 'active')",
@@ -81,20 +84,25 @@ def register(body: RegisterSchema):
         conn.commit()
 
         token = generate_token(user_id, role)
-        return JSONResponse({
+        return jsonify({
             'token': token,
             'user': {'id': user_id, 'name': name, 'email': email, 'role': role},
-        }, status_code=201)
+        }), 201
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.post('/login')
-def login(body: LoginSchema):
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    try:
+        body = LoginSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     email, password = body.email, body.password
 
     conn = get_connection()
@@ -107,17 +115,17 @@ def login(body: LoginSchema):
         )
         user = cursor.fetchone()
         if not user or not bcrypt.checkpw(password.encode(), user['password_hash'].encode()):
-            return JSONResponse({'error': 'Invalid email or password'}, status_code=401)
+            return jsonify({'error': 'Invalid email or password'}), 401
         if user['status'] != 'active':
-            return JSONResponse({'error': 'Account is disabled'}, status_code=403)
+            return jsonify({'error': 'Account is disabled'}), 403
 
         token = generate_token(user['id'], user['role'])
-        return {
+        return jsonify({
             'token': token,
             'user': {'id': user['id'], 'name': user['name'], 'email': user['email'], 'role': user['role']},
-        }
+        })
     except Exception as e:
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
@@ -165,8 +173,9 @@ class UpdateProfileSchema(BaseModel):
     goal: Optional[Literal['lose_weight', 'maintain', 'gain_muscle']] = None
 
 
-@router.get('/me')
-def me(user: CurrentUser = Depends(get_current_user)):
+@auth_bp.route('/me', methods=['GET'])
+@token_required
+def me():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -186,39 +195,47 @@ def me(user: CurrentUser = Depends(get_current_user)):
             "p.bio, p.specialization, p.experience_years, p.available_time "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s",
-            (user.user_id,),
+            (request.user_id,),
         )
-        row = cursor.fetchone()
-        if not row:
-            return JSONResponse({'error': 'User not found'}, status_code=404)
-        return _serialize_row(row)
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify(_serialize_row(user))
     finally:
         cursor.close()
         conn.close()
 
 
-@router.put('/avatar')
-def update_avatar(body: dict, user: CurrentUser = Depends(get_current_user)):
-    url = (body.get('profile_image_url') or '').strip()
+@auth_bp.route('/avatar', methods=['PUT'])
+@token_required
+def update_avatar():
+    body = request.get_json() or {}
+    url = body.get('profile_image_url', '').strip()
     if not url:
-        return JSONResponse({'error': 'profile_image_url is required'}, status_code=400)
+        return jsonify({'error': 'profile_image_url is required'}), 400
 
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "UPDATE users SET profile_image_url = %s WHERE id = %s",
-            (url, user.user_id),
+            (url, request.user_id),
         )
         conn.commit()
-        return {'message': 'Avatar updated', 'profile_image_url': url}
+        return jsonify({'message': 'Avatar updated', 'profile_image_url': url})
     finally:
         cursor.close()
         conn.close()
 
 
-@router.put('/profile')
-def update_profile(body: UpdateProfileSchema, user: CurrentUser = Depends(get_current_user)):
+@auth_bp.route('/profile', methods=['PUT'])
+@token_required
+def update_profile():
+    try:
+        body = UpdateProfileSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
     _JSON_FIELDS = {'dietary_restrictions', 'allergens', 'cuisine_preferences', 'health_conditions'}
     updates = {}
     for k, v in body.model_dump().items():
@@ -226,10 +243,10 @@ def update_profile(body: UpdateProfileSchema, user: CurrentUser = Depends(get_cu
             continue
         updates[k] = json.dumps(v) if k in _JSON_FIELDS else v
     if not updates:
-        return JSONResponse({'error': 'No valid fields provided'}, status_code=400)
+        return jsonify({'error': 'No valid fields provided'}), 400
 
     set_clause = ', '.join(f"{k} = %s" for k in updates)
-    values = list(updates.values()) + [user.user_id]
+    values = list(updates.values()) + [request.user_id]
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -239,10 +256,10 @@ def update_profile(body: UpdateProfileSchema, user: CurrentUser = Depends(get_cu
             values,
         )
         conn.commit()
-        return {'message': 'Profile updated'}
+        return jsonify({'message': 'Profile updated'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

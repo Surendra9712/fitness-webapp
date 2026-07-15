@@ -1,29 +1,28 @@
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
-
+from flask import Blueprint, request, jsonify
 from database.connection import get_connection
-from dependencies import CurrentUser, require_roles
+from middleware.auth import role_required
 from utils.pagination import parse_page_params, paginated_response
 
-router = APIRouter()
+notifications_bp = Blueprint('notifications', __name__)
 
 
-@router.get('')
-def list_notifications(request: Request, user: CurrentUser = Depends(require_roles('admin', 'dietitian', 'trainee'))):
-    page, page_size, offset = parse_page_params(request, default_size=20, max_size=100)
+@notifications_bp.route('', methods=['GET'])
+@role_required('admin', 'dietitian', 'trainee')
+def list_notifications():
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT COUNT(*) AS total FROM notifications WHERE user_id = %s",
-            (user.user_id,),
+            (request.user_id,),
         )
         total = cursor.fetchone()['total']
         cursor.execute(
             "SELECT id, type, title, message, reference_id, is_read, created_at "
             "FROM notifications WHERE user_id = %s "
             "ORDER BY created_at DESC LIMIT %s OFFSET %s",
-            (user.user_id, page_size, offset),
+            (request.user_id, page_size, offset),
         )
         return paginated_response(cursor.fetchall(), total, page, page_size)
     finally:
@@ -31,77 +30,81 @@ def list_notifications(request: Request, user: CurrentUser = Depends(require_rol
         conn.close()
 
 
-@router.get('/unread-count')
-def unread_count(user: CurrentUser = Depends(require_roles('admin', 'dietitian', 'trainee'))):
+@notifications_bp.route('/unread-count', methods=['GET'])
+@role_required('admin', 'dietitian', 'trainee')
+def unread_count():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
             "SELECT COUNT(*) AS count FROM notifications WHERE user_id = %s AND is_read = 0",
-            (user.user_id,),
+            (request.user_id,),
         )
-        return {'count': cursor.fetchone()['count']}
+        return jsonify({'count': cursor.fetchone()['count']})
     finally:
         cursor.close()
         conn.close()
 
 
-@router.put('/{nid}/read')
-def mark_read(nid: int, user: CurrentUser = Depends(require_roles('admin', 'dietitian', 'trainee'))):
+@notifications_bp.route('/<int:nid>/read', methods=['PUT'])
+@role_required('admin', 'dietitian', 'trainee')
+def mark_read(nid):
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "UPDATE notifications SET is_read = 1 WHERE id = %s AND user_id = %s",
-            (nid, user.user_id),
+            (nid, request.user_id),
         )
         conn.commit()
         if cursor.rowcount == 0:
-            return JSONResponse({'error': 'Notification not found'}, status_code=404)
-        return {'message': 'Marked as read'}
+            return jsonify({'error': 'Notification not found'}), 404
+        return jsonify({'message': 'Marked as read'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.put('/read-all')
-def mark_all_read(user: CurrentUser = Depends(require_roles('admin', 'dietitian', 'trainee'))):
+@notifications_bp.route('/read-all', methods=['PUT'])
+@role_required('admin', 'dietitian', 'trainee')
+def mark_all_read():
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "UPDATE notifications SET is_read = 1 WHERE user_id = %s AND is_read = 0",
-            (user.user_id,),
+            (request.user_id,),
         )
         conn.commit()
-        return {'message': 'All marked as read'}
+        return jsonify({'message': 'All marked as read'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()
 
 
-@router.delete('/{nid}')
-def delete_notification(nid: int, user: CurrentUser = Depends(require_roles('admin', 'dietitian', 'trainee'))):
+@notifications_bp.route('/<int:nid>', methods=['DELETE'])
+@role_required('admin', 'dietitian', 'trainee')
+def delete_notification(nid):
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "DELETE FROM notifications WHERE id = %s AND user_id = %s",
-            (nid, user.user_id),
+            (nid, request.user_id),
         )
         conn.commit()
         if cursor.rowcount == 0:
-            return JSONResponse({'error': 'Notification not found'}, status_code=404)
-        return {'message': 'Deleted'}
+            return jsonify({'error': 'Notification not found'}), 404
+        return jsonify({'message': 'Deleted'})
     except Exception as e:
         conn.rollback()
-        return JSONResponse({'error': str(e)}, status_code=500)
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

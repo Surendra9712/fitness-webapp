@@ -114,6 +114,7 @@ export interface EsewaParams {
 export interface User {
   id: number;
   name: string;
+  full_name: string;
   email: string;
   role: Role;
   status: UserStatus;

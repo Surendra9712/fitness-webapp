@@ -4,6 +4,7 @@ RapidFuzz-based fuzzy string matching for misspellings, abbreviations,
 and Nepali local food names. Normalizes user text before querying
 the food knowledge base.
 """
+from __future__ import annotations
 from rapidfuzz import fuzz, process
 
 # ── Synonym map: local/abbreviated terms -> canonical food names ──

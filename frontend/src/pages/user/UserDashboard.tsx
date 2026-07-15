@@ -26,8 +26,6 @@ import { useNavigate } from "react-router-dom";
 import ProfileSetup from "./profile/ProfileSetup";
 import type { DashboardStats } from "@/types";
 
-const today = new Date().toISOString().split("T")[0];
-
 interface MealLog {
   id: number;
   meal_type: string;
@@ -67,6 +65,7 @@ interface TodayMeals {
   targets: Targets;
   total_entries: number;
   water: Water;
+  day_ended: boolean;
 }
 interface FoodResult {
   name: string;
@@ -123,6 +122,13 @@ const UNITS = [
   "ml",
 ];
 const WATER_AMOUNTS = [150, 200, 250, 300, 500];
+
+// DEV/TESTING ONLY — keeps "End Meal Today" clickable even after the day has
+// already been ended, so the flow can be exercised repeatedly without
+// waiting for a real day to pass. The backend advances one simulated day
+// per click when this is on. Controlled by VITE_MODE (must match backend
+// MODE) rather than a hardcoded flag, so it's off by default in production.
+const DEV_ALWAYS_ALLOW_END_DAY = import.meta.env.VITE_MODE === "dev";
 
 function MacroRing({
   label,
@@ -194,6 +200,7 @@ function MealSection({
   onLog,
   onDelete,
   onToggleConsumed,
+  disabled,
 }: {
   mealType: string;
   emoji: string;
@@ -208,6 +215,7 @@ function MealSection({
   ) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onToggleConsumed: (id: number, val: number) => Promise<void>;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(mealType === "breakfast");
   const [query, setQuery] = useState("");
@@ -385,130 +393,141 @@ function MealSection({
               ))}
             </div>
           )}
-          <div className="space-y-2 pt-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                className="pl-8 text-sm h-8"
-                placeholder="Search food (Nepali, global, any language)..."
-                value={query}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-            </div>
-            {searching && (
-              <p className="text-xs text-muted-foreground pl-1">Searching...</p>
-            )}
-            {results.length > 0 && !selected && (
-              <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-                {results.map((f, i) => (
-                  <button
-                    key={i}
-                    className="w-full text-left px-3 py-2 hover:bg-muted transition-colors border-b last:border-b-0"
-                    onClick={() => selectFood(f)}
-                  >
-                    <p className="text-sm font-medium">
-                      {f.name}{" "}
-                      {f.cuisine && (
-                        <span className="text-[10px] text-muted-foreground capitalize">
-                          ({f.cuisine})
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {f.calories} kcal · P{f.protein_g}g · C{f.carbs_g}g · F
-                      {f.fat_g}g
-                    </p>
-                  </button>
-                ))}
+          {disabled ? (
+            <p className="text-xs text-muted-foreground italic pt-1">
+              Today's log is finalized — start logging again after your next day
+              begins.
+            </p>
+          ) : (
+            <div className="space-y-2 pt-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-8 text-sm h-8"
+                  placeholder="Search food (Nepali, global, any language)..."
+                  value={query}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
               </div>
-            )}
-            {!selected && results.length === 0 && (
-              <button
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 text-sm text-primary hover:bg-primary/10 transition-colors"
-                onClick={handleAiSuggest}
-              >
-                🤖 AI: what should I eat for {label.toLowerCase()}?
-              </button>
-            )}
-            {selected && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-                <p className="text-sm font-semibold text-primary">
-                  ✓ {selected.name}
+              {searching && (
+                <p className="text-xs text-muted-foreground pl-1">
+                  Searching...
                 </p>
-                {selected.ai_explanation && (
-                  <p className="text-[10px] text-blue-600">
-                    💡 {selected.ai_explanation}
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      Quantity
-                    </label>
-                    <Input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={qty}
-                      onChange={(e) => setQty(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      Unit
-                    </label>
-                    <select
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
-                      className="w-full h-8 text-sm border rounded-md px-2 bg-background"
+              )}
+              {results.length > 0 && !selected && (
+                <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                  {results.map((f, i) => (
+                    <button
+                      key={i}
+                      className="w-full text-left px-3 py-2 hover:bg-muted transition-colors border-b last:border-b-0"
+                      onClick={() => selectFood(f)}
                     >
-                      {UNITS.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1 text-xs">
-                  {[
-                    [
-                      "🔥",
-                      Math.round(selected.calories * parseFloat(qty || "1")),
-                      "kcal",
-                    ],
-                    [
-                      "💪",
-                      (selected.protein_g * parseFloat(qty || "1")).toFixed(1),
-                      "g protein",
-                    ],
-                    [
-                      "🌾",
-                      (selected.carbs_g * parseFloat(qty || "1")).toFixed(1),
-                      "g carbs",
-                    ],
-                  ].map(([ic, v, lb]) => (
-                    <span
-                      key={String(lb)}
-                      className="bg-muted px-2 py-0.5 rounded-full"
-                    >
-                      {ic} {v} {lb}
-                    </span>
+                      <p className="text-sm font-medium">
+                        {f.name}{" "}
+                        {f.cuisine && (
+                          <span className="text-[10px] text-muted-foreground capitalize">
+                            ({f.cuisine})
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {f.calories} kcal · P{f.protein_g}g · C{f.carbs_g}g · F
+                        {f.fat_g}g
+                      </p>
+                    </button>
                   ))}
                 </div>
-                <Button
-                  size="sm"
-                  className="w-full h-8"
-                  onClick={handleLog}
-                  disabled={logging}
+              )}
+              {/* {!selected && results.length === 0 && (
+                <button
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 text-sm text-primary hover:bg-primary/10 transition-colors"
+                  onClick={handleAiSuggest}
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  {logging ? "Adding..." : `Add to ${label}`}
-                </Button>
-              </div>
-            )}
-          </div>
+                  🤖 AI: what should I eat for {label.toLowerCase()}?
+                </button>
+              )} */}
+              {selected && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-semibold text-primary">
+                    ✓ {selected.name}
+                  </p>
+                  {selected.ai_explanation && (
+                    <p className="text-[10px] text-blue-600">
+                      💡 {selected.ai_explanation}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Quantity
+                      </label>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={qty}
+                        onChange={(e) => setQty(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Unit
+                      </label>
+                      <select
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        className="w-full h-8 text-sm border rounded-md px-2 bg-background"
+                      >
+                        {UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1 text-xs">
+                    {[
+                      [
+                        "🔥",
+                        Math.round(selected.calories * parseFloat(qty || "1")),
+                        "kcal",
+                      ],
+                      [
+                        "💪",
+                        (selected.protein_g * parseFloat(qty || "1")).toFixed(
+                          1,
+                        ),
+                        "g protein",
+                      ],
+                      [
+                        "🌾",
+                        (selected.carbs_g * parseFloat(qty || "1")).toFixed(1),
+                        "g carbs",
+                      ],
+                    ].map(([ic, v, lb]) => (
+                      <span
+                        key={String(lb)}
+                        className="bg-muted px-2 py-0.5 rounded-full"
+                      >
+                        {ic} {v} {lb}
+                      </span>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full h-8"
+                    onClick={handleLog}
+                    disabled={logging}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    {logging ? "Adding..." : `Add to ${label}`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -524,21 +543,40 @@ export default function UserDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [endingDay, setEndingDay] = useState(false);
   const [dayEnded, setDayEnded] = useState(false);
+  const [lastEndedDate, setLastEndedDate] = useState<string | null>(null);
   const [tomorrowPlan, setTomorrowPlan] = useState<Record<
     string,
     unknown
   > | null>(null);
-  const hasProfile = Boolean((user as Record<string, unknown>)?.full_name);
+  const hasProfile = Boolean(user?.full_name);
 
   const loadData = useCallback(async () => {
     setError("");
     try {
+      // Computed fresh (not a frozen constant) so a session left open across
+      // midnight picks up the new calendar day on the next refresh instead
+      // of staying stuck on yesterday's date.
+      const dateStr = new Date().toISOString().split("T")[0];
       const [s, m] = await Promise.all([
-        api.get<DashboardStats>(`/user/dashboard?date=${today}`),
-        api.get<TodayMeals>(`/ai/meals/today?date=${today}`),
+        api.get<DashboardStats>(`/user/dashboard?date=${dateStr}`),
+        api.get<TodayMeals>(`/ai/meals/today?date=${dateStr}`),
       ]);
       setStats(s);
       setTodayMeals(m);
+      setDayEnded(m.day_ended);
+      if (m.day_ended) {
+        // Day was already ended in a previous session (e.g. page reload) —
+        // re-fetch a plan preview since it isn't persisted server-side.
+        try {
+          const plan =
+            await api.get<Record<string, unknown>>("/ai/recommend/meal");
+          setTomorrowPlan(plan);
+        } catch {
+          // Non-critical — the "day ended" panel still renders without it.
+        }
+      } else {
+        setTomorrowPlan(null);
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -610,20 +648,21 @@ export default function UserDashboard() {
   };
 
   const handleToggleConsumed = async (id: number, val: number) => {
-    await api.patch(`/ai/meals/log/${id}/consume`, { is_consumed: val });
+    await api.put(`/ai/meals/log/${id}/consume`, { is_consumed: val });
     await loadData();
   };
 
   const handleEndDay = async () => {
-    if (endingDay || dayEnded) return;
+    if (endingDay || (dayEnded && !DEV_ALWAYS_ALLOW_END_DAY)) return;
     setEndingDay(true);
     try {
       const r = await api.post<{
         message: string;
-        today_summary: Record<string, unknown>;
+        today_summary: { date?: string } & Record<string, unknown>;
         tomorrow_plan: Record<string, unknown>;
       }>("/ai/meals/end-day", {});
       setDayEnded(true);
+      setLastEndedDate(r.today_summary?.date || null);
       setTomorrowPlan(r.tomorrow_plan || null);
       await loadData();
     } catch (e) {
@@ -661,32 +700,9 @@ export default function UserDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back,{" "}
-            {(user as Record<string, unknown>)?.full_name
-              ?.toString()
-              .split(" ")[0] ||
-              (user as Record<string, unknown>)?.name?.toString() ||
-              "there"}{" "}
-            👋
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Log your meals through the day — breakfast, lunch, snacks, then
-            dinner
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </Button>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Log your meals through the day — breakfast, lunch, snacks, then dinner
+        </p>
       </div>
 
       {error && (
@@ -821,12 +837,13 @@ export default function UserDashboard() {
               onLog={handleLogMeal}
               onDelete={handleDeleteLog}
               onToggleConsumed={handleToggleConsumed}
+              disabled={dayEnded}
             />
           ))}
         </div>
       </div>
 
-      {!dayEnded ? (
+      {(!dayEnded || DEV_ALWAYS_ALLOW_END_DAY) && (
         <div className="border-2 border-dashed border-emerald-200 rounded-2xl p-6 flex flex-col items-center gap-3 bg-emerald-50/40">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
             <CheckCircle2 className="h-6 w-6 text-emerald-600" />
@@ -839,6 +856,13 @@ export default function UserDashboard() {
               Click to save today's nutrition, get tomorrow's meal plan, and
               check your exercise recommendation.
             </p>
+            {DEV_ALWAYS_ALLOW_END_DAY && dayEnded && (
+              <p className="text-xs text-amber-600 mt-1">
+                🧪 Dev mode: last ended day{" "}
+                {lastEndedDate ? `= ${lastEndedDate}` : ""} — clicking again
+                simulates the next day.
+              </p>
+            )}
           </div>
           <div className="flex gap-3">
             <button
@@ -850,7 +874,7 @@ export default function UserDashboard() {
             </button>
             <button
               onClick={() =>
-                navigate("/customer/ai-recommendation?tab=exercise")
+                navigate("/trainee/ai-recommendations?tab=exercise")
               }
               className="px-6 py-2.5 border border-emerald-300 hover:bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-xl transition-colors"
             >
@@ -858,7 +882,8 @@ export default function UserDashboard() {
             </button>
           </div>
         </div>
-      ) : (
+      )}
+      {dayEnded && (
         <div className="border border-emerald-300 rounded-2xl p-6 bg-emerald-50 space-y-3">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -898,7 +923,7 @@ export default function UserDashboard() {
             </div>
           )}
           <button
-            onClick={() => navigate("/customer/ai-recommendation?tab=exercise")}
+            onClick={() => navigate("/trainee/ai-recommendations?tab=exercise")}
             className="w-full mt-2 py-2.5 border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-xl transition-colors"
           >
             🏋️ Check Exercise Recommendation

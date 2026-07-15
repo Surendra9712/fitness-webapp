@@ -71,6 +71,47 @@ def extract_create_tables(sql):
     return results
 
 
+def extract_alter_statements(sql):
+    """Return list of (table_name, statement_body) for each standalone
+    ALTER TABLE ... ; block (statement_body excludes the 'ALTER TABLE tbl' prefix)."""
+    sql = strip_comments(sql)
+    results = []
+    pos = 0
+    while True:
+        m = re.search(r'ALTER\s+TABLE\s+`?(\w+)`?\s+', sql[pos:], re.IGNORECASE)
+        if not m:
+            break
+        table_name = m.group(1)
+        abs_start = pos + m.end()
+        depth = 0
+        i = abs_start
+        while i < len(sql):
+            if sql[i] == '(':
+                depth += 1
+            elif sql[i] == ')':
+                depth -= 1
+            elif sql[i] == ';' and depth == 0:
+                break
+            i += 1
+        results.append((table_name, sql[abs_start:i]))
+        pos = i + 1
+    return results
+
+
+def extract_add_columns_from_alter(body):
+    """From an ALTER TABLE body, return [(col_name, col_def), ...] for each
+    top-level 'ADD COLUMN name defn' clause. Ignores MODIFY/ADD INDEX/etc.
+    (those require manual review, same as documented at the top of this file)."""
+    columns = []
+    for clause in split_top_level(body):
+        clause = clause.strip()
+        m = re.match(r'ADD\s+COLUMN\s+`?(\w+)`?\s+(.*)', clause, re.IGNORECASE | re.DOTALL)
+        if m:
+            col_def = ' '.join(m.group(2).split())
+            columns.append((m.group(1), col_def))
+    return columns
+
+
 def split_top_level(s):
     """Split s by top-level commas (respects parentheses for ENUM/SET values)."""
     parts, current, depth = [], [], 0
@@ -212,6 +253,16 @@ def run(dry_run=False):
         print("No CREATE TABLE statements found in schema.sql")
         sys.exit(1)
 
+    # schema.sql also carries standalone `ALTER TABLE tbl ADD COLUMN ...`
+    # statements for columns bolted on after a table's original CREATE TABLE
+    # (e.g. meal_logs.is_consumed). Merge those into each table's column set
+    # too, otherwise this script silently never adds them.
+    alter_columns = {}
+    for table_name, body in extract_alter_statements(schema_sql):
+        cols = extract_add_columns_from_alter(body)
+        if cols:
+            alter_columns.setdefault(table_name, {}).update(dict(cols))
+
     existing_tables = get_existing_tables(cursor, db_name)
 
     tables_created  = []
@@ -219,23 +270,45 @@ def run(dry_run=False):
     columns_changed = []  # (table, col, db_type, schema_type)
     errors          = []
 
+    # Pass 1: create any missing tables outright.
+    for table_name, create_sql in schema_tables:
+        if table_name in existing_tables:
+            continue
+        print(f"  {GREEN}CREATE{RESET}  {BOLD}{table_name}{RESET}")
+        if not dry_run:
+            try:
+                cursor.execute(create_sql)
+                conn.commit()
+                tables_created.append(table_name)
+                existing_tables.add(table_name)
+            except mysql.connector.Error as e:
+                err(f"Failed to create {table_name}: {e}")
+                conn.rollback()
+                errors.append(table_name)
+        else:
+            tables_created.append(table_name)
+            existing_tables.add(table_name)
+
+    # Pass 2: reconcile columns for every table against CREATE TABLE + the
+    # merged ALTER-derived columns. Runs for freshly-created tables too,
+    # since their raw CREATE TABLE text predates later ALTER additions.
     for table_name, create_sql in schema_tables:
         if table_name not in existing_tables:
-            print(f"  {GREEN}CREATE{RESET}  {BOLD}{table_name}{RESET}")
-            if not dry_run:
-                try:
-                    cursor.execute(create_sql)
-                    conn.commit()
-                    tables_created.append(table_name)
-                except mysql.connector.Error as e:
-                    err(f"Failed to create {table_name}: {e}")
-                    conn.rollback()
-                    errors.append(table_name)
-            else:
-                tables_created.append(table_name)
+            continue  # creation failed above
+
+        freshly_created = table_name in tables_created
+
+        if freshly_created and dry_run:
+            # The table doesn't actually exist yet (nothing was really
+            # created in a dry run), so there's no live row to diff against.
+            # Its base columns will come from the CREATE TABLE above; only
+            # surface the ALTER-only columns it would still need afterward.
+            missing = dict(alter_columns.get(table_name, {}))
+            changed = {}
         else:
             schema_cols = dict(parse_columns(create_sql))
-            db_cols     = get_existing_columns(cursor, db_name, table_name)
+            schema_cols.update(alter_columns.get(table_name, {}))
+            db_cols = get_existing_columns(cursor, db_name, table_name)
 
             missing = {k: v for k, v in schema_cols.items() if k not in db_cols}
             changed = {}
@@ -246,34 +319,35 @@ def run(dry_run=False):
                     if s_type and d_type and s_type != d_type:
                         changed[col] = {'db': db_cols[col], 'schema': defn}
 
-            if not missing and not changed:
+        if not missing and not changed:
+            if not freshly_created:
                 ok(table_name)
-                continue
+            continue
 
-            print(f"  {CYAN}ALTER {RESET}  {BOLD}{table_name}{RESET}")
+        print(f"  {CYAN}ALTER {RESET}  {BOLD}{table_name}{RESET}")
 
-            for col_name, col_def in missing.items():
-                preview = col_def[:70] + ('…' if len(col_def) > 70 else '')
-                added(f"  ADD COLUMN {col_name}  {preview}")
-                if not dry_run:
-                    sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col_name}` {col_def}"
-                    try:
-                        cursor.execute(sql)
-                        conn.commit()
-                        columns_added.append(f"{table_name}.{col_name}")
-                    except mysql.connector.Error as e:
-                        err(f"    Failed: {e}")
-                        conn.rollback()
-                        errors.append(f"{table_name}.{col_name}")
-                else:
+        for col_name, col_def in missing.items():
+            preview = col_def[:70] + ('…' if len(col_def) > 70 else '')
+            added(f"  ADD COLUMN {col_name}  {preview}")
+            if not dry_run:
+                sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col_name}` {col_def}"
+                try:
+                    cursor.execute(sql)
+                    conn.commit()
                     columns_added.append(f"{table_name}.{col_name}")
+                except mysql.connector.Error as e:
+                    err(f"    Failed: {e}")
+                    conn.rollback()
+                    errors.append(f"{table_name}.{col_name}")
+            else:
+                columns_added.append(f"{table_name}.{col_name}")
 
-            for col_name, info in changed.items():
-                warn(f"  TYPE MISMATCH {col_name}")
-                warn(f"    db     : {info['db']}")
-                warn(f"    schema : {info['schema'][:70]}")
-                warn(f"    → run manually: ALTER TABLE `{table_name}` MODIFY COLUMN `{col_name}` {info['schema']};")
-                columns_changed.append((table_name, col_name))
+        for col_name, info in changed.items():
+            warn(f"  TYPE MISMATCH {col_name}")
+            warn(f"    db     : {info['db']}")
+            warn(f"    schema : {info['schema'][:70]}")
+            warn(f"    → run manually: ALTER TABLE `{table_name}` MODIFY COLUMN `{col_name}` {info['schema']};")
+            columns_changed.append((table_name, col_name))
 
     # ── Summary ───────────────────────────────────────────────────────────────
 

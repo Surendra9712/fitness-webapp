@@ -4,6 +4,7 @@ Secondary nutritional database — used when USDA has no match,
 for branded foods, restaurant foods, and natural-language queries.
 Free tier: https://www.nutritionix.com/business/api
 """
+from __future__ import annotations
 import os, requests
 
 NUTRITIONIX_APP_ID  = os.getenv("NUTRITIONIX_APP_ID", "")

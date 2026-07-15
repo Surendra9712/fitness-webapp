@@ -23,22 +23,22 @@ export default function HeroSection() {
       <div className="absolute left-1/3 top-10 h-64 w-64 rounded-full bg-primary-400/5  blur-2xl float-c" />
 
       {/* Floating pills */}
-      <div className="absolute bottom-36 left-[11%] float-b hidden lg:block">
+      {/* <div className="absolute bottom-36 left-[11%] float-b hidden lg:block">
         <div className="flex items-center gap-2 rounded-2xl border border-accent-500/30 bg-accent-500/15 px-4 py-2.5 backdrop-blur">
           <Flame className="h-5 w-5 text-accent-400" />
           <span className="text-xs font-medium text-accent-200">
             420 kcal burned
           </span>
         </div>
-      </div>
-      <div className="absolute left-[9%] top-1/3 float-c hidden lg:block">
+      </div> */}
+      {/* <div className="absolute left-[9%] top-1/3 float-c hidden lg:block">
         <div className="flex items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/15 px-3 py-2 backdrop-blur">
           <TrendingUp className="h-4 w-4 text-purple-400" />
           <span className="text-xs font-medium text-purple-300">
             +2.4 kg muscle
           </span>
         </div>
-      </div>
+      </div> */}
 
       <div className="relative z-10 mx-auto w-full max-w-5xl px-6 py-24 text-center">
         {/* <div className="hero-tag mb-6 flex justify-center">
