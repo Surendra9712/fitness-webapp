@@ -17,18 +17,11 @@ import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MealPlanTab } from "./ai-recommendation/MealPlanTab";
-import { ExerciseTab } from "./ai-recommendation/ExerciseTab";
-import { FoodSearchTab } from "./ai-recommendation/FoodSearchTab";
-import { AskAiTab } from "./ai-recommendation/AskAiTab";
-import type {
-  ExerciseRec,
-  MealRecommendation,
-} from "./ai-recommendation/types";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface FoodResult {
@@ -188,12 +181,14 @@ function FoodCard({
 function ExerciseCard({
   ex,
   onComplete,
+  onRefreshExercise,
 }: {
   ex: ExerciseItem;
   onComplete?: (result: {
     calories_burned: number;
     exercise_name: string;
   }) => void;
+  onRefreshExercise?: () => void;
 }) {
   const [showInstr, setShowInstr] = useState(false);
   const [duration, setDuration] = useState(30);
@@ -220,6 +215,13 @@ function ExerciseCard({
         calories_burned: res.calories_burned,
         exercise_name: ex.name,
       });
+      // Req 12: Signal dashboard to refresh stats when user navigates back
+      localStorage.setItem(
+        "smartdiet_exercise_completed",
+        Date.now().toString(),
+      );
+      // Refresh exercise panel immediately
+      if (onRefreshExercise) onRefreshExercise();
     } catch {
     } finally {
       setCompleting(false);
@@ -337,6 +339,19 @@ export default function AiRecommendation() {
     { calories_burned: number; exercise_name: string }[]
   >([]);
 
+  // Food search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<FoodResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // NLP query
+  const [nlpText, setNlpText] = useState("");
+  const [nlpResult, setNlpResult] = useState<Record<string, unknown> | null>(
+    null,
+  );
+  const [nlpLoading, setNlpLoading] = useState(false);
+
   const loadMealPlan = async () => {
     setLoadingMeal(true);
     setError("");
@@ -354,7 +369,6 @@ export default function AiRecommendation() {
 
   const loadExercise = async () => {
     setLoadingEx(true);
-    setError("");
     try {
       const res = await api.get<ExerciseRec>("/ai/recommend/exercise");
       setExercise(res);
@@ -371,6 +385,43 @@ export default function AiRecommendation() {
       loadExercise();
     }
   }, [isPro]);
+
+  const handleSearch = (q: string) => {
+    setSearchQuery(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await api.get<{ results: FoodResult[] }>(
+          `/ai/food/search?q=${encodeURIComponent(q)}`,
+        );
+        setSearchResults(res.results);
+      } catch {
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
+  };
+
+  const handleNlpQuery = async () => {
+    if (!nlpText.trim()) return;
+    setNlpLoading(true);
+    setNlpResult(null);
+    try {
+      const res = await api.post<Record<string, unknown>>("/ai/nlp/query", {
+        text: nlpText,
+      });
+      setNlpResult(res);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setNlpLoading(false);
+    }
+  };
 
   if (!isPro) {
     return (
@@ -399,6 +450,9 @@ export default function AiRecommendation() {
             <Sparkles className="h-5 w-5 text-primary" />
           </div>
           <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              AI Recommendations
+            </h1>
             <p className="text-sm text-muted-foreground">
               Personalised meal plans &amp; animated exercise recommendations
               powered by AI
@@ -421,13 +475,105 @@ export default function AiRecommendation() {
           <TabsTrigger value="nlp">💬 Ask AI</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meals" className="mt-4">
-          <MealPlanTab
-            mealPlan={mealPlan}
-            loading={loadingMeal}
-            onRefresh={loadMealPlan}
-            onError={setError}
-          />
+        {/* ── MEAL PLAN TAB ─────────────────────────────────── */}
+        <TabsContent value="meals" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Breakfast &amp; snack ={" "}
+              <span className="font-medium text-primary">light</span>{" "}
+              &nbsp;•&nbsp; Lunch &amp; dinner ={" "}
+              <span className="font-medium text-orange-500">heavy</span>
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadMealPlan}
+              disabled={loadingMeal}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${loadingMeal ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </div>
+
+          {loadingMeal ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="h-48 rounded-xl bg-muted animate-pulse"
+                />
+              ))}
+            </div>
+          ) : mealPlan ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {(["breakfast", "lunch", "snack", "dinner"] as const).map(
+                (mt) => {
+                  const rec = mealPlan[mt];
+                  if (!rec) return null;
+                  const info = MEAL_LABELS[mt];
+                  const isLight = info.class === "Light";
+                  return (
+                    <Card key={mt} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <span>{info.emoji}</span>
+                            {info.label}
+                          </CardTitle>
+                          <Badge
+                            variant={isLight ? "secondary" : "default"}
+                            className={`text-xs ${isLight ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}`}
+                          >
+                            {isLight ? (
+                              <>
+                                <Leaf className="h-3 w-3 mr-1" />
+                                Light
+                              </>
+                            ) : (
+                              <>
+                                <Flame className="h-3 w-3 mr-1" />
+                                Heavy
+                              </>
+                            )}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Target: ~{rec.target?.calories ?? 0} kcal
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {rec.recommendations.slice(0, 3).map((food, i) => (
+                          <FoodCard key={i} food={food} rank={i + 1} />
+                        ))}
+                        {mt === "breakfast" &&
+                          rec.dry_fruits_addon &&
+                          rec.dry_fruits_addon.length > 0 && (
+                            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                              <p className="text-xs font-semibold text-amber-700 mb-1">
+                                🌰 Recommended dry fruits (add-on)
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {rec.dry_fruits_addon.map((df) => (
+                                  <span
+                                    key={df.name}
+                                    className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full"
+                                  >
+                                    {df.name} — {df.grams}g (
+                                    {df.calories_per_serving} kcal)
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </CardContent>
+                    </Card>
+                  );
+                },
+              )}
+            </div>
+          ) : null}
         </TabsContent>
 
         {/* ── EXERCISE TAB ──────────────────────────────────── */}
@@ -505,9 +651,9 @@ export default function AiRecommendation() {
                     key={i}
                     ex={ex}
                     onComplete={(result) => {
-                      // Show a quick toast-style notification
                       setExerciseCompleted((prev) => [...prev, result]);
                     }}
+                    onRefreshExercise={loadExercise}
                   />
                 ))}
                 {exerciseCompleted.length > 0 && (
@@ -535,12 +681,135 @@ export default function AiRecommendation() {
           ) : null}
         </TabsContent>
 
-        <TabsContent value="search" className="mt-4">
-          <FoodSearchTab />
+        {/* ── FOOD SEARCH TAB ───────────────────────────────── */}
+        <TabsContent value="search" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Search any food — Nepali dishes, global cuisine, branded foods.
+            Searches Nepali knowledge base → USDA → Nutritionix automatically.
+          </p>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="e.g. daal bhat, chicken curry, sushi..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+          {searching && (
+            <p className="text-sm text-muted-foreground">Searching...</p>
+          )}
+          {searchResults.length > 0 && (
+            <div className="space-y-2">
+              {searchResults.map((food, i) => (
+                <FoodCard key={i} food={food} rank={i + 1} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="nlp" className="mt-4">
-          <AskAiTab onError={setError} />
+        {/* ── ASK AI / NLP TAB ──────────────────────────────── */}
+        <TabsContent value="nlp" className="space-y-4 mt-4">
+          <p className="text-sm text-muted-foreground">
+            Tell the AI what you ate or ask for a recommendation in plain
+            English. Examples: "I ate chiya and pauroti for breakfast" —
+            "suggest high protein lunch"
+          </p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="I ate daal bhat and chicken curry..."
+              value={nlpText}
+              onChange={(e) => setNlpText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleNlpQuery()}
+            />
+            <Button
+              onClick={handleNlpQuery}
+              disabled={nlpLoading || !nlpText.trim()}
+            >
+              <Send className="h-4 w-4 mr-1" />
+              {nlpLoading ? "..." : "Ask"}
+            </Button>
+          </div>
+
+          {nlpResult && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  AI detected:{" "}
+                  {
+                    (nlpResult.nlp_analysis as Record<string, unknown>)
+                      ?.intent as string
+                  }
+                  {(
+                    (nlpResult.nlp_analysis as Record<string, unknown>)
+                      ?.foods_detected as string[]
+                  )?.length > 0 && (
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      —{" "}
+                      {(
+                        (nlpResult.nlp_analysis as Record<string, unknown>)
+                          ?.foods_detected as string[]
+                      ).join(", ")}
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {nlpResult.result &&
+                  (nlpResult.result as Record<string, unknown>).type ===
+                    "logged_meal_nutrition" && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        Nutrition totals:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(
+                          (nlpResult.result as Record<string, unknown>)
+                            .totals as Record<string, number>,
+                        ).map(([k, v]) => (
+                          <Badge
+                            key={k}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {k}: {v}
+                          </Badge>
+                        ))}
+                      </div>
+                      {(
+                        (nlpResult.result as Record<string, unknown>)
+                          .items as FoodResult[]
+                      )?.map((food, i) => (
+                        <FoodCard key={i} food={food} rank={i + 1} />
+                      ))}
+                    </div>
+                  )}
+                {nlpResult.result &&
+                  (nlpResult.result as Record<string, unknown>).type ===
+                    "recommendation" && (
+                    <div className="space-y-2">
+                      {(
+                        (nlpResult.result as Record<string, unknown>)
+                          .options as FoodResult[]
+                      )?.map((food, i) => (
+                        <FoodCard key={i} food={food} rank={i + 1} />
+                      ))}
+                    </div>
+                  )}
+                {nlpResult.result &&
+                  (nlpResult.result as Record<string, unknown>).type ===
+                    "not_found" && (
+                    <p className="text-sm text-muted-foreground">
+                      {
+                        (nlpResult.result as Record<string, unknown>)
+                          .message as string
+                      }
+                    </p>
+                  )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
