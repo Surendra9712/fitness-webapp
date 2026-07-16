@@ -8,6 +8,7 @@ import { TrainerRequestDialog } from "@/components/trainer/TrainerRequestDialog"
 import { TrainerDetailModal } from "@/components/trainer/TrainerDetailModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import type { TrainerInfo } from "@/types";
 
 export default function TrainerRequest({
@@ -68,9 +69,7 @@ export default function TrainerRequest({
       {/* Search */}
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-        </div>
+        <ListRowSkeleton avatar="circle" lines={2} actions={1} />
       ) : (
         <>
           <TrainerList

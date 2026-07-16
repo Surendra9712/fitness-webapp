@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { api } from "@/api/client";
 import {
@@ -564,8 +565,57 @@ export default function Profile() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+      <div className="space-y-4">
+        {/* Hero card skeleton */}
+        <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+          <Skeleton className="h-32 w-full rounded-none" />
+          <div className="px-6 pb-6">
+            <div className="-mt-11 mb-4">
+              <Skeleton className="h-20 w-20 rounded-full ring-4 ring-white" />
+            </div>
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-56 mt-2" />
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          </div>
+        </div>
+
+        {/* Quick stats skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-3"
+            >
+              <Skeleton className="h-10 w-10 rounded-xl" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Body metrics skeleton (BMI gauge + BMR/TDEE/target rows + macro donut) */}
+        <div className="space-y-4">
+          <Skeleton className="h-5 w-32" />
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Skeleton className="h-64 rounded-2xl lg:col-span-1" />
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              <Skeleton className="h-20 rounded-xl" />
+              <Skeleton className="h-20 rounded-xl" />
+              <Skeleton className="h-20 rounded-xl" />
+            </div>
+          </div>
+          <Skeleton className="h-32 rounded-2xl" />
+        </div>
+
+        {/* Section cards skeleton (Personal Details, Fitness Goals, Diet & Nutrition, Daily Habits, Health) */}
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-40 rounded-2xl" />
+        ))}
       </div>
     );
   }

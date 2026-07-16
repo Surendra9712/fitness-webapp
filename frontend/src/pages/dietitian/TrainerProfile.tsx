@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import type { TrainerCertification, AvailableSlot } from "@/types";
 
@@ -292,8 +293,102 @@ export default function TrainerProfile() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        <Skeleton className="h-4 w-96" />
+
+        <div className="space-y-6">
+          {/* Profile photo */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-4 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-24 w-24 rounded-full" />
+            </CardContent>
+          </Card>
+
+          {/* Personal info */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-4 w-40" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Professional details */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-4 w-48" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Availability */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-4 w-28" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-14 w-full rounded-lg" />
+              <Skeleton className="h-14 w-full rounded-lg" />
+              <Skeleton className="h-9 w-36" />
+            </CardContent>
+          </Card>
+
+          {/* Certifications */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-4 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-28 rounded-full" />
+                <Skeleton className="h-9 w-28 rounded-full" />
+              </div>
+              <Skeleton className="h-9 w-40" />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

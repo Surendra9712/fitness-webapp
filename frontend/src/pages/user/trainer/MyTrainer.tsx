@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import TrainerRequest from "./TrainerRequest";
 import { toast } from "sonner";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import type { TrainerAssignment } from "@/types";
 
 // Shared detail view — used for the "single trainer" inline case (My Trainers tab).
@@ -84,8 +85,9 @@ export default function MyTrainer() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight">Trainers</h1>
+        <ListRowSkeleton avatar="circle" lines={2} actions={0} />
       </div>
     );
   }

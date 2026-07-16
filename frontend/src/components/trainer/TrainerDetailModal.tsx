@@ -13,6 +13,7 @@ import {
   DialogBody,
 } from "@/components/ui/dialog";
 import { StarRating } from "@/components/ui/star-rating";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AssignmentStatusCard } from "./AssignmentStatusCard";
 import { TrainerProfileSummary } from "./TrainerProfileSummary";
 import { TrainerReviewSection } from "./TrainerReviewSection";
@@ -74,9 +75,53 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
       <Dialog open={trainerId != null} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-            </div>
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="min-w-0 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <DialogBody className="space-y-4">
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-3 rounded-lg bg-muted/40 py-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1.5">
+                      <Skeleton className="h-5 w-8" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Assignment / request action */}
+                <Skeleton className="h-9 w-full" />
+
+                {/* Trainer profile summary */}
+                <Skeleton className="h-32 w-full rounded-lg" />
+
+                {/* Reviews */}
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-20" />
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg border bg-background p-3 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  ))}
+                </div>
+              </DialogBody>
+            </>
           ) : !trainer ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               Trainer not found

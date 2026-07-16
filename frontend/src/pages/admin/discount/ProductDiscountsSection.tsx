@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Pencil, Loader2 } from "lucide-react";
+import { Pencil } from "lucide-react";
 import useAdmin from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import ProductDiscountDialog from "./ProductDiscountDialog";
 import type { Product } from "@/types";
 
@@ -34,9 +35,7 @@ export default function ProductDiscountsSection() {
       />
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <TableSkeleton rows={6} columns={5} />
       ) : (
         <div className="rounded-lg border overflow-hidden">
           <table className="w-full text-sm">

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { toast } from "sonner";
 import type { User } from "@/types";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 
 type TrainerRow = User & {
   specialization?: string;
@@ -90,9 +91,7 @@ export default function TrainerVerification() {
       </form>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+        <ListRowSkeleton avatar="circle" lines={2} actions={2} />
       ) : trainers.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-20 text-center">
           <ShieldCheck className="h-12 w-12 text-emerald-300" />

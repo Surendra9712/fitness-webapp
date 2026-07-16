@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ExerciseCard } from "./ExerciseCard";
 import type { ExerciseRec } from "./types";
 
@@ -39,7 +40,19 @@ export function ExerciseTab({
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 rounded-xl bg-muted animate-pulse" />
+            <div key={i} className="border rounded-lg overflow-hidden bg-card">
+              <Skeleton className="w-full h-40 rounded-none" />
+              <div className="p-3 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <div className="flex flex-wrap gap-1">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-9 w-full rounded-md mt-1" />
+              </div>
+            </div>
           ))}
         </div>
       ) : exercise ? (

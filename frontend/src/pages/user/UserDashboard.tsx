@@ -21,6 +21,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ProfileSetup from "./profile/ProfileSetup";
@@ -539,6 +540,7 @@ export default function UserDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [todayMeals, setTodayMeals] = useState<TodayMeals | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [endingDay, setEndingDay] = useState(false);
@@ -551,6 +553,7 @@ export default function UserDashboard() {
   const hasProfile = Boolean(user?.full_name);
 
   const loadData = useCallback(async () => {
+    setDataLoading(true);
     setError("");
     try {
       // Computed fresh (not a frozen constant) so a session left open across
@@ -579,6 +582,8 @@ export default function UserDashboard() {
       }
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setDataLoading(false);
     }
   }, []);
 
@@ -692,6 +697,95 @@ export default function UserDashboard() {
         }}
       />
     );
+
+  // First load only — once `stats` has loaded once, subsequent refetches
+  // (log/delete/toggle/end-day/refresh) shouldn't flash the whole page back
+  // to a skeleton.
+  if (dataLoading && !stats) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-4 w-96" />
+        </div>
+
+        {/* Stat cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-4 rounded-full" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-14 mb-2" />
+                <Skeleton className="h-3 w-20" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Macro rings */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-card border rounded-xl p-4 flex flex-col items-center gap-2"
+            >
+              <Skeleton className="h-24 w-24 rounded-full" />
+              <Skeleton className="h-4 w-14" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          ))}
+        </div>
+
+        {/* Water card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-5 w-64" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-2 w-full rounded-full mb-3" />
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-6 w-16 rounded-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Meal-log accordions */}
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-32" />
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+
+        {/* End-day panel */}
+        <Skeleton className="h-40 w-full rounded-2xl" />
+
+        {/* Body metrics card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-5 w-28" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-1.5 flex flex-col items-center">
+                  <Skeleton className="h-7 w-12" />
+                  <Skeleton className="h-3 w-14" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const totals = todayMeals?.totals;
   const targets = todayMeals?.targets;

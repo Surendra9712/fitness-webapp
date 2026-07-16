@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { UserModal } from "./UserModal";
 import { toast } from "sonner";
@@ -86,8 +87,41 @@ export default function UserDetail() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
-        Loading...
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-9 w-9 rounded-md" />
+          <Skeleton className="h-7 w-36" />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Profile card */}
+          <Card className="md:col-span-1">
+            <CardContent className="flex flex-col items-center gap-4 pt-8 pb-6">
+              <Skeleton className="h-20 w-20 rounded-full" />
+              <div className="flex flex-col items-center gap-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Info cards */}
+          <div className="md:col-span-2 grid sm:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import type { Order, OrderStatus } from "@/types";
 
 const STATUS_COLORS: Record<
@@ -64,8 +65,9 @@ export default function MyOrders() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight">My Orders</h1>
+        <ListRowSkeleton avatar="square" lines={2} actions={1} />
       </div>
     );
   }

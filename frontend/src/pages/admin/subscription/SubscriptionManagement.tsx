@@ -17,6 +17,7 @@ import { AppPagination } from "@/components/ui/app-pagination";
 import { toast } from "sonner";
 import type { User } from "@/types";
 import SubscriptionRejectDialog from "./SubscriptionRejectDialog";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 
 type SubUser = User & {
   subscription_payment_method?: "cash" | "esewa" | "stripe";
@@ -131,9 +132,7 @@ export default function SubscriptionManagement() {
       </form>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+        <ListRowSkeleton avatar="circle" lines={2} actions={2} />
       ) : rows.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-20 text-center">
           <Crown className="h-12 w-12 text-muted-foreground/30" />

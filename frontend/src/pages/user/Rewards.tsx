@@ -10,6 +10,7 @@ import useUser from "@/hooks/useUser";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
 import { Badge } from "@/components/ui/badge";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import type { PointTransaction } from "@/types";
 
 export default function Rewards() {
@@ -87,9 +88,7 @@ export default function Rewards() {
       <div>
         <h2 className="text-base font-semibold mb-3">Transaction History</h2>
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          </div>
+          <ListRowSkeleton avatar="circle" lines={1} actions={0} />
         ) : transactions.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center rounded-lg border">
             <Gift className="h-12 w-12 text-muted-foreground/30" />

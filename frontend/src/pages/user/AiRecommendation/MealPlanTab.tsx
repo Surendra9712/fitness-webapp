@@ -2,6 +2,7 @@ import { RefreshCw, Flame, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FoodCard } from "./FoodCard";
 import type { MealRecommendation } from "./types";
 
@@ -47,7 +48,40 @@ export function MealPlanTab({
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
+            <Card key={i} className="overflow-hidden">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <Skeleton className="h-3 w-28 mt-1" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {[1, 2, 3].map((j) => (
+                  <div
+                    key={j}
+                    className="border rounded-lg p-3 bg-card space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-4" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <Skeleton className="h-4 w-12 rounded-full" />
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Skeleton className="h-4 w-10 rounded-full" />
+                      <Skeleton className="h-4 w-10 rounded-full" />
+                      <Skeleton className="h-4 w-10 rounded-full" />
+                      <Skeleton className="h-4 w-10 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : mealPlan ? (

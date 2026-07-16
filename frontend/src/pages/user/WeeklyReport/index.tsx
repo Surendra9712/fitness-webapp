@@ -4,6 +4,9 @@ import { api } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import type { WeeklyData } from "./types";
 import StatCards from "./StatCards";
 import NutritionCharts from "./NutritionCharts";
@@ -53,8 +56,49 @@ export default function WeeklyReport() {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-9 w-32 rounded-xl" />
+          </div>
+        </div>
+
+        {/* Stat cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-4 rounded-full" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-7 w-16 mb-2" />
+                <Skeleton className="h-3 w-24" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Nutrition chart */}
+        <Skeleton className="h-80 w-full rounded-2xl" />
+
+        {/* Exercise summary + hydration tracking */}
+        <Skeleton className="h-56 w-full rounded-2xl" />
+        <Skeleton className="h-56 w-full rounded-2xl" />
+
+        {/* Daily breakdown table (9 columns: Day, Cal, Protein, Carbs, Fat, Burned, Ex.Min, Water, Exercises) */}
+        <TableSkeleton rows={7} columns={9} />
       </div>
     );
   if (error)

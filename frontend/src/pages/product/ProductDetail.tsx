@@ -10,6 +10,7 @@ import { StarDisplay } from "@/components/ui/star-rating";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ProductReviews } from "./ProductReviews";
 
@@ -58,9 +59,75 @@ export default function ProductDetail() {
   if (isLoading) {
     return (
       <PublicLayout>
-        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-muted-foreground">
-          <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
-          <span className="text-sm">Loading product…</span>
+        <div className="border-b bg-background">
+          <div className="mx-auto max-w-6xl px-6 py-3">
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-6xl px-6 py-10">
+          <div className="grid gap-10 md:grid-cols-2">
+            {/* Left: image */}
+            <div className="space-y-4">
+              <Skeleton className="aspect-square w-full rounded-2xl" />
+            </div>
+
+            {/* Right: details */}
+            <div className="flex flex-col gap-6">
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+
+              <div className="space-y-2">
+                <Skeleton className="h-9 w-40" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+
+              <Separator />
+
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-28" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <Skeleton className="h-11 w-full rounded-md" />
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="mt-14">
+            <Separator className="mb-10" />
+            <Skeleton className="mb-6 h-6 w-40" />
+            <div className="max-w-2xl space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          </div>
+
+          {/* Reviews */}
+          <div className="mt-14 space-y-4">
+            <Separator className="mb-10" />
+            <Skeleton className="h-6 w-32" />
+            <div className="space-y-4">
+              <div className="space-y-2 rounded-lg border p-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+              <div className="space-y-2 rounded-lg border p-4">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            </div>
+          </div>
         </div>
       </PublicLayout>
     );

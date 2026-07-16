@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FoodCard } from "./FoodCard";
 import type { FoodResult } from "./types";
 
@@ -30,7 +31,31 @@ export function FoodSearchTab({
         />
       </div>
       {searching && (
-        <p className="text-sm text-muted-foreground">Searching...</p>
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="border rounded-lg p-3 bg-card space-y-2"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-5 w-6" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-14 rounded-full" />
+                  <Skeleton className="h-4 w-12 rounded-full" />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <Skeleton className="h-4 w-12 rounded-full" />
+                <Skeleton className="h-4 w-10 rounded-full" />
+                <Skeleton className="h-4 w-10 rounded-full" />
+                <Skeleton className="h-4 w-10 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       {results.length > 0 && (
         <div className="space-y-2">

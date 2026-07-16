@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import type { Product } from "@/types";
 import { SearchInput } from "@/components/ui/search-input";
@@ -166,9 +167,10 @@ export default function Products() {
       <main className="min-h-[50vh] bg-muted">
         <div className="mx-auto max-w-7xl px-6 pb-20 pt-10">
           {isLoading ? (
-            <div className="flex flex-col items-center gap-4 py-20 text-muted-foreground">
-              <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
-              <span className="text-sm">Loading equipment…</span>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(268px,1fr))] gap-5">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <ProductCardSkeleton key={i} />
+              ))}
             </div>
           ) : products.length === 0 ? (
             <div className="py-20 text-center">
@@ -259,6 +261,24 @@ export default function Products() {
         </section>
       )}
     </PublicLayout>
+  );
+}
+
+// ── Product card skeleton ────────────────────────────────────────────────────
+function ProductCardSkeleton() {
+  return (
+    <Card className="flex flex-col overflow-hidden p-0">
+      <Skeleton className="h-40 w-full rounded-none" />
+      <CardContent className="flex flex-1 flex-col gap-2 px-5 pb-0 pt-4">
+        <Skeleton className="h-4 w-16 rounded-full" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+      </CardContent>
+      <CardFooter className="mt-auto flex items-center justify-between px-5 py-4">
+        <Skeleton className="h-7 w-20" />
+        <Skeleton className="h-8 w-20 rounded-md" />
+      </CardFooter>
+    </Card>
   );
 }
 

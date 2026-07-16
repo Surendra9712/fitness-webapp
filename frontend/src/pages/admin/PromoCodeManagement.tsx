@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import type { PromoCode } from "@/types";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SearchInput } from "@/components/ui/search-input";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 
 type PromoForm = {
   code: string;

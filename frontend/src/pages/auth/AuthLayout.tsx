@@ -104,7 +104,7 @@ export default function AuthLayout() {
             onValueChange={(v) => setTab(v as "login" | "register")}
           >
             {/* Tab switcher at the top */}
-            <TabsList className="mb-8 w-[240px] absolute top-20">
+            <TabsList className="mb-8 w-[240px]">
               <TabsTrigger value="login" className="flex-1">
                 Sign In
               </TabsTrigger>

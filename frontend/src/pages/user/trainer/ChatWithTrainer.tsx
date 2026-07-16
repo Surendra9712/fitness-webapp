@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ChatMessages from "@/components/chat/ChatMessages";
 import ChatComposer from "@/components/chat/ChatComposer";
+import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import { cn } from "@/lib/utils";
 
 export default function ChatWithTrainer() {
@@ -70,7 +71,9 @@ export default function ChatWithTrainer() {
           )}
         >
           {threadsLoading && (
-            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+            <div className="p-3">
+              <ListRowSkeleton avatar="circle" lines={1} actions={0} rows={6} />
+            </div>
           )}
           {threads?.length === 0 && (
             <p className="p-4 text-sm text-muted-foreground">

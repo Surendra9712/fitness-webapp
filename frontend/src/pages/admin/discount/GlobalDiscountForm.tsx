@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import type { GlobalDiscount } from "@/types";
 
@@ -101,8 +102,42 @@ export default function GlobalDiscountForm() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-6 max-w-lg">
+        <Skeleton className="h-4 w-full" />
+
+        <div className="space-y-5">
+          {/* Active toggle */}
+          <div className="flex items-center justify-between rounded-lg border px-4 py-3">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-6 w-11 rounded-full" />
+          </div>
+
+          {/* Discount type */}
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+
+          {/* Discount value */}
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+
+          {/* Date range */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-9 w-full" />
+            </div>
+          </div>
+
+          <Skeleton className="h-9 w-44" />
+        </div>
       </div>
     );
   }

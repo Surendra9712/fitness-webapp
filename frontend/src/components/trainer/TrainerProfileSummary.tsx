@@ -1,6 +1,7 @@
 import { Dumbbell, Briefcase, Phone, MapPin, Award, Clock } from "lucide-react";
 import useUser from "@/hooks/useUser";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Full trainer profile (experience, phone, bio, certifications, availability) — fetched
 // separately since trainer_assignments only carries name/email, not the full profile.
@@ -10,9 +11,29 @@ export function TrainerProfileSummary({ trainerId }: { trainerId: number }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
-      </div>
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <Skeleton className="h-4 w-32" />
+
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-24 rounded-full" />
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-28 rounded-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     );
   }
   if (!trainer) return null;
