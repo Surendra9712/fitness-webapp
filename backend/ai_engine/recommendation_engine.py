@@ -371,17 +371,36 @@ def recommend_daily_meals(weight_kg, height_cm, age, gender, activity_level, goa
     targets = calculate_nutrition_targets(weight_kg, height_cm, age, gender, activity_level, goal)
     dietary["_target_cal"] = targets.daily_calories
 
-    # Always recommend all 4 meal types (Req snack fix)
-    daily_plan = {
-        mt: recommend_meal_for_type(
+    # Always recommend all 4 meal types (Req snack fix). Processed sequentially,
+    # feeding each pick forward into the next meal type's history as if it had
+    # just been eaten (days_since=0). This reuses the same variety-aware
+    # scoring already applied to real meal-log history (both the ML model and
+    # the rule-based fallback already deprioritize a days_since=0 food) —
+    # so a same-day repeat is naturally discouraged but still allowed when
+    # it's genuinely the best fit (e.g. dal-bhat for both lunch and dinner),
+    # rather than being forcibly banned outright.
+    daily_plan  = {}
+    today_detail = dict(recently_eaten_detail)
+    for mt in ["breakfast", "lunch", "snack", "dinner"]:
+        result = recommend_meal_for_type(
             mt, targets, meals_per_day, dietary,
             preferred_cuisines, top_n=3,
             recently_eaten=recently_eaten,
-            recently_eaten_detail=recently_eaten_detail,
+            recently_eaten_detail=today_detail,
             goal=goal,
         )
-        for mt in ["breakfast","lunch","snack","dinner"]
-    }
+        daily_plan[mt] = result
+        top_pick = result["recommendations"][0].get("name") if result["recommendations"] else None
+        if top_pick:
+            prev = today_detail.get(top_pick, {})
+            today_detail = {
+                **today_detail,
+                top_pick: {
+                    "days_since":  0,
+                    "times_week":  prev.get("times_week", 0) + 1,
+                    "times_total": prev.get("times_total", 0) + 1,
+                },
+            }
 
     return {
         "nutrition_targets": {
@@ -487,7 +506,8 @@ def handle_natural_language_query(text, dietary=None):
 
 def recommend_exercise(goal, bmi, age, fitness_level, calorie_ratio,
                         activity_level="moderate", today_calories=1200,
-                        protein_gap=0, today_protein=60, days_exercised_this_week=0):
+                        protein_gap=0, today_protein=60, days_exercised_this_week=0,
+                        recently_done=None):
     if ml_is_loaded():
         prediction = predict_exercise_category({
             "age":age,"bmi":bmi,"goal":goal,"fitness_level":fitness_level,
@@ -518,7 +538,7 @@ def recommend_exercise(goal, bmi, age, fitness_level, calorie_ratio,
         else: category,reason = "yoga_light","Within target — light activity recommended."
         scoring = "rule_based_v4"
 
-    exercises = exercisedb.get_exercises_for_category(category, limit_per_part=3)
+    exercises = exercisedb.get_exercises_for_category(category, limit_per_part=3, recently_done=recently_done)
     for ex in exercises:
         ex["has_animation"] = bool(ex.get("gif_url"))
     return {

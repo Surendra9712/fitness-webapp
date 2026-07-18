@@ -59,29 +59,11 @@ export default function AuthLayout() {
             Equipment, tracking, and expert trainers — everything you need to
             hit your goals in one place.
           </p>
-
-          {/* Stats */}
-          <div className="flex flex-wrap gap-3 pt-2">
-            {[
-              { emoji: "🏋️", value: "50K+", label: "Active users" },
-              { emoji: "⭐", value: "4.9", label: "Rating" },
-              { emoji: "🔥", value: "2M+", label: "Workouts done" },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="flex items-center gap-2.5 rounded-full border border-white/8 bg-white/5 px-4 py-2 backdrop-blur-sm"
-              >
-                <span className="text-lg">{s.emoji}</span>
-                <span className="font-bold text-white">{s.value}</span>
-                <span className="text-sm text-white/45">{s.label}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Bottom quote */}
         <p className="relative text-xs text-white/30">
-          &copy; {new Date().getFullYear()} FitStore. All rights reserved.
+          {/* &copy; {new Date().getFullYear()} FitStore. All rights reserved. */}
         </p>
       </div>
 

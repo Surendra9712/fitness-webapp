@@ -233,10 +233,26 @@ def dashboard():
 
 # ── Products (shop) ───────────────────────────────────────────────────────────
 
-def _compute_effective_price(price, discount_type, discount_value):
-    """Return (effective_price, discounted_price_or_None)."""
+def _is_within_validity(valid_from, valid_to, today=None):
+    today = today or datetime.date.today()
+    if valid_from:
+        vf = valid_from if isinstance(valid_from, datetime.date) else datetime.date.fromisoformat(str(valid_from)[:10])
+        if today < vf:
+            return False
+    if valid_to:
+        vt = valid_to if isinstance(valid_to, datetime.date) else datetime.date.fromisoformat(str(valid_to)[:10])
+        if today > vt:
+            return False
+    return True
+
+
+def _compute_effective_price(price, discount_type, discount_value, valid_from=None, valid_to=None):
+    """Return (effective_price, discounted_price_or_None). No discount is applied if its
+    validity date range has expired or not started yet."""
     price = float(price)
     if not discount_type or not discount_value or float(discount_value) <= 0:
+        return price, None
+    if not _is_within_validity(valid_from, valid_to):
         return price, None
     dv = float(discount_value)
     if discount_type == 'percentage':
@@ -249,13 +265,17 @@ def _compute_effective_price(price, discount_type, discount_value):
 def _get_global_discount(cursor):
     cursor.execute(
         "SELECT `key`, value FROM site_settings "
-        "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active')"
+        "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active',"
+        "'global_discount_valid_from','global_discount_valid_to')"
     )
     s = {row['key']: row['value'] for row in cursor.fetchall()}
+    is_active = s.get('global_discount_active', '0') == '1' and _is_within_validity(
+        s.get('global_discount_valid_from') or None, s.get('global_discount_valid_to') or None
+    )
     return {
         'type':      s.get('global_discount_type', 'percentage'),
         'value':     float(s.get('global_discount_value', '0') or '0'),
-        'is_active': s.get('global_discount_active', '0') == '1',
+        'is_active': is_active,
     }
 
 
@@ -269,7 +289,7 @@ def list_products():
         base = (
             "SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
             "c.slug AS category, c.name AS category_name, p.image_url, "
-            "p.discount_type, p.discount_value "
+            "p.discount_type, p.discount_value, p.discount_valid_from, p.discount_valid_to "
             "FROM products p JOIN categories c ON p.category_id = c.id "
             "WHERE p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL "
         )
@@ -279,7 +299,10 @@ def list_products():
             cursor.execute(base + "ORDER BY c.name, p.name")
         rows = cursor.fetchall()
         for row in rows:
-            _, dp = _compute_effective_price(row['price'], row.get('discount_type'), row.get('discount_value'))
+            _, dp = _compute_effective_price(
+                row['price'], row.get('discount_type'), row.get('discount_value'),
+                row.get('discount_valid_from'), row.get('discount_valid_to'),
+            )
             row['discounted_price'] = dp
         return jsonify(rows)
     finally:
@@ -306,7 +329,8 @@ def place_order():
         resolved = []
         for item in body.items:
             cursor.execute(
-                "SELECT id, name, price, stock_quantity, discount_type, discount_value "
+                "SELECT id, name, price, stock_quantity, discount_type, discount_value, "
+                "discount_valid_from, discount_valid_to "
                 "FROM products WHERE id = %s AND status = 'active' AND deleted_at IS NULL",
                 (item.product_id,),
             )
@@ -316,7 +340,8 @@ def place_order():
             if product['stock_quantity'] < item.quantity:
                 return jsonify({'error': f"Insufficient stock for '{product['name']}'"}), 400
             effective_price, _ = _compute_effective_price(
-                product['price'], product.get('discount_type'), product.get('discount_value')
+                product['price'], product.get('discount_type'), product.get('discount_value'),
+                product.get('discount_valid_from'), product.get('discount_valid_to'),
             )
             item_subtotal += effective_price * item.quantity
             resolved.append({'product': product, 'quantity': item.quantity, 'effective_price': effective_price})
@@ -890,7 +915,8 @@ def get_trainer_assignments():
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
-            "SELECT ta.*, u.name AS trainer_name, u.email AS trainer_email "
+            "SELECT ta.*, u.name AS trainer_name, u.email AS trainer_email, "
+            "u.profile_image_url AS trainer_profile_image_url "
             "FROM trainer_assignments ta "
             "JOIN users u ON ta.trainer_id = u.id "
             "WHERE ta.customer_id = %s AND ta.deleted_at IS NULL "

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   Bell,
@@ -300,7 +300,7 @@ export default function Notifications() {
 
   const {
     GetAvailablePromos,
-    GetNotifications,
+    GetNotificationsInfinite,
     MarkRead,
     MarkAllRead,
     DeleteNotification,
@@ -310,9 +310,34 @@ export default function Notifications() {
     enabled: !isAdmin,
   });
 
-  const { data: notifData, isFetching: notifsLoading } = GetNotifications({});
-  const notifications: Notification[] = (notifData as any)?.items ?? [];
+  const {
+    data: notifPages,
+    isLoading: notifsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = GetNotificationsInfinite({ queryParams: { page_size: 20 } });
+  const notifications: Notification[] =
+    notifPages?.pages.flatMap((p) => p.items) ?? [];
   const unread = notifications.filter((n) => !n.is_read).length;
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tab !== "notifications" || !hasNextPage) return;
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      // { rootMargin: "10px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [tab, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const markRead = MarkRead();
   const markAllRead = MarkAllRead();
@@ -425,6 +450,17 @@ export default function Notifications() {
                   onDelete={handleDelete}
                 />
               ))}
+
+              {hasNextPage && (
+                <div
+                  ref={loadMoreRef}
+                  className="flex items-center justify-center py-4"
+                >
+                  {isFetchingNextPage && (
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>

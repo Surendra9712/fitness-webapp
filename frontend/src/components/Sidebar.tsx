@@ -1,7 +1,11 @@
 import { useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboardPath, getProfilePath } from "@/lib/constant";
+import {
+  avatarInitial,
+  getDashboardPath,
+  getProfilePath,
+} from "@/lib/constant";
 import { useChatStore } from "@/store/chatStore";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -38,6 +42,7 @@ import type { Role } from "@/types";
 import useUser from "@/hooks/useUser";
 import useChat from "@/hooks/useChat";
 import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface NavItem {
   to: string;
@@ -328,9 +333,15 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5 text-left transition-colors hover:bg-white/10">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-500/30 text-xs font-bold text-primary-300">
+              {/* <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-500/30 text-xs font-bold text-primary-300">
                 {user.name.charAt(0).toUpperCase()}
-              </div>
+              </div> */}
+              <Avatar>
+                <AvatarFallback className="text-lg">
+                  {avatarInitial(user?.name || user?.full_name)}
+                </AvatarFallback>
+                <AvatarImage src={user.profile_image_url} alt={user.name} />
+              </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-white">
                   {user.name}

@@ -73,6 +73,7 @@ export interface TrainerAssignment {
   trainer_id: number;
   trainer_name?: string;
   trainer_email?: string;
+  trainer_profile_image_url?: string;
   status: AssignmentStatus;
   customer_note?: string;
   trainer_note?: string;
@@ -127,9 +128,10 @@ export interface User {
   age?: number;
   weight_kg?: number;
   height_cm?: number;
-  gender?: string;
+  gender?: Gender;
   goal?: Goal;
   activity_level?: string;
+  profile_image_url?: string;
 }
 
 export interface Exercise {

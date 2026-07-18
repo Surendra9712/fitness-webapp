@@ -42,7 +42,7 @@ export function Step2Goals() {
                         : "border-gray-100 bg-gray-50 hover:border-emerald-200",
                     )}
                   >
-                    <span className="text-2xl">{g.icon}</span>
+                    <g.icon className="h-6 w-6 text-gray-700" />
                     <span className="text-sm font-semibold text-gray-800">
                       {g.title}
                     </span>

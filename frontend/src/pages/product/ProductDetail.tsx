@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ShoppingCart, Package } from "lucide-react";
+import {
+  ArrowLeft,
+  ShoppingCart,
+  Package,
+  Activity,
+  Dumbbell,
+  Cog,
+  Flower2,
+  Shirt,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import usePublic from "@/hooks/usePublic";
@@ -14,33 +24,33 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ProductReviews } from "./ProductReviews";
 
-type CatMeta = { gradient: string; badgeClass: string; glyph: string };
+type CatMeta = { gradient: string; badgeClass: string; Icon: LucideIcon };
 
 const CAT_META: Record<string, CatMeta> = {
   cardio: {
     gradient: "linear-gradient(140deg,#f97316,#dc2626)",
     badgeClass: "bg-orange-100 text-orange-700 border-0",
-    glyph: "🏃",
+    Icon: Activity,
   },
   strength: {
     gradient: "linear-gradient(140deg,#3B82F6,#4338CA)",
     badgeClass: "bg-blue-100 text-blue-700 border-0",
-    glyph: "🏋️",
+    Icon: Dumbbell,
   },
   machines: {
     gradient: "linear-gradient(140deg,#64748B,#1E293B)",
     badgeClass: "bg-slate-100 text-slate-600 border-0",
-    glyph: "⚙️",
+    Icon: Cog,
   },
   recovery: {
     gradient: "linear-gradient(140deg,#8B5CF6,#BE185D)",
     badgeClass: "bg-purple-100 text-purple-700 border-0",
-    glyph: "🧘",
+    Icon: Flower2,
   },
   accessories: {
     gradient: "linear-gradient(140deg,#10B981,#0F766E)",
     badgeClass: "bg-primary-100 text-primary-700 border-0",
-    glyph: "🎽",
+    Icon: Shirt,
   },
 };
 const fallbackMeta: CatMeta = CAT_META.machines;
@@ -227,7 +237,7 @@ export default function ProductDetail() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <span className="text-[120px] opacity-30">{meta.glyph}</span>
+                <meta.Icon className="h-28 w-28 opacity-30 text-white" strokeWidth={1.5} />
               )}
               {outOfStock && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">

@@ -2,6 +2,7 @@ import { Clock, CheckCircle2, XCircle, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { TrainerAssignment } from '@/types'
 
 export const STATUS_META: Record<string, {
@@ -60,8 +61,14 @@ export function AssignmentStatusCard({ assignment, onCancel }: Props) {
         <p className="text-sm text-muted-foreground">{meta.description}</p>
 
         <div className="rounded-lg bg-white/60 p-3 space-y-1.5 text-sm">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <span className="font-medium w-24 shrink-0">Trainer</span>
+            <Avatar className="h-6 w-6 shrink-0">
+              <AvatarImage src={assignment.trainer_profile_image_url ?? undefined} />
+              <AvatarFallback className="text-[10px] font-bold">
+                {assignment.trainer_name?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <span className="min-w-0 break-words">{assignment.trainer_name}</span>
           </div>
           <div className="flex gap-2">

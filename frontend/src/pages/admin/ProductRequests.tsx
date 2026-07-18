@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useForm, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { CheckCircle, XCircle, Bell, MoreHorizontal } from "lucide-react";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
@@ -6,7 +9,6 @@ import { AppPagination } from "@/components/ui/app-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -23,6 +25,14 @@ import {
   DialogFooter,
   DialogBody,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -48,19 +58,25 @@ const statusVariant: Record<string, "info" | "success" | "destructive"> = {
   rejected: "destructive",
 };
 
+const approveSchema = z.object({
+  price: z.coerce.number().positive("Price must be greater than 0"),
+  stock_quantity: z.coerce.number().min(0, "Stock cannot be negative"),
+  category: z.string().min(1, "Category is required"),
+  admin_note: z.string().optional(),
+});
+type ApproveValues = z.infer<typeof approveSchema>;
+
+const rejectSchema = z.object({
+  admin_note: z.string().optional(),
+});
+type RejectValues = z.infer<typeof rejectSchema>;
+
 export default function ProductRequests() {
   const [filter, setFilter] = useState("pending");
   const [approveDialog, setApproveDialog] = useState<ProductRequest | null>(
     null,
   );
   const [rejectDialog, setRejectDialog] = useState<ProductRequest | null>(null);
-  const [approveForm, setApproveForm] = useState({
-    price: "",
-    stock_quantity: "",
-    category: "",
-    admin_note: "",
-  });
-  const [rejectNote, setRejectNote] = useState("");
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
     initialPageSize: 20,
@@ -84,24 +100,50 @@ export default function ProductRequests() {
   const approveRequest = ApproveProductRequest();
   const rejectRequest = RejectProductRequest();
 
+  const approveForm = useForm<ApproveValues>({
+    resolver: zodResolver(approveSchema) as Resolver<ApproveValues>,
+    defaultValues: {
+      price: 0,
+      stock_quantity: 0,
+      category: "",
+      admin_note: "",
+    },
+  });
+
+  const rejectForm = useForm<RejectValues>({
+    resolver: zodResolver(rejectSchema) as Resolver<RejectValues>,
+    defaultValues: { admin_note: "" },
+  });
+
+  useEffect(() => {
+    if (!approveDialog) return;
+    approveForm.reset({
+      price: 0,
+      stock_quantity: 0,
+      category: categories[0]?.slug ?? "",
+      admin_note: "",
+    });
+  }, [approveDialog, categories]);
+
+  useEffect(() => {
+    if (!rejectDialog) return;
+    rejectForm.reset({ admin_note: "" });
+  }, [rejectDialog]);
+
   function handleFilterChange(value: string) {
     setFilter(value);
     resetPage();
   }
 
-  async function approve() {
+  async function onApprove(values: ApproveValues) {
     if (!approveDialog) return;
-    if (!approveForm.price) {
-      toast.error("Price is required");
-      return;
-    }
     try {
       await approveRequest.mutateAsync({
         id: approveDialog.id,
-        price: parseFloat(approveForm.price),
-        stock_quantity: parseInt(approveForm.stock_quantity || "0"),
-        category: approveForm.category,
-        admin_note: approveForm.admin_note,
+        price: values.price,
+        stock_quantity: values.stock_quantity,
+        category: values.category,
+        admin_note: values.admin_note,
       });
       toast.success(
         `"${approveDialog.product_name}" approved and added to catalog`,
@@ -112,16 +154,15 @@ export default function ProductRequests() {
     }
   }
 
-  async function reject() {
+  async function onReject(values: RejectValues) {
     if (!rejectDialog) return;
     try {
       await rejectRequest.mutateAsync({
         id: rejectDialog.id,
-        admin_note: rejectNote,
+        admin_note: values.admin_note,
       });
       toast.success("Request rejected");
       setRejectDialog(null);
-      setRejectNote("");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -210,15 +251,7 @@ export default function ProductRequests() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => {
-                                setApproveForm({
-                                  price: "",
-                                  stock_quantity: "",
-                                  category: categories[0]?.slug ?? "",
-                                  admin_note: "",
-                                });
-                                setApproveDialog(r);
-                              }}
+                              onClick={() => setApproveDialog(r)}
                             >
                               <CheckCircle className="h-3.5 w-3.5 mr-1" />{" "}
                               Approve
@@ -226,10 +259,7 @@ export default function ProductRequests() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => {
-                                setRejectNote("");
-                                setRejectDialog(r);
-                              }}
+                              onClick={() => setRejectDialog(r)}
                             >
                               <XCircle className="h-3.5 w-3.5 mr-1" />
                               Reject
@@ -267,123 +297,162 @@ export default function ProductRequests() {
 
       <Dialog
         open={!!approveDialog}
-        onOpenChange={() => setApproveDialog(null)}
+        onOpenChange={(o) => !o && setApproveDialog(null)}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Approve & Add to Catalog</DialogTitle>
           </DialogHeader>
-          <DialogBody>
-            <p className="text-sm text-muted-foreground">
-              Adding <strong>{approveDialog?.product_name}</strong> as a new
-              product.
-            </p>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Price (Rs.) *</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={approveForm.price}
-                    onChange={(e) =>
-                      setApproveForm((p) => ({ ...p, price: e.target.value }))
-                    }
+          <Form {...approveForm}>
+            <form onSubmit={approveForm.handleSubmit(onApprove)}>
+              <DialogBody>
+                <p className="text-sm text-muted-foreground">
+                  Adding <strong>{approveDialog?.product_name}</strong> as a
+                  new product.
+                </p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={approveForm.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Price (Rs.){" "}
+                            <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={approveForm.control}
+                      name="stock_quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Initial Stock</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={approveForm.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.slug} value={c.slug}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={approveForm.control}
+                    name="admin_note"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Note to Customer (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g. Now available in the shop!"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Initial Stock</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={approveForm.stock_quantity}
-                    onChange={(e) =>
-                      setApproveForm((p) => ({
-                        ...p,
-                        stock_quantity: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Select
-                  value={approveForm.category}
-                  onValueChange={(v) =>
-                    setApproveForm((p) => ({ ...p, category: v }))
-                  }
+              </DialogBody>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setApproveDialog(null)}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.slug} value={c.slug}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Note to Customer (optional)</Label>
-                <Input
-                  placeholder="e.g. Now available in the shop!"
-                  value={approveForm.admin_note}
-                  onChange={(e) =>
-                    setApproveForm((p) => ({
-                      ...p,
-                      admin_note: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveDialog(null)}>
-              Cancel
-            </Button>
-            <Button onClick={approve} disabled={approveRequest.isPending}>
-              {approveRequest.isPending ? "Adding…" : "Approve & Add"}
-            </Button>
-          </DialogFooter>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={approveRequest.isPending}>
+                  {approveRequest.isPending ? "Adding…" : "Approve & Add"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!rejectDialog} onOpenChange={() => setRejectDialog(null)}>
+      <Dialog
+        open={!!rejectDialog}
+        onOpenChange={(o) => !o && setRejectDialog(null)}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Reject Request</DialogTitle>
           </DialogHeader>
-          <DialogBody>
-            <p className="text-sm text-muted-foreground">
-              Rejecting request for{" "}
-              <strong>{rejectDialog?.product_name}</strong>.
-            </p>
-            <div className="space-y-1.5">
-              <Label>Reason for Rejection (optional)</Label>
-              <Input
-                placeholder="e.g. Not within our product range"
-                value={rejectNote}
-                onChange={(e) => setRejectNote(e.target.value)}
-              />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialog(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={reject}
-              disabled={rejectRequest.isPending}
-            >
-              {rejectRequest.isPending ? "Rejecting…" : "Reject"}
-            </Button>
-          </DialogFooter>
+          <Form {...rejectForm}>
+            <form onSubmit={rejectForm.handleSubmit(onReject)}>
+              <DialogBody>
+                <p className="text-sm text-muted-foreground">
+                  Rejecting request for{" "}
+                  <strong>{rejectDialog?.product_name}</strong>.
+                </p>
+                <FormField
+                  control={rejectForm.control}
+                  name="admin_note"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reason for Rejection (optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Not within our product range"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </DialogBody>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRejectDialog(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={rejectRequest.isPending}
+                >
+                  {rejectRequest.isPending ? "Rejecting…" : "Reject"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

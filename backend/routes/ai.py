@@ -34,6 +34,35 @@ def _pydantic_errors(exc):
     return [{"field": e["loc"][-1], "message": e["msg"]} for e in exc.errors()]
 
 
+def _get_cached_recommendation(cursor, user_id, date_str, rec_type):
+    """Look up a previously-generated meal/exercise plan for this user+day.
+    Plans are pinned per effective day so repeated requests (page refreshes,
+    tab switches) return the same recommendation instead of a fresh one each
+    time — it should only change on a new day or after End Meal Today."""
+    cursor.execute(
+        "SELECT content FROM ai_recommendations "
+        "WHERE user_id=%s AND rec_date=%s AND rec_type=%s",
+        (user_id, date_str, rec_type)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["content"])
+    except Exception:
+        return None
+
+
+def _save_recommendation(cursor, conn, user_id, date_str, rec_type, content):
+    cursor.execute(
+        "INSERT INTO ai_recommendations (user_id, rec_date, rec_type, meal_type, content) "
+        "VALUES (%s,%s,%s,NULL,%s) "
+        "ON DUPLICATE KEY UPDATE content=VALUES(content)",
+        (user_id, date_str, rec_type, json.dumps(content))
+    )
+    conn.commit()
+
+
 def _get_profile(cursor, user_id):
     cursor.execute(
         "SELECT current_weight_kg, height_cm, date_of_birth, gender, "
@@ -382,6 +411,8 @@ def end_meal_day():
         if profile:
             try:
                 tomorrow_plan = _build_meal_recommendation(cursor, request.user_id, profile)
+                tomorrow_date = (datetime.date.fromisoformat(today) + datetime.timedelta(days=1)).isoformat()
+                _save_recommendation(cursor, conn, request.user_id, tomorrow_date, "meal", tomorrow_plan)
             except Exception:
                 tomorrow_plan = {}
 
@@ -512,10 +543,14 @@ def recommend_meal():
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        profile = _get_profile(cursor, request.user_id)
-        if not profile:
-            return jsonify({"error": "Complete your profile first"}), 400
-        result = _build_meal_recommendation(cursor, request.user_id, profile)
+        today = get_effective_today(cursor, request.user_id).isoformat()
+        result = _get_cached_recommendation(cursor, request.user_id, today, "meal")
+        if result is None:
+            profile = _get_profile(cursor, request.user_id)
+            if not profile:
+                return jsonify({"error": "Complete your profile first"}), 400
+            result = _build_meal_recommendation(cursor, request.user_id, profile)
+            _save_recommendation(cursor, conn, request.user_id, today, "meal", result)
         if meal_type and meal_type in result.get("meal_plan", {}):
             return jsonify({
                 "nutrition_targets": result["nutrition_targets"],
@@ -553,15 +588,44 @@ def recommend_exercise_endpoint():
             goal=profile.get("primary_goal", "maintain"),
         )
         calorie_ratio = round(consumed / t.daily_calories, 3) if t.daily_calories else 1.0
-        result = recommend_exercise(
-            goal=profile.get("primary_goal", "maintain"),
-            bmi=t.bmi,
-            age=profile.get("age", 25),
-            fitness_level=profile.get("fitness_level", "beginner"),
-            calorie_ratio=calorie_ratio,
-            activity_level=profile.get("activity_level", "moderate"),
-            today_calories=consumed,
-        )
+
+        # The recommended category/exercise list is pinned per effective day —
+        # only regenerated on a new day (or after End Meal Today advances it),
+        # not on every refresh or when today_calories/calorie_ratio change.
+        result = _get_cached_recommendation(cursor, request.user_id, today, "exercise")
+        if result is None:
+            cursor.execute(
+                "SELECT COUNT(DISTINCT logged_date) AS cnt FROM exercise_logs "
+                "WHERE user_id=%s AND logged_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)",
+                (request.user_id,)
+            )
+            days_exercised_this_week = int((cursor.fetchone() or {}).get("cnt") or 0)
+
+            recently_done = {}
+            try:
+                cursor.execute(
+                    "SELECT e.name AS name, MIN(DATEDIFF(CURDATE(), el.logged_date)) AS days_since "
+                    "FROM exercise_logs el JOIN exercises e ON e.id = el.exercise_id "
+                    "WHERE el.user_id=%s AND el.logged_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) "
+                    "GROUP BY e.name",
+                    (request.user_id,)
+                )
+                recently_done = {row["name"]: int(row["days_since"] or 0) for row in cursor.fetchall()}
+            except Exception:
+                pass
+
+            result = recommend_exercise(
+                goal=profile.get("primary_goal", "maintain"),
+                bmi=t.bmi,
+                age=profile.get("age", 25),
+                fitness_level=profile.get("fitness_level", "beginner"),
+                calorie_ratio=calorie_ratio,
+                activity_level=profile.get("activity_level", "moderate"),
+                today_calories=consumed,
+                days_exercised_this_week=days_exercised_this_week,
+                recently_done=recently_done,
+            )
+            _save_recommendation(cursor, conn, request.user_id, today, "exercise", result)
 
         # Mark exercises already logged today so the UI can lock them until
         # the day changes (real rollover, or an End Meal Today advance).

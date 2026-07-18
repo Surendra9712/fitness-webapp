@@ -2,7 +2,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check } from "lucide-react";
+import {
+  Check,
+  PartyPopper,
+  Flame,
+  Dumbbell,
+  Wheat,
+  Droplet,
+  Target,
+} from "lucide-react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -285,8 +293,9 @@ export default function ProfileSetup({
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border-2 border-primary-200 bg-primary-50">
           <Check className="h-8 w-8 text-primary-600" />
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          You're all set! 🎉
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center justify-center gap-2">
+          You're all set!
+          <PartyPopper className="h-6 w-6 text-primary-600" />
         </h2>
         <p className="mt-2 text-sm text-gray-500">
           {macros
@@ -298,25 +307,25 @@ export default function ProfileSetup({
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               {
-                icon: "🔥",
+                icon: Flame,
                 value: macros.calories,
                 unit: "",
                 label: "kcal/day",
               },
               {
-                icon: "💪",
+                icon: Dumbbell,
                 value: macros.protein,
                 unit: "g",
                 label: "Protein",
               },
-              { icon: "🌾", value: macros.carbs, unit: "g", label: "Carbs" },
-              { icon: "🥑", value: macros.fat, unit: "g", label: "Fat" },
+              { icon: Wheat, value: macros.carbs, unit: "g", label: "Carbs" },
+              { icon: Droplet, value: macros.fat, unit: "g", label: "Fat" },
             ].map((m) => (
               <div
                 key={m.label}
                 className="rounded-2xl bg-gray-50 border border-gray-100 px-4 py-5 text-center"
               >
-                <p className="text-xl">{m.icon}</p>
+                <m.icon className="h-6 w-6 mx-auto text-primary-600" />
                 <p className="mt-2 text-xl sm:text-2xl font-bold text-primary-600 truncate">
                   {m.value}
                   {m.unit}
@@ -374,8 +383,9 @@ export default function ProfileSetup({
                   at a safe, sustainable rate.
                 </p>
               ) : (
-                <p className="font-semibold text-gray-700">
-                  You're already at a healthy weight for your goal 🎯
+                <p className="font-semibold text-gray-700 flex items-center justify-center gap-1.5">
+                  <Target className="h-4 w-4 shrink-0" />
+                  You're already at a healthy weight for your goal
                 </p>
               )}
             </div>

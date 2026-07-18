@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Sparkles, Lock } from "lucide-react";
+import { Sparkles, Lock, Utensils, Dumbbell, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -167,10 +167,21 @@ export default function AiRecommendation() {
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>
-          <TabsTrigger value="meals">🍽️ Meal Plan</TabsTrigger>
-          <TabsTrigger value="exercise">🏋️ Exercise</TabsTrigger>
-          <TabsTrigger value="search">🔍 Food Search</TabsTrigger>
-          <TabsTrigger value="nlp">💬 Ask AI</TabsTrigger>
+          <TabsTrigger value="meals" className="flex gap-2">
+            {" "}
+            <Utensils size={14} />
+            Meal Plan
+          </TabsTrigger>
+          <TabsTrigger value="exercise" className="flex gap-2">
+            {" "}
+            <Dumbbell size={14} />
+            Exercise
+          </TabsTrigger>
+          <TabsTrigger value="search" className="flex gap-2">
+            <Search size={14} />
+            Food Search
+          </TabsTrigger>
+          {/* <TabsTrigger value="nlp">Ask AI</TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="meals">
@@ -187,9 +198,21 @@ export default function AiRecommendation() {
             loading={loadingEx}
             onRefresh={loadExercise}
             completed={exerciseCompleted}
-            onExerciseComplete={(result) =>
-              setExerciseCompleted((prev) => [...prev, result])
-            }
+            onExerciseComplete={(result) => {
+              setExerciseCompleted((prev) => [...prev, result]);
+              setExercise((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      exercises: prev.exercises.map((e) =>
+                        e.name === result.exercise_name
+                          ? { ...e, is_completed: true }
+                          : e,
+                      ),
+                    }
+                  : prev,
+              );
+            }}
           />
         </TabsContent>
 

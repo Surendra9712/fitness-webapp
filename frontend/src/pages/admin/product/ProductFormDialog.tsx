@@ -3,11 +3,12 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
-import { ApiError } from "@/api/client";
+import http, { ApiError } from "@/api/client";
 import useAdmin from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,15 @@ const productSchema = z.object({
 });
 
 type ProductValues = z.infer<typeof productSchema>;
+
+async function uploadImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("image", file);
+  const res = await http.post<{ url: string }>("/upload/image", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data.url;
+}
 
 interface Props {
   open: boolean;
@@ -228,8 +238,14 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                 name="image_url"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
-                    <FormControl><Input placeholder="https://…" {...field} /></FormControl>
+                    <FormLabel>Product Image</FormLabel>
+                    <FormControl>
+                      <ImageUpload
+                        value={field.value}
+                        onChange={field.onChange}
+                        onUpload={uploadImage}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
