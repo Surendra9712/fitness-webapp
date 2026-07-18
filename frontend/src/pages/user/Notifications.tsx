@@ -316,7 +316,7 @@ export default function Notifications() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = GetNotificationsInfinite({ queryParams: { page_size: 8 } });
+  } = GetNotificationsInfinite({ queryParams: { page_size: 20 } });
   const notifications: Notification[] =
     notifPages?.pages.flatMap((p) => p.items) ?? [];
   const unread = notifications.filter((n) => !n.is_read).length;
