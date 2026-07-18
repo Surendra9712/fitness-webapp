@@ -1,6 +1,19 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ShoppingCart, ArrowRight, Package, Zap } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ShoppingCart,
+  ArrowLeft,
+  ArrowRight,
+  Package,
+  Zap,
+  Flame,
+  Activity,
+  Dumbbell,
+  Cog,
+  Flower2,
+  Shirt,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useCartStore } from "@/store/cartStore";
 import usePublic from "@/hooks/usePublic";
@@ -8,42 +21,42 @@ import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
 import PublicLayout from "@/components/PublicLayout";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import type { Product } from "@/types";
+import type { Product, GlobalDiscount } from "@/types";
 import { SearchInput } from "@/components/ui/search-input";
+import useUser from "@/hooks/useUser";
 
-type CatMeta = { gradient: string; badgeClass: string; glyph: string };
+type CatMeta = { gradient: string; badgeClass: string; Icon: LucideIcon };
 
 const CAT_META: Record<string, CatMeta> = {
   cardio: {
     gradient: "linear-gradient(140deg,#f97316,#dc2626)",
     badgeClass: "bg-orange-100 text-orange-700 border-0",
-    glyph: "🏃",
+    Icon: Activity,
   },
   strength: {
     gradient: "linear-gradient(140deg,#3B82F6,#4338CA)",
     badgeClass: "bg-blue-100 text-blue-700 border-0",
-    glyph: "🏋️",
+    Icon: Dumbbell,
   },
   machines: {
     gradient: "linear-gradient(140deg,#64748B,#1E293B)",
     badgeClass: "bg-slate-100 text-slate-600 border-0",
-    glyph: "⚙️",
+    Icon: Cog,
   },
   recovery: {
     gradient: "linear-gradient(140deg,#8B5CF6,#BE185D)",
     badgeClass: "bg-purple-100 text-purple-700 border-0",
-    glyph: "🧘",
+    Icon: Flower2,
   },
   accessories: {
     gradient: "linear-gradient(140deg,#10B981,#0F766E)",
     badgeClass: "bg-primary-100 text-primary-700 border-0",
-    glyph: "🎽",
+    Icon: Shirt,
   },
 };
 const fallbackMeta: CatMeta = CAT_META.machines;
@@ -57,8 +70,10 @@ export default function Products() {
   });
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
+  const navigate = useNavigate();
 
   const { GetProducts, GetCategories } = usePublic();
+  const { GetGlobalDiscount } = useUser();
   const { data, isLoading } = GetProducts({
     queryParams: {
       page,
@@ -72,6 +87,15 @@ export default function Products() {
   const { data: categoriesData = [] } = GetCategories({
     queryParams: { page_size: 100 },
   });
+  const { data: globalDiscountData } = GetGlobalDiscount({});
+  const globalDiscount = globalDiscountData as GlobalDiscount | undefined;
+  const showGlobalDiscount = Boolean(
+    globalDiscount?.is_active && globalDiscount.discount_value,
+  );
+  const globalDiscountLabel =
+    globalDiscount?.discount_type === "percentage"
+      ? `${Number(globalDiscount.discount_value)}% OFF`
+      : `RS. ${Number(globalDiscount?.discount_value).toFixed(0)} OFF`;
 
   function handleSearch(value: string) {
     setSearch(value);
@@ -106,6 +130,15 @@ export default function Products() {
         />
 
         <div className="relative mx-auto max-w-3xl text-center">
+          <Button
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="absolute left-0 top-0 text-primary-200 hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back
+          </Button>
+
           <div className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-primary-400">
             <Zap className="h-2.5 w-2.5" />
             Professional-grade fitness equipment
@@ -140,6 +173,16 @@ export default function Products() {
           </div>
         </div>
       </section>
+
+      {/* ── Global discount banner ── */}
+      {showGlobalDiscount && (
+        <div className="bg-linear-to-r from-red-600 via-red-500 to-orange-500 px-6 py-3 text-center">
+          <p className="flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wide text-white sm:text-base">
+            <Flame className="h-4 w-4 shrink-0" />
+            Sitewide Sale — {globalDiscountLabel} everything!
+          </p>
+        </div>
+      )}
 
       {/* ── Category filter ── */}
       <div className="sticky top-14 z-40 border-b bg-background shadow-sm">
@@ -318,7 +361,7 @@ function ProductCard({
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="text-6xl opacity-35">{meta.glyph}</span>
+            <meta.Icon className="h-16 w-16 opacity-35 text-white" strokeWidth={1.5} />
           )}
           {outOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/65">

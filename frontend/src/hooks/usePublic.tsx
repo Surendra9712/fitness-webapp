@@ -1,4 +1,9 @@
-import { useQuery, useMutation, UseQueryResult, UseMutationResult } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  UseQueryResult,
+  UseMutationResult,
+} from "@tanstack/react-query";
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
 import type { QueryArgs } from "@/interfaces/iUseApi";
@@ -11,6 +16,7 @@ import type {
   TrainerInfo,
   PublicBecomeTrainerPayload,
   BecomeTrainerResult,
+  GlobalDiscount,
 } from "@/types";
 
 interface UsePublicReturn {
@@ -18,18 +24,43 @@ interface UsePublicReturn {
   GetProduct: (id?: string) => UseQueryResult<Product>;
   GetCategories: (args?: QueryArgs) => UseQueryResult<Category[]>;
   GetTrainers: (args?: QueryArgs) => UseQueryResult<TrainerInfo[]>;
-  GetProductReviews: (productId?: string | number) => UseQueryResult<ReviewStats>;
-  SubmitProductReview: (productId?: string | number) => UseMutationResult<void, Error, ReviewPayload>;
-  DeleteProductReview: (productId?: string | number) => UseMutationResult<void, Error, void>;
-  BecomeTrainer: () => UseMutationResult<BecomeTrainerResult, Error, PublicBecomeTrainerPayload>;
+  GetProductReviews: (
+    productId?: string | number,
+  ) => UseQueryResult<ReviewStats>;
+  SubmitProductReview: (
+    productId?: string | number,
+  ) => UseMutationResult<void, Error, ReviewPayload>;
+  DeleteProductReview: (
+    productId?: string | number,
+  ) => UseMutationResult<void, Error, void>;
+  BecomeTrainer: () => UseMutationResult<
+    BecomeTrainerResult,
+    Error,
+    PublicBecomeTrainerPayload
+  >;
+  GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
 }
 
 const usePublic = (): UsePublicReturn => {
-  const { api, get: GetProducts } = useApi({ endpoint: endpoint.publicProducts, queryKey: "publicProducts" });
+  const { api, get: GetProducts } = useApi({
+    endpoint: endpoint.publicProducts,
+    queryKey: "publicProducts",
+  });
 
-  const { get: GetCategories } = useApi({ endpoint: endpoint.publicCategories, queryKey: "publicCategories" });
+  const { get: GetCategories } = useApi({
+    endpoint: endpoint.publicCategories,
+    queryKey: "publicCategories",
+  });
 
-  const { get: GetTrainers } = useApi({ endpoint: endpoint.publicTrainers, queryKey: "publicTrainers" });
+  const { get: GetTrainers } = useApi({
+    endpoint: endpoint.publicTrainers,
+    queryKey: "publicTrainers",
+  });
+
+  const { get: GetGlobalDiscount } = useApi({
+    endpoint: endpoint.publicGlobalDiscount,
+    queryKey: "publicGlobalDiscount",
+  });
 
   const GetProduct = (id?: string) =>
     useQuery({
@@ -49,7 +80,9 @@ const usePublic = (): UsePublicReturn => {
     useQuery({
       queryKey: ["productReviews", String(productId)],
       queryFn: async () => {
-        const { data } = await api.get(`${endpoint.publicProducts}/${productId}/reviews`);
+        const { data } = await api.get(
+          `${endpoint.publicProducts}/${productId}/reviews`,
+        );
         return data;
       },
       enabled: !!productId,
@@ -57,8 +90,14 @@ const usePublic = (): UsePublicReturn => {
 
   const SubmitProductReview = (productId?: string | number) =>
     useMutation({
-      mutationFn: async (reviewData: { rating: number; comment?: string | null }) => {
-        const { data } = await api.post(`user/products/${productId}/reviews`, reviewData);
+      mutationFn: async (reviewData: {
+        rating: number;
+        comment?: string | null;
+      }) => {
+        const { data } = await api.post(
+          `user/products/${productId}/reviews`,
+          reviewData,
+        );
         return data;
       },
     });
@@ -80,9 +119,13 @@ const usePublic = (): UsePublicReturn => {
     });
 
   return {
-    GetProducts, GetProduct,
-    GetCategories, GetTrainers,
-    GetProductReviews, SubmitProductReview, DeleteProductReview,
+    GetProducts,
+    GetProduct,
+    GetCategories,
+    GetTrainers,
+    GetProductReviews,
+    SubmitProductReview,
+    DeleteProductReview,
     BecomeTrainer,
   } as UsePublicReturn;
 };

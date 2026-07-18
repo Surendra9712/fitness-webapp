@@ -1,4 +1,14 @@
-import { RefreshCw, Flame, Leaf } from "lucide-react";
+import {
+  RefreshCw,
+  Flame,
+  Leaf,
+  Sunrise,
+  Sun,
+  Apple,
+  Moon,
+  Nut,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +18,12 @@ import type { MealRecommendation } from "./types";
 
 const MEAL_LABELS: Record<
   string,
-  { label: string; emoji: string; class: string }
+  { label: string; icon: LucideIcon; class: string }
 > = {
-  breakfast: { label: "Breakfast", emoji: "🌅", class: "Light" },
-  lunch: { label: "Lunch", emoji: "☀️", class: "Heavy" },
-  snack: { label: "Snack", emoji: "🍎", class: "Light" },
-  dinner: { label: "Dinner", emoji: "🌙", class: "Heavy" },
+  breakfast: { label: "Breakfast", icon: Sunrise, class: "Light" },
+  lunch: { label: "Lunch", icon: Sun, class: "Heavy" },
+  snack: { label: "Snack", icon: Apple, class: "Light" },
+  dinner: { label: "Dinner", icon: Moon, class: "Heavy" },
 };
 
 export function MealPlanTab({
@@ -96,7 +106,7 @@ export function MealPlanTab({
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <span>{info.emoji}</span>
+                      <info.icon className="h-4 w-4 text-muted-foreground" />
                       {info.label}
                     </CardTitle>
                     <Badge
@@ -128,8 +138,9 @@ export function MealPlanTab({
                     rec.dry_fruits_addon &&
                     rec.dry_fruits_addon.length > 0 && (
                       <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-xs font-semibold text-amber-700 mb-1">
-                          🌰 Recommended dry fruits (add-on)
+                        <p className="text-xs font-semibold text-amber-700 mb-1 flex items-center gap-1">
+                          <Nut className="h-3 w-3 shrink-0" />
+                          Recommended dry fruits (add-on)
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {rec.dry_fruits_addon.map((df) => (

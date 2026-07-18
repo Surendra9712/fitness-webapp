@@ -1,4 +1,5 @@
 import bcrypt
+import datetime
 import json
 from flask import Blueprint, request, jsonify
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
@@ -39,9 +40,25 @@ class PublicBecomeTrainerSchema(BaseModel):
         return str(v).strip().lower() if v else v
 
 
-def _compute_discounted_price(price, discount_type, discount_value):
-    """Return effective price after applying product-level discount, or None if no discount."""
+def _is_within_validity(valid_from, valid_to, today=None):
+    today = today or datetime.date.today()
+    if valid_from:
+        vf = valid_from if isinstance(valid_from, datetime.date) else datetime.date.fromisoformat(str(valid_from)[:10])
+        if today < vf:
+            return False
+    if valid_to:
+        vt = valid_to if isinstance(valid_to, datetime.date) else datetime.date.fromisoformat(str(valid_to)[:10])
+        if today > vt:
+            return False
+    return True
+
+
+def _compute_discounted_price(price, discount_type, discount_value, valid_from=None, valid_to=None):
+    """Return effective price after applying product-level discount, or None if no discount
+    (including when the discount's validity date range has expired or not started yet)."""
     if not discount_type or not discount_value or float(discount_value) <= 0:
+        return None
+    if not _is_within_validity(valid_from, valid_to):
         return None
     price = float(price)
     dv = float(discount_value)
@@ -94,7 +111,7 @@ def list_products():
         cursor.execute(
             f"SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
             f"c.slug AS category, c.name AS category_name, p.image_url, "
-            f"p.discount_type, p.discount_value "
+            f"p.discount_type, p.discount_value, p.discount_valid_from, p.discount_valid_to "
             f"FROM products p JOIN categories c ON p.category_id = c.id "
             f"WHERE {where} ORDER BY p.created_at DESC LIMIT %s OFFSET %s",
             params + [page_size, offset],
@@ -102,7 +119,8 @@ def list_products():
         rows = cursor.fetchall()
         for row in rows:
             row['discounted_price'] = _compute_discounted_price(
-                row['price'], row.get('discount_type'), row.get('discount_value')
+                row['price'], row.get('discount_type'), row.get('discount_value'),
+                row.get('discount_valid_from'), row.get('discount_valid_to'),
             )
         return jsonify({
             'items': rows,
@@ -124,7 +142,7 @@ def get_product(product_id):
         cursor.execute(
             "SELECT p.id, p.name, p.description, p.price, p.stock_quantity, "
             "c.slug AS category, c.name AS category_name, p.image_url, "
-            "p.discount_type, p.discount_value "
+            "p.discount_type, p.discount_value, p.discount_valid_from, p.discount_valid_to "
             "FROM products p JOIN categories c ON p.category_id = c.id "
             "WHERE p.id = %s AND p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL",
             (product_id,),
@@ -133,7 +151,8 @@ def get_product(product_id):
         if not product:
             return jsonify({'error': 'Product not found'}), 404
         product['discounted_price'] = _compute_discounted_price(
-            product['price'], product.get('discount_type'), product.get('discount_value')
+            product['price'], product.get('discount_type'), product.get('discount_value'),
+            product.get('discount_valid_from'), product.get('discount_valid_to'),
         )
         return jsonify(product)
     finally:
@@ -148,13 +167,17 @@ def get_global_discount():
     try:
         cursor.execute(
             "SELECT `key`, value FROM site_settings "
-            "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active')"
+            "WHERE `key` IN ('global_discount_type','global_discount_value','global_discount_active',"
+            "'global_discount_valid_from','global_discount_valid_to')"
         )
         s = {row['key']: row['value'] for row in cursor.fetchall()}
+        is_active = s.get('global_discount_active', '0') == '1' and _is_within_validity(
+            s.get('global_discount_valid_from') or None, s.get('global_discount_valid_to') or None
+        )
         return jsonify({
             'discount_type':  s.get('global_discount_type', 'percentage'),
             'discount_value': float(s.get('global_discount_value', '0') or '0'),
-            'is_active':      s.get('global_discount_active', '0') == '1',
+            'is_active':      is_active,
         })
     finally:
         cursor.close()

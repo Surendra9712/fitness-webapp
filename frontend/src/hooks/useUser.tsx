@@ -3,6 +3,8 @@ import {
   useMutation,
   UseQueryResult,
   UseMutationResult,
+  UseInfiniteQueryResult,
+  InfiniteData,
 } from "@tanstack/react-query";
 import { endpoint } from "@/api/endpoint.ts";
 import { useApi } from "./useApi";
@@ -33,6 +35,12 @@ interface UseUserReturn {
   GetNotifications: (
     args?: QueryArgs,
   ) => UseQueryResult<PaginatedResponse<Notification>>;
+  GetNotificationsInfinite: (
+    args?: QueryArgs,
+  ) => UseInfiniteQueryResult<
+    InfiniteData<PaginatedResponse<Notification>>,
+    Error
+  >;
   GetUnreadCount: () => UseQueryResult<{ count: number }>;
   MarkRead: () => UseMutationResult<void, Error, number>;
   MarkAllRead: () => UseMutationResult<void, Error, void>;
@@ -289,10 +297,11 @@ const useUser = (): UseUserReturn => {
     queryKey: "publicFxRate",
   });
 
-  const { get: GetNotifications } = useApi({
-    endpoint: endpoint.notifications,
-    queryKey: "notifications",
-  });
+  const { get: GetNotifications, getInfinite: GetNotificationsInfinite } =
+    useApi({
+      endpoint: endpoint.notifications,
+      queryKey: "notifications",
+    });
 
   const GetUnreadCount = () =>
     useQuery({
@@ -363,6 +372,7 @@ const useUser = (): UseUserReturn => {
     GetGlobalDiscount,
     GetFxRate,
     GetNotifications,
+    GetNotificationsInfinite,
     GetUnreadCount,
     MarkRead,
     MarkAllRead,

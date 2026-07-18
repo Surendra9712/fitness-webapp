@@ -18,7 +18,10 @@ import {
   Zap,
   Flame,
   Droplets,
+  Droplet,
   Award,
+  Wheat,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,7 +72,13 @@ interface HealthCondition {
 }
 
 const GOAL_MAP = Object.fromEntries(
-  GOALS.map((g) => [g.key, `${g.icon} ${g.title}`]),
+  GOALS.map((g) => [
+    g.key,
+    <span className="inline-flex items-center gap-1.5">
+      <g.icon className="h-4 w-4 shrink-0" />
+      {g.title}
+    </span>,
+  ]),
 );
 const DIET_MAP = Object.fromEntries(DIETS);
 const ACTIVITY_MAP = Object.fromEntries(ACTIVITIES);
@@ -237,7 +246,7 @@ function InfoItem({
   value,
 }: {
   label: string;
-  value?: string | number | null;
+  value?: React.ReactNode;
 }) {
   return (
     <div className="bg-gray-50 rounded-xl px-4 py-3">
@@ -915,8 +924,9 @@ export default function Profile() {
                           at a safe, sustainable rate.
                         </p>
                       ) : (
-                        <p className="font-semibold text-gray-700">
-                          You're already at a healthy weight for your goal 🎯
+                        <p className="font-semibold text-gray-700 flex items-center justify-center gap-1.5">
+                          <Target className="h-4 w-4 shrink-0" />
+                          You're already at a healthy weight for your goal
                         </p>
                       )}
                     </div>
@@ -934,13 +944,13 @@ export default function Profile() {
               {/* Daily macro targets */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { icon: "🔥", label: "kcal/day", value: nutritionTargets.calories, color: "text-orange-500", bg: "bg-orange-50" },
-                  { icon: "💪", label: "Protein", value: `${nutritionTargets.protein_g}g`, color: "text-blue-600", bg: "bg-blue-50" },
-                  { icon: "🌾", label: "Carbs", value: `${nutritionTargets.carbs_g}g`, color: "text-green-600", bg: "bg-green-50" },
-                  { icon: "🥑", label: "Fat", value: `${nutritionTargets.fat_g}g`, color: "text-yellow-600", bg: "bg-yellow-50" },
+                  { icon: Flame, label: "kcal/day", value: nutritionTargets.calories, color: "text-orange-500", bg: "bg-orange-50" },
+                  { icon: Dumbbell, label: "Protein", value: `${nutritionTargets.protein_g}g`, color: "text-blue-600", bg: "bg-blue-50" },
+                  { icon: Wheat, label: "Carbs", value: `${nutritionTargets.carbs_g}g`, color: "text-green-600", bg: "bg-green-50" },
+                  { icon: Droplet, label: "Fat", value: `${nutritionTargets.fat_g}g`, color: "text-yellow-600", bg: "bg-yellow-50" },
                 ].map((m) => (
                   <div key={m.label} className={`${m.bg} rounded-2xl border border-gray-100 p-4 flex flex-col items-center gap-1`}>
-                    <span className="text-2xl">{m.icon}</span>
+                    <m.icon className={`h-6 w-6 ${m.color}`} />
                     <span className={`text-xl font-bold ${m.color}`}>{m.value}</span>
                     <span className="text-xs text-gray-500">{m.label}</span>
                   </div>
@@ -960,7 +970,8 @@ export default function Profile() {
                   <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-gray-800 flex items-center gap-2">
-                        🤖 AI Target Weight Recommendation
+                        <Bot className="h-4 w-4 shrink-0" />
+                        AI Target Weight Recommendation
                       </span>
                       <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-medium">BMI: {bmi}</span>
                     </div>

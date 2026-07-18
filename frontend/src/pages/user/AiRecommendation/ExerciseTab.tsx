@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Flame, Target, Info, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,18 +73,21 @@ export function ExerciseTab({
                 </Badge>
               </div>
               <div className="flex gap-4 text-sm">
-                <span>
-                  🔥 Consumed:{" "}
+                <span className="inline-flex items-center gap-1">
+                  <Flame className="h-3.5 w-3.5" />
+                  Consumed:{" "}
                   <strong>{Math.round(exercise.today_calories)} kcal</strong>
                 </span>
-                <span>
-                  🎯 Target:{" "}
+                <span className="inline-flex items-center gap-1">
+                  <Target className="h-3.5 w-3.5" />
+                  Target:{" "}
                   <strong>{Math.round(exercise.target_calories)} kcal</strong>
                 </span>
               </div>
               {!exercise.exercisedb_configured && (
-                <p className="text-xs text-muted-foreground border-t pt-2">
-                  ℹ️ Add <code>EXERCISEDB_API_KEY</code> to .env to enable real
+                <p className="text-xs text-muted-foreground border-t pt-2 flex items-center gap-1">
+                  <Info className="h-3 w-3 shrink-0" />
+                  Add <code>EXERCISEDB_API_KEY</code> to .env to enable real
                   animated GIFs from ExerciseDB.
                 </p>
               )}
@@ -93,17 +96,13 @@ export function ExerciseTab({
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {exercise.exercises.map((ex, i) => (
-              <ExerciseCard
-                key={i}
-                ex={ex}
-                onComplete={onExerciseComplete}
-                onRefreshExercise={onRefresh}
-              />
+              <ExerciseCard key={i} ex={ex} onComplete={onExerciseComplete} />
             ))}
             {completed.length > 0 && (
               <div className="col-span-full bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-emerald-700 mb-2">
-                  ✅ Exercises completed today:
+                <p className="text-sm font-semibold text-emerald-700 mb-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  Exercises completed today:
                 </p>
                 {completed.map((r, i) => (
                   <p key={i} className="text-xs text-emerald-600">

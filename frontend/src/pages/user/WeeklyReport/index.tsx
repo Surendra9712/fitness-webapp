@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { BarChart3, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  BarChart3,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+} from "lucide-react";
 import { api } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -124,9 +130,10 @@ export default function WeeklyReport() {
               {report.is_finalized && (
                 <Badge
                   variant="secondary"
-                  className="bg-emerald-100 text-emerald-700 text-xs"
+                  className="bg-emerald-100 text-emerald-700 text-xs gap-1"
                 >
-                  ✅ Finalized
+                  <CheckCircle2 className="h-3 w-3" />
+                  Finalized
                 </Badge>
               )}
             </div>

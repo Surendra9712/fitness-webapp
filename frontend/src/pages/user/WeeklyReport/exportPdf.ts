@@ -1,5 +1,17 @@
 import type { DayData, WeeklyData } from "./types";
 
+// Printed report is a raw HTML string (opened in a new window), so section
+// headers use hand-inlined lucide-icon SVGs rather than React components.
+const ICON_SVG_ATTRS =
+  'width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"';
+
+const ICONS = {
+  chart: `<svg ${ICON_SVG_ATTRS}><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+  dumbbell: `<svg ${ICON_SVG_ATTRS}><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></svg>`,
+  droplet: `<svg ${ICON_SVG_ATTRS}><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`,
+  calendar: `<svg ${ICON_SVG_ATTRS}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>`,
+};
+
 export function exportWeeklyReportPdf(
   report: WeeklyData,
   userName: string,
@@ -52,7 +64,7 @@ export function exportWeeklyReportPdf(
       <b>Generated:</b> ${new Date().toLocaleDateString()}
     </div>
 
-    <h2>📊 Weekly Nutrition Summary</h2>
+    <h2>${ICONS.chart}Weekly Nutrition Summary</h2>
     <div class="grid">
       <div class="stat"><div class="stat-val">${Math.round(summary.avg_calories)}</div><div class="stat-label">Avg Calories/day</div></div>
       <div class="stat"><div class="stat-val">${Math.round(summary.avg_protein_g)}g</div><div class="stat-label">Avg Protein/day</div></div>
@@ -64,7 +76,7 @@ export function exportWeeklyReportPdf(
       <div class="stat"><div class="stat-val">${Math.round(summary.avg_water_ml)}ml</div><div class="stat-label">Avg Water/day</div></div>
     </div>
 
-    <h2>🏋️ Weekly Exercise Summary</h2>
+    <h2>${ICONS.dumbbell}Weekly Exercise Summary</h2>
     <div class="grid">
       <div class="stat"><div class="stat-val">${summary.total_workouts}</div><div class="stat-label">Total Workouts</div></div>
       <div class="stat"><div class="stat-val">${summary.total_exercise_mins}m</div><div class="stat-label">Total Active Time</div></div>
@@ -72,7 +84,7 @@ export function exportWeeklyReportPdf(
       <div class="stat"><div class="stat-val">${summary.most_frequent_exercise || "—"}</div><div class="stat-label">Most Done Exercise</div></div>
     </div>
 
-    <h2>💧 Hydration Summary</h2>
+    <h2>${ICONS.droplet}Hydration Summary</h2>
     <div class="grid">
       <div class="stat"><div class="stat-val">${Math.round(summary.avg_water_ml)}ml</div><div class="stat-label">Avg Water/Day</div></div>
       <div class="stat"><div class="stat-val">${summary.water_target_ml}ml</div><div class="stat-label">Daily Target</div></div>
@@ -80,7 +92,7 @@ export function exportWeeklyReportPdf(
       <div class="stat"><div class="stat-val">${daily_data.filter((d: DayData) => d.water_ml >= summary.water_target_ml).length}/7</div><div class="stat-label">Days Target Met</div></div>
     </div>
 
-    <h2>📅 Daily Breakdown</h2>
+    <h2>${ICONS.calendar}Daily Breakdown</h2>
     <table>
       <thead><tr>
         <th>Day</th><th>Calories</th><th>Protein(g)</th><th>Carbs(g)</th><th>Fat(g)</th>

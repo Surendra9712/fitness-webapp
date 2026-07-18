@@ -1,5 +1,6 @@
 import {
   useQuery,
+  useInfiniteQuery,
   useMutation,
   MutationKey,
   keepPreviousData,
@@ -45,6 +46,25 @@ export function useApi({
     });
   };
 
+  const useInfiniteQueryHelper = (args?: QueryArgs) => {
+    const pageSize = args?.queryParams?.page_size ?? 20;
+    return useInfiniteQuery({
+      queryKey: [queryKey, endpoint, "infinite", args?.queryParams],
+      queryFn: ({ pageParam }) =>
+        fetchApiData(api, endpoint, {
+          ...args,
+          queryParams: { ...args?.queryParams, page: pageParam, page_size: pageSize },
+        }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage: any) =>
+        lastPage?.page < lastPage?.total_pages ? lastPage.page + 1 : undefined,
+      enabled: typeof enabled === "function" ? enabled(args) : enabled,
+      staleTime,
+      gcTime: cacheTime,
+      refetchOnWindowFocus,
+    });
+  };
+
   const useMutationHelper = () => {
     return useMutation({
       mutationKey: [endpoint] as MutationKey,
@@ -80,6 +100,7 @@ export function useApi({
   return {
     api,
     get: useQueryHelper,
+    getInfinite: useInfiniteQueryHelper,
     post: useMutationHelper,
     update: useUpdateHelper,
     delete: useDeleteHelper,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, CheckCircle2 } from "lucide-react";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,12 @@ import type { ExerciseItem } from "./types";
 export function ExerciseCard({
   ex,
   onComplete,
-  onRefreshExercise,
 }: {
   ex: ExerciseItem;
   onComplete?: (result: {
     calories_burned: number;
     exercise_name: string;
   }) => void;
-  onRefreshExercise?: () => void;
 }) {
   const [showInstr, setShowInstr] = useState(false);
   const [duration, setDuration] = useState(30);
@@ -50,8 +48,6 @@ export function ExerciseCard({
         "smartdiet_exercise_completed",
         Date.now().toString(),
       );
-      // Refresh exercise panel immediately
-      if (onRefreshExercise) onRefreshExercise();
     } catch {
     } finally {
       setCompleting(false);
@@ -118,7 +114,8 @@ export function ExerciseCard({
 
         {isCompleted ? (
           <div className="flex items-center gap-2 bg-emerald-100 text-emerald-700 rounded-lg px-3 py-2 text-sm font-medium">
-            ✅ Completed today
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            Completed today
             {caloriesBurned !== null ? ` — ~${caloriesBurned} kcal burned` : ""}
           </div>
         ) : (
@@ -139,9 +136,16 @@ export function ExerciseCard({
             <Button
               onClick={handleComplete}
               disabled={completing}
-              className="w-full"
+              className="w-full gap-1.5"
             >
-              {completing ? "Logging..." : "✓ Complete Exercise"}
+              {completing ? (
+                "Logging..."
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Complete Exercise
+                </>
+              )}
             </Button>
           </div>
         )}

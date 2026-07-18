@@ -1,3 +1,11 @@
+import {
+  TrendingDown,
+  Dumbbell,
+  Scale,
+  Heart,
+  Activity,
+} from "lucide-react";
+
 export const STEPS = [
   "Personal Info",
   "Your Goal",
@@ -9,26 +17,26 @@ export const STEPS = [
 export const GOALS = [
   {
     key: "lose_weight",
-    icon: "📉",
+    icon: TrendingDown,
     title: "Lose Weight",
     desc: "Caloric deficit + cardio",
   },
   {
     key: "gain_muscle",
-    icon: "💪",
+    icon: Dumbbell,
     title: "Gain Muscle",
     desc: "Protein surplus + strength",
   },
-  { key: "maintain", icon: "⚖️", title: "Maintain", desc: "Balanced macros" },
+  { key: "maintain", icon: Scale, title: "Maintain", desc: "Balanced macros" },
   {
     key: "improve_health",
-    icon: "❤️",
+    icon: Heart,
     title: "Improve Health",
     desc: "Overall wellness",
   },
   {
     key: "athletic_performance",
-    icon: "🏃",
+    icon: Activity,
     title: "Athletic",
     desc: "Endurance + energy",
   },

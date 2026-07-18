@@ -53,7 +53,7 @@ import Notifications from "@/pages/user/Notifications";
 import AuthLayout from "./pages/auth/AuthLayout";
 import { useState } from "react";
 import { Button } from "./components/ui/button";
-import { Menu } from "lucide-react";
+import { Menu, Hand } from "lucide-react";
 export const getGreeting = (date: Date = new Date()): string => {
   const hour = date.getHours();
 
@@ -83,9 +83,12 @@ function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const pathSegments = location.pathname.split("/");
   const lastElement = pathSegments[pathSegments?.length - 1] || "Dashboard";
-  const title =
-    lastElement === "my-dashboard" || lastElement === "trainer-dashboard"
-      ? `${getGreeting()}, ${user?.name?.split(" ")[0] || "there"} 👋`
+  const isGreeting =
+    lastElement === "my-dashboard" || lastElement === "trainer-dashboard";
+  const title = isGreeting
+    ? `${getGreeting()}, ${user?.name?.split(" ")[0] || "there"}`
+    : lastElement && !isNaN(Number(lastElement))
+      ? ""
       : lastElement;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -103,8 +106,9 @@ function Layout({ children }: { children: React.ReactNode }) {
             >
               <Menu className="h-4 w-4" />
             </Button>
-            <h1 className="text-2xl font-bold tracking-tight ">
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               {toTitleCase(title)}
+              {isGreeting && <Hand className="h-5 w-5 text-amber-500" />}
             </h1>
           </div>
           <div>{children}</div>

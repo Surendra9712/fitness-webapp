@@ -16,6 +16,7 @@ Reads API key dynamically on every call (not at import time) so .env
 changes are always picked up without restarting the server.
 """
 import os
+import random
 import requests
 
 CATEGORY_TO_BODYPART = {
@@ -113,32 +114,55 @@ def _fallback_exercises(body_part: str) -> list:
     return list(_FALLBACK_DB.get(body_part, _FALLBACK_DB["cardio"]))
 
 
-def get_exercises_by_body_part(body_part: str, limit: int = 6) -> list:
+def _pick_variety(pool: list, limit: int, recently_done: dict | None) -> list:
+    """Rotate exercise picks instead of always returning the same deterministic
+    slice. Soft-avoids exercises done in the last 2 days (falling back to the
+    full pool if that would leave too few to choose from — a repeat is still
+    fine when there's genuinely nothing else to offer), then shuffles so the
+    same body part doesn't always surface the same exercises in the same order."""
+    recently_done = recently_done or {}
+    fresh = [e for e in pool if recently_done.get(e.get("name", ""), 999) > 2]
+    candidates = fresh if len(fresh) >= limit else pool
+    candidates = list(candidates)
+    random.shuffle(candidates)
+    return candidates[:limit]
+
+
+def get_exercises_by_body_part(body_part: str, limit: int = 6, recently_done: dict | None = None) -> list:
+    # Fetch a larger pool than needed so there's something to rotate between
+    # across requests, instead of always slicing the same deterministic top N.
+    pool_size = max(limit * 4, 12)
     if not is_configured():
-        return _fallback_exercises(body_part)[:limit]
-    try:
-        r = requests.get(
-            f"{_get_base_url()}/exercises/bodyPart/{body_part}",
-            headers=_get_headers(),
-            params={"limit": limit},
-            timeout=8,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, list) and data:
-                return [_normalize_exercise(e) for e in data[:limit]]
-        print(f"  ExerciseDB {r.status_code} for {body_part} — using fallback")
-        return _fallback_exercises(body_part)[:limit]
-    except Exception as ex:
-        print(f"  ExerciseDB error: {ex} — using fallback")
-        return _fallback_exercises(body_part)[:limit]
+        pool = _fallback_exercises(body_part)
+    else:
+        try:
+            r = requests.get(
+                f"{_get_base_url()}/exercises/bodyPart/{body_part}",
+                headers=_get_headers(),
+                params={"limit": pool_size},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                pool = [_normalize_exercise(e) for e in data] if isinstance(data, list) and data else []
+                if not pool:
+                    print(f"  ExerciseDB empty response for {body_part} — using fallback")
+                    pool = _fallback_exercises(body_part)
+            else:
+                print(f"  ExerciseDB {r.status_code} for {body_part} — using fallback")
+                pool = _fallback_exercises(body_part)
+        except Exception as ex:
+            print(f"  ExerciseDB error: {ex} — using fallback")
+            pool = _fallback_exercises(body_part)
+
+    return _pick_variety(pool, limit, recently_done)
 
 
-def get_exercises_for_category(category: str, limit_per_part: int = 3) -> list:
+def get_exercises_for_category(category: str, limit_per_part: int = 3, recently_done: dict | None = None) -> list:
     body_parts = CATEGORY_TO_BODYPART.get(category, ["cardio"])
     result = []
     for bp in body_parts:
-        result.extend(get_exercises_by_body_part(bp, limit_per_part))
+        result.extend(get_exercises_by_body_part(bp, limit_per_part, recently_done))
     return result
 
 

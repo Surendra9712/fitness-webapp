@@ -420,7 +420,8 @@ CREATE TABLE IF NOT EXISTS ai_recommendations (
     model_version   VARCHAR(50) DEFAULT 'v2.0-large',
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_date (user_id, rec_date)
+    INDEX idx_user_date (user_id, rec_date),
+    UNIQUE KEY uniq_user_date_type (user_id, rec_date, rec_type)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS weekly_reports (

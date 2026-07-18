@@ -5,7 +5,7 @@ import { UserCheck, Lock, Crown, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import useUser from "@/hooks/useUser";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AssignmentStatusCard,
   STATUS_META,
@@ -150,6 +150,7 @@ export default function MyTrainer() {
                     className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/40"
                   >
                     <Avatar className="h-10 w-10 shrink-0">
+                      <AvatarImage src={assignment.trainer_profile_image_url ?? undefined} />
                       <AvatarFallback className="text-sm font-bold">
                         {assignment.trainer_name?.charAt(0).toUpperCase()}
                       </AvatarFallback>

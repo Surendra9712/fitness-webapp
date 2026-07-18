@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useForm, type Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Plus,
   Edit2,
@@ -24,30 +27,55 @@ import {
   DialogFooter,
   DialogBody,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import type { PromoCode } from "@/types";
 import { DatePicker } from "@/components/ui/date-picker";
 import { SearchInput } from "@/components/ui/search-input";
-import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 
-type PromoForm = {
-  code: string;
-  description: string;
-  discount_type: "percentage" | "fixed";
-  discount_value: string;
-  min_order_amount: string;
-  max_uses: string;
-  valid_from: string;
-  valid_to: string;
-  is_active: boolean;
-};
+const promoSchema = z
+  .object({
+    code: z.string().min(1, "Code is required"),
+    description: z.string().optional(),
+    discount_type: z.enum(["percentage", "fixed"]),
+    discount_value: z.coerce.number().positive("Discount value must be > 0"),
+    min_order_amount: z.coerce.number().min(0, "Cannot be negative"),
+    max_uses: z.string().optional(),
+    valid_from: z.string().optional(),
+    valid_to: z.string().optional(),
+    is_active: z.boolean(),
+  })
+  .refine(
+    (data) =>
+      !(data.discount_type === "percentage" && data.discount_value > 100),
+    {
+      message: "Percentage discount cannot exceed 100",
+      path: ["discount_value"],
+    },
+  );
 
-const EMPTY_FORM: PromoForm = {
+type PromoValues = z.infer<typeof promoSchema>;
+
+const EMPTY_FORM: PromoValues = {
   code: "",
   description: "",
   discount_type: "percentage",
-  discount_value: "",
-  min_order_amount: "0",
+  discount_value: 0,
+  min_order_amount: 0,
   max_uses: "",
   valid_from: "",
   valid_to: "",
@@ -59,8 +87,6 @@ export default function PromoCodeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PromoCode | null>(null);
-  const [form, setForm] = useState<PromoForm>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
@@ -80,6 +106,31 @@ export default function PromoCodeManagement() {
   const rows: PromoCode[] = data?.items ?? [];
   const total = data?.total ?? 0;
 
+  const form = useForm<PromoValues>({
+    resolver: zodResolver(promoSchema) as Resolver<PromoValues>,
+    defaultValues: EMPTY_FORM,
+  });
+  const { isSubmitting } = form.formState;
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    if (editing) {
+      form.reset({
+        code: editing.code,
+        description: editing.description ?? "",
+        discount_type: editing.discount_type,
+        discount_value: Number(editing.discount_value),
+        min_order_amount: Number(editing.min_order_amount),
+        max_uses: editing.max_uses != null ? String(editing.max_uses) : "",
+        valid_from: editing.valid_from ?? "",
+        valid_to: editing.valid_to ?? "",
+        is_active: editing.is_active,
+      });
+    } else {
+      form.reset(EMPTY_FORM);
+    }
+  }, [dialogOpen, editing]);
+
   function handleSearch(value: string) {
     setSearchQuery(value);
     resetPage();
@@ -87,54 +138,25 @@ export default function PromoCodeManagement() {
 
   function openCreate() {
     setEditing(null);
-    setForm(EMPTY_FORM);
     setDialogOpen(true);
   }
 
   function openEdit(p: PromoCode) {
     setEditing(p);
-    setForm({
-      code: p.code,
-      description: p.description ?? "",
-      discount_type: p.discount_type,
-      discount_value: String(p.discount_value),
-      min_order_amount: String(p.min_order_amount),
-      max_uses: p.max_uses != null ? String(p.max_uses) : "",
-      valid_from: p.valid_from ?? "",
-      valid_to: p.valid_to ?? "",
-      is_active: p.is_active,
-    });
     setDialogOpen(true);
   }
 
-  async function handleSave() {
-    if (!form.code.trim()) {
-      toast.error("Code is required");
-      return;
-    }
-    if (!form.discount_value || Number(form.discount_value) <= 0) {
-      toast.error("Discount value must be > 0");
-      return;
-    }
-    if (
-      form.discount_type === "percentage" &&
-      Number(form.discount_value) > 100
-    ) {
-      toast.error("Percentage discount cannot exceed 100");
-      return;
-    }
-
-    setSaving(true);
+  async function onSubmit(values: PromoValues) {
     const payload = {
-      code: form.code.trim().toUpperCase(),
-      description: form.description.trim() || undefined,
-      discount_type: form.discount_type,
-      discount_value: Number(form.discount_value),
-      min_order_amount: Number(form.min_order_amount) || 0,
-      max_uses: form.max_uses ? Number(form.max_uses) : undefined,
-      valid_from: form.valid_from || undefined,
-      valid_to: form.valid_to || undefined,
-      is_active: form.is_active,
+      code: values.code.trim().toUpperCase(),
+      description: values.description?.trim() || undefined,
+      discount_type: values.discount_type,
+      discount_value: values.discount_value,
+      min_order_amount: values.min_order_amount || 0,
+      max_uses: values.max_uses ? Number(values.max_uses) : undefined,
+      valid_from: values.valid_from || undefined,
+      valid_to: values.valid_to || undefined,
+      is_active: values.is_active,
     };
 
     try {
@@ -149,8 +171,6 @@ export default function PromoCodeManagement() {
       setDialogOpen(false);
     } catch (err) {
       toast.error((err as Error).message);
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -253,9 +273,7 @@ export default function PromoCodeManagement() {
                     </span>
                   )}
                   {p.description && (
-                    <span className="truncate max-w-[200px]">
-                      {p.description}
-                    </span>
+                    <span className="truncate max-w-50">{p.description}</span>
                   )}
                 </div>
               </div>
@@ -298,194 +316,258 @@ export default function PromoCodeManagement() {
             </DialogTitle>
           </DialogHeader>
 
-          <DialogBody>
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>
-                    Code <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    placeholder="SAVE20"
-                    value={form.code}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        code: e.target.value.toUpperCase(),
-                      }))
-                    }
-                    disabled={!!editing}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <DialogBody>
+                <div className="space-y-4 py-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="code"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Code <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="SAVE20"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.toUpperCase())
+                              }
+                              disabled={!!editing}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="discount_type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Discount Type</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="percentage">
+                                Percentage (%)
+                              </SelectItem>
+                              <SelectItem value="fixed">
+                                Fixed Amount (Rs.)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="discount_value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Discount Value{" "}
+                            <span className="text-destructive">*</span>
+                            <span className="ml-1 text-muted-foreground font-normal">
+                              (
+                              {form.watch("discount_type") === "percentage"
+                                ? "%"
+                                : "Rs."}
+                              )
+                            </span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              max={
+                                form.watch("discount_type") === "percentage"
+                                  ? "100"
+                                  : undefined
+                              }
+                              step="0.01"
+                              placeholder="20"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="min_order_amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Min Order Amount (Rs.)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="max_uses"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Max Uses{" "}
+                          <span className="text-muted-foreground font-normal">
+                            (leave blank for unlimited)
+                          </span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="1"
+                            placeholder="100"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="valid_from"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Valid From</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Pick a date"
+                              startYear={new Date().getFullYear()}
+                              endYear={new Date().getFullYear() + 18}
+                              defaultMonth={
+                                new Date(
+                                  new Date().getFullYear(),
+                                  new Date().getMonth(),
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="valid_to"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Valid To</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder="Pick a date"
+                              startYear={new Date().getFullYear()}
+                              endYear={new Date().getFullYear() + 18}
+                              defaultMonth={
+                                new Date(
+                                  new Date().getFullYear(),
+                                  new Date().getMonth(),
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Summer sale discount…"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="is_active"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={field.value}
+                            onClick={() => field.onChange(!field.value)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${field.value ? "bg-primary" : "bg-muted"}`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${field.value ? "translate-x-6" : "translate-x-1"}`}
+                            />
+                          </button>
+                          <Label
+                            className="cursor-pointer"
+                            onClick={() => field.onChange(!field.value)}
+                          >
+                            Active
+                          </Label>
+                        </div>
+                      </FormItem>
+                    )}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Discount Type</Label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={form.discount_type}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        discount_type: e.target.value as "percentage" | "fixed",
-                      }))
-                    }
-                  >
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed Amount (Rs.)</option>
-                  </select>
-                </div>
-              </div>
+              </DialogBody>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>
-                    Discount Value <span className="text-destructive">*</span>
-                    <span className="ml-1 text-muted-foreground font-normal">
-                      ({form.discount_type === "percentage" ? "%" : "Rs."})
-                    </span>
-                  </Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={
-                      form.discount_type === "percentage" ? "100" : undefined
-                    }
-                    step="0.01"
-                    placeholder="20"
-                    value={form.discount_value}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, discount_value: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Min Order Amount (Rs.)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0"
-                    value={form.min_order_amount}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        min_order_amount: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>
-                  Max Uses{" "}
-                  <span className="text-muted-foreground font-normal">
-                    (leave blank for unlimited)
-                  </span>
-                </Label>
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="100"
-                  value={form.max_uses}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, max_uses: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Valid From</Label>
-                  <DatePicker
-                    value={form.valid_from}
-                    onChange={(v) => setForm((f) => ({ ...f, valid_from: v }))}
-                    placeholder="Pick a date"
-                    // disabledDates={(d) => d < new Date()}
-                    startYear={new Date().getFullYear()}
-                    endYear={new Date().getFullYear() + 18}
-                    defaultMonth={
-                      new Date(new Date().getFullYear(), new Date().getMonth())
-                    }
-                  />
-                  {/* <Input
-                    type="date"
-                    value={form.valid_from}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, valid_from: e.target.value }))
-                    }
-                  /> */}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Valid To</Label>
-                  <DatePicker
-                    value={form.valid_to}
-                    onChange={(v) => setForm((f) => ({ ...f, valid_to: v }))}
-                    placeholder="Pick a date"
-                    startYear={new Date().getFullYear()}
-                    endYear={new Date().getFullYear() + 18}
-                    defaultMonth={
-                      new Date(new Date().getFullYear(), new Date().getMonth())
-                    }
-                  />
-                  {/* <Input
-                    type="date"
-                    value={form.valid_to}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, valid_to: e.target.value }))
-                    }
-                  /> */}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Description</Label>
-                <Input
-                  placeholder="Summer sale discount…"
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
+              <DialogFooter>
+                <Button
                   type="button"
-                  role="switch"
-                  aria-checked={form.is_active}
-                  onClick={() =>
-                    setForm((f) => ({ ...f, is_active: !f.is_active }))
-                  }
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_active ? "bg-primary" : "bg-muted"}`}
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                  disabled={isSubmitting}
                 >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.is_active ? "translate-x-6" : "translate-x-1"}`}
-                  />
-                </button>
-                <Label
-                  className="cursor-pointer"
-                  onClick={() =>
-                    setForm((f) => ({ ...f, is_active: !f.is_active }))
-                  }
-                >
-                  Active
-                </Label>
-              </div>
-            </div>
-          </DialogBody>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDialogOpen(false)}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving…" : editing ? "Update" : "Create"}
-            </Button>
-          </DialogFooter>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving…" : editing ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
