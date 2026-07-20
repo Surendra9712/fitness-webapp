@@ -394,7 +394,7 @@ export default function ProfileSetup({
 
         <Button
           className="mt-8 w-full h-12 text-base bg-primary-600 hover:bg-primary-500"
-          onClick={() => (onDone ? onDone() : navigate("/dashboard"))}
+          onClick={() => (onDone ? onDone() : navigate("/my-dashboard"))}
         >
           {onDone ? "Done" : "Go to Dashboard →"}
         </Button>

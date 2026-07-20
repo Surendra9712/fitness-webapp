@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { ChevronLeft, MessageCircle, Phone, Video } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  ChevronLeft,
+  MessageCircle,
+  Phone,
+  Video,
+  Lock,
+  Crown,
+} from "lucide-react";
 import useChat from "@/hooks/useChat";
 import { useChatThread } from "@/hooks/useChatThread";
 import { useCallStore } from "@/store/callStore";
@@ -53,6 +61,33 @@ export default function ChatWithTrainer() {
   }
 
   const activeThread = threads?.find((t) => t.assignment_id === activeId);
+
+  const isPro =
+    user?.subscription_plan === "pro" &&
+    user?.subscription_status === "active";
+
+  if (!isPro) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-24 text-center max-w-md mx-auto">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <Lock className="h-8 w-8 text-primary" />
+        </div>
+        <h2 className="text-xl font-bold">Pro Feature</h2>
+        <p className="text-sm text-muted-foreground">
+          Chat with your trainer is available exclusively on the Pro plan.
+          {user?.subscription_plan === "pro" &&
+          user?.subscription_status === "pending"
+            ? " Your upgrade request is pending admin approval."
+            : " Upgrade to message a certified trainer."}
+        </p>
+        <Button asChild className="mt-2 gap-2">
+          <Link to="/trainee/subscription">
+            <Crown className="h-4 w-4" /> View Plans
+          </Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

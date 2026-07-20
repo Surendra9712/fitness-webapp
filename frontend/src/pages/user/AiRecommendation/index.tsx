@@ -137,7 +137,7 @@ export default function AiRecommendation() {
           animated GIFs, food search, and natural language logging.
         </p>
         <Button asChild className="mt-2">
-          <Link to="/customer/subscription">Upgrade to Pro</Link>
+          <Link to="/trainee/subscription">Upgrade to Pro</Link>
         </Button>
       </div>
     );

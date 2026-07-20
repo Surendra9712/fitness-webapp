@@ -23,6 +23,7 @@ const buttonVariants = cva(
         "danger-subtle": "text-red-500 shadow-sm hover:bg-red-100",
         "primary-outline":
           "border border-primary-300 hover:bg-primary-50 text-primary-700",
+        "error-outline": "border border-destructive",
       },
       size: {
         default: "h-9 px-4 py-2",

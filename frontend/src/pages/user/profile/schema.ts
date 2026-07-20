@@ -12,7 +12,22 @@ const positiveStr = (msg: string) =>
 export const profileSchema = z.object({
   // Step 1
   full_name: z.string().min(1, "Name is required"),
-  date_of_birth: z.string().min(1, "Date of birth is required"),
+  date_of_birth: z
+    .string()
+    .min(1, "Date of birth is required")
+    .refine((v) => !isNaN(Date.parse(v)), "Invalid date")
+    .refine(
+      (v) => new Date(v) <= new Date(),
+      "Date of birth cannot be in the future",
+    )
+    .refine((v) => {
+      const dob = new Date(v);
+      const now = new Date();
+      let age = now.getFullYear() - dob.getFullYear();
+      const m = now.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+      return age >= 16;
+    }, "You must be at least 16 years old"),
   gender: z.enum(["male", "female", "other", "prefer_not_to_say"]),
   phone_number: z.string(),
   city: z.string(),

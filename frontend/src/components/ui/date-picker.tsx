@@ -22,6 +22,7 @@ export interface DatePickerProps {
   endYear?: number;
   defaultMonth?: Date;
   className?: string;
+  error?: boolean;
 }
 
 export function DatePicker({
@@ -34,6 +35,7 @@ export function DatePicker({
   endYear = today.getFullYear(),
   defaultMonth = today,
   className,
+  error = false,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -45,7 +47,7 @@ export function DatePicker({
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant="outline"
+          variant={error ? "error-outline" : "outline"}
           role="combobox"
           disabled={disabled}
           className={cn(

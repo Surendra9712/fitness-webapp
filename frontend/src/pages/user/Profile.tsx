@@ -546,9 +546,15 @@ export default function Profile() {
   const hasProfile = Boolean(data?.full_name);
 
   const [nutritionTargets, setNutritionTargets] = useState<{
-    calories: number; protein_g: number; carbs_g: number; fat_g: number;
-    bmi?: number; recommended_weight?: number; healthy_range_low?: number;
-    healthy_range_high?: number; weeks_to_target?: number;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    bmi?: number;
+    recommended_weight?: number;
+    healthy_range_low?: number;
+    healthy_range_high?: number;
+    weeks_to_target?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -560,7 +566,14 @@ export default function Profile() {
       .catch(() => {});
     // Fetch nutrition targets from AI engine
     api
-      .get<{ targets: { calories: number; protein_g: number; carbs_g: number; fat_g: number } }>(`/ai/meals/today?date=${today}`)
+      .get<{
+        targets: {
+          calories: number;
+          protein_g: number;
+          carbs_g: number;
+          fat_g: number;
+        };
+      }>(`/ai/meals/today?date=${today}`)
       .then((res) => {
         if (res?.targets) setNutritionTargets(res.targets);
       })
@@ -742,7 +755,7 @@ export default function Profile() {
                 className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50 h-7 px-3 text-xs"
                 asChild
               >
-                <Link to="/customer/become-trainer">
+                <Link to="/trainee/become-trainer">
                   <Award className="h-3.5 w-3.5" />
                   Become a Trainer
                 </Link>
@@ -939,60 +952,122 @@ export default function Profile() {
           {/* ── AI Nutrition Targets ──────────────────────── */}
           {nutritionTargets && (
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">AI Nutrition Targets</h2>
+              <h2 className="text-base font-semibold text-gray-800">
+                AI Nutrition Targets
+              </h2>
 
               {/* Daily macro targets */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { icon: Flame, label: "kcal/day", value: nutritionTargets.calories, color: "text-orange-500", bg: "bg-orange-50" },
-                  { icon: Dumbbell, label: "Protein", value: `${nutritionTargets.protein_g}g`, color: "text-blue-600", bg: "bg-blue-50" },
-                  { icon: Wheat, label: "Carbs", value: `${nutritionTargets.carbs_g}g`, color: "text-green-600", bg: "bg-green-50" },
-                  { icon: Droplet, label: "Fat", value: `${nutritionTargets.fat_g}g`, color: "text-yellow-600", bg: "bg-yellow-50" },
+                  {
+                    icon: Flame,
+                    label: "kcal/day",
+                    value: nutritionTargets.calories,
+                    color: "text-orange-500",
+                    bg: "bg-orange-50",
+                  },
+                  {
+                    icon: Dumbbell,
+                    label: "Protein",
+                    value: `${nutritionTargets.protein_g}g`,
+                    color: "text-blue-600",
+                    bg: "bg-blue-50",
+                  },
+                  {
+                    icon: Wheat,
+                    label: "Carbs",
+                    value: `${nutritionTargets.carbs_g}g`,
+                    color: "text-green-600",
+                    bg: "bg-green-50",
+                  },
+                  {
+                    icon: Droplet,
+                    label: "Fat",
+                    value: `${nutritionTargets.fat_g}g`,
+                    color: "text-yellow-600",
+                    bg: "bg-yellow-50",
+                  },
                 ].map((m) => (
-                  <div key={m.label} className={`${m.bg} rounded-2xl border border-gray-100 p-4 flex flex-col items-center gap-1`}>
+                  <div
+                    key={m.label}
+                    className={`${m.bg} rounded-2xl border border-gray-100 p-4 flex flex-col items-center gap-1`}
+                  >
                     <m.icon className={`h-6 w-6 ${m.color}`} />
-                    <span className={`text-xl font-bold ${m.color}`}>{m.value}</span>
+                    <span className={`text-xl font-bold ${m.color}`}>
+                      {m.value}
+                    </span>
                     <span className="text-xs text-gray-500">{m.label}</span>
                   </div>
                 ))}
               </div>
 
               {/* AI Weight Recommendation card */}
-              {data?.current_weight_kg && data?.height_cm && (() => {
-                const w = parseFloat(data.current_weight_kg);
-                const h = parseFloat(data.height_cm) / 100;
-                const bmi = Math.round((w / (h * h)) * 10) / 10;
-                const low = Math.round(18.5 * h * h * 10) / 10;
-                const high = Math.round(24.9 * h * h * 10) / 10;
-                const rec = Math.round(((low + high) / 2) * 10) / 10;
-                const weeks = Math.round(Math.abs(w - rec) / 0.5);
-                return (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-800 flex items-center gap-2">
-                        <Bot className="h-4 w-4 shrink-0" />
-                        AI Target Weight Recommendation
-                      </span>
-                      <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-medium">BMI: {bmi}</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-8">
-                      <div className="text-center">
-                        <p className="text-4xl font-bold text-gray-900">{w}<span className="text-base font-normal text-gray-400">kg</span></p>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">Current</p>
+              {data?.current_weight_kg &&
+                data?.height_cm &&
+                (() => {
+                  const w = parseFloat(data.current_weight_kg);
+                  const h = parseFloat(data.height_cm) / 100;
+                  const bmi = Math.round((w / (h * h)) * 10) / 10;
+                  const low = Math.round(18.5 * h * h * 10) / 10;
+                  const high = Math.round(24.9 * h * h * 10) / 10;
+                  const rec = Math.round(((low + high) / 2) * 10) / 10;
+                  const weeks = Math.round(Math.abs(w - rec) / 0.5);
+                  return (
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-800 flex items-center gap-2">
+                          <Bot className="h-4 w-4 shrink-0" />
+                          AI Target Weight Recommendation
+                        </span>
+                        <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-medium">
+                          BMI: {bmi}
+                        </span>
                       </div>
-                      <span className="text-gray-300 text-2xl">→</span>
-                      <div className="text-center">
-                        <p className="text-4xl font-bold text-emerald-500">{rec}<span className="text-base font-normal text-gray-400">kg</span></p>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">Recommended Target</p>
+                      <div className="flex items-center justify-center gap-8">
+                        <div className="text-center">
+                          <p className="text-4xl font-bold text-gray-900">
+                            {w}
+                            <span className="text-base font-normal text-gray-400">
+                              kg
+                            </span>
+                          </p>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">
+                            Current
+                          </p>
+                        </div>
+                        <span className="text-gray-300 text-2xl">→</span>
+                        <div className="text-center">
+                          <p className="text-4xl font-bold text-emerald-500">
+                            {rec}
+                            <span className="text-base font-normal text-gray-400">
+                              kg
+                            </span>
+                          </p>
+                          <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">
+                            Recommended Target
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-center space-y-1 border-t border-gray-50 pt-3">
+                        <p className="text-sm text-gray-500">
+                          Healthy range for your height:{" "}
+                          <span className="font-semibold text-gray-800">
+                            {low}–{high}kg
+                          </span>
+                        </p>
+                        {weeks > 0 && (
+                          <p className="text-sm text-gray-500">
+                            Estimated time to reach target:{" "}
+                            <span className="font-bold text-gray-800">
+                              ~{weeks} weeks
+                            </span>{" "}
+                            at a safe, sustainable rate.
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="text-center space-y-1 border-t border-gray-50 pt-3">
-                      <p className="text-sm text-gray-500">Healthy range for your height: <span className="font-semibold text-gray-800">{low}–{high}kg</span></p>
-                      {weeks > 0 && <p className="text-sm text-gray-500">Estimated time to reach target: <span className="font-bold text-gray-800">~{weeks} weeks</span> at a safe, sustainable rate.</p>}
-                    </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
             </div>
           )}
 
