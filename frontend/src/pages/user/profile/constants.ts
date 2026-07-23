@@ -1,10 +1,4 @@
-import {
-  TrendingDown,
-  Dumbbell,
-  Scale,
-  Heart,
-  Activity,
-} from "lucide-react";
+import { TrendingDown, Dumbbell, Scale, Heart, Activity } from "lucide-react";
 
 export const STEPS = [
   "Personal Info",
@@ -76,11 +70,15 @@ export const CUISINES = [
   "Nepali",
   "Indian",
   "Chinese",
-  "Continental",
+  // "Continental",
   "Italian",
   "Japanese",
+  "Korean",
   "Mexican",
+  "Thai",
   "Mediterranean",
+  "French",
+  "American",
 ];
 
 export const CONDITIONS = [

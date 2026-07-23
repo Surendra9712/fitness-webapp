@@ -126,14 +126,26 @@ const MEAL_TYPES = [
 
 const WATER_AMOUNTS = [150, 200, 250, 300, 500];
 
-// "ml"/"g" style units pair with a number ("200 ml"); descriptive units
-// like "1 plate" or "2 slices" already read fine on their own.
-function servingHint(food: FoodResult): string | null {
-  if (!food.serving_unit) return null;
-  const isBareUnit = /^(g|kg|ml|l|oz|lb)s?$/i.test(food.serving_unit.trim());
-  return isBareUnit && food.serving_size
-    ? `1 serving = ${food.serving_size} ${food.serving_unit}`
-    : `1 serving = ${food.serving_unit}`;
+// serving_unit is a self-describing portion string, e.g. "1 plate (250 g)",
+// "2 slices (70 g)", or "200 ml". Show it as-is; fall back to grams.
+function formatServing(food: FoodResult): string | null {
+  if (food.serving_unit) return food.serving_unit;
+  if (food.serving_size) return `${food.serving_size} g`;
+  return null;
+}
+
+// Whether the serving weight is measured in ml (drinks) or g (everything else),
+// inferred from the unit string ("… ml" / "… ml)").
+function servingMeasure(food: FoodResult): "g" | "ml" {
+  return /ml\)?\s*$/i.test(food.serving_unit ?? "") ? "ml" : "g";
+}
+
+// Total amount for the chosen number of servings, so the user can gauge how
+// much they're actually logging (e.g. "≈ 500 g" for 2 × 250 g).
+function totalQuantity(food: FoodResult, qty: number): string | null {
+  if (!food.serving_size || !Number.isFinite(qty) || qty <= 0) return null;
+  const total = Math.round(food.serving_size * qty);
+  return `≈ ${total} ${servingMeasure(food)}`;
 }
 
 // DEV/TESTING ONLY — keeps "End Meal Today" clickable even after the day has
@@ -447,6 +459,11 @@ function MealSection({
                         {f.calories} kcal · P{f.protein_g}g · C{f.carbs_g}g · F
                         {f.fat_g}g
                       </p>
+                      {formatServing(f) && (
+                        <p className="text-[10px] text-muted-foreground">
+                          per serving: {formatServing(f)}
+                        </p>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -500,12 +517,19 @@ function MealSection({
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
-                      {servingHint(selected) && (
+                      {formatServing(selected) && (
                         <span className="text-xs text-muted-foreground truncate">
-                          {servingHint(selected)}
+                          1 serving = {formatServing(selected)}
                         </span>
                       )}
                     </div>
+                    {totalQuantity(selected, parseFloat(qty || "1")) && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {qty || "1"}{" "}
+                        {parseFloat(qty || "1") === 1 ? "serving" : "servings"}{" "}
+                        {totalQuantity(selected, parseFloat(qty || "1"))}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-1 text-xs">
                     {[
