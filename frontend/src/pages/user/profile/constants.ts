@@ -4,7 +4,6 @@ export const STEPS = [
   "Personal Info",
   "Your Goal",
   "Diet & Allergens",
-  "Habits",
   "Health",
 ];
 
@@ -104,16 +103,3 @@ export const FITNESS: [string, string][] = [
   ["advanced", "Advanced"],
 ];
 
-export const COOKING: [string, string][] = [
-  ["daily", "Daily"],
-  ["few_times_week", "Few times/week"],
-  ["weekly", "Weekly"],
-  ["rarely", "Rarely"],
-];
-
-export const STRESS: [string, string][] = [
-  ["low", "Low"],
-  ["moderate", "Moderate"],
-  ["high", "High"],
-  ["very_high", "Very High"],
-];

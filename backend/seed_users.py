@@ -168,8 +168,8 @@ def seed_trainees(cursor, conn, count=100):
             "INSERT INTO user_profiles "
             "(user_id, full_name, date_of_birth, gender, city, country, "
             " height_cm, current_weight_kg, activity_level, primary_goal, "
-            " fitness_level, diet_type, stress_level) "
-            "VALUES (%s,%s,%s,%s,%s,'Nepal',%s,%s,%s,%s,%s,%s,%s)",
+            " fitness_level, diet_type) "
+            "VALUES (%s,%s,%s,%s,%s,'Nepal',%s,%s,%s,%s,%s,%s)",
             (
                 uid, name, rand_dob(),
                 random.choice(GENDERS),
@@ -180,7 +180,6 @@ def seed_trainees(cursor, conn, count=100):
                 random.choice(GOALS),
                 random.choice(FITNESS_LVL),
                 random.choice(DIET_TYPES),
-                random.choice(STRESS),
             ),
         )
         ids.append(uid)

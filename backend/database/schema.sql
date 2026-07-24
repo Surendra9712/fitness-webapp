@@ -50,17 +50,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     allergens            JSON,
     cuisine_preferences  JSON,
 
-    breakfast_time       TIME DEFAULT '07:30:00',
-    lunch_time           TIME DEFAULT '12:30:00',
-    dinner_time          TIME DEFAULT '19:00:00',
     meals_per_day        INT DEFAULT 3,
-    snacks_between_meals BOOLEAN DEFAULT FALSE,
-    cooking_frequency    VARCHAR(30) DEFAULT 'daily',
-    eating_out_frequency INT DEFAULT 2,
-    track_hydration      BOOLEAN DEFAULT TRUE,
-    avg_sleep_hours      DECIMAL(3,1) DEFAULT 7.0,
-    emotional_eater      BOOLEAN DEFAULT FALSE,
-    stress_level         ENUM('low','moderate','high','very_high') DEFAULT 'moderate',
 
     health_conditions    JSON,
     notes                TEXT,

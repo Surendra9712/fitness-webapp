@@ -67,26 +67,8 @@ export const profileSchema = z.object({
   other_restrictions: z.string(),
   allergens: z.array(z.string()),
   cuisine_preferences: z.array(z.string()),
-  // Step 4
-  breakfast_time: z.string(),
-  lunch_time: z.string(),
-  dinner_time: z.string(),
-  avg_sleep_hours: z
-    .string()
-    .refine(
-      (v) =>
-        v === "" ||
-        (!isNaN(parseFloat(v)) && parseFloat(v) >= 3 && parseFloat(v) <= 12),
-      "Must be 3–12",
-    ),
   meals_per_day: z.number().int().min(1).max(8),
-  snacks_between_meals: z.boolean(),
-  cooking_frequency: z.enum(["daily", "few_times_week", "weekly", "rarely"]),
-  eating_out_frequency: z.number().int().min(0).max(7),
-  track_hydration: z.boolean(),
-  emotional_eater: z.boolean(),
-  stress_level: z.enum(["low", "moderate", "high", "very_high"]),
-  // Step 5
+  // Step 4 (Health)
   health_conditions: z.array(
     z.object({ name: z.string(), type: z.string(), affects_diet: z.boolean() }),
   ),
@@ -100,5 +82,4 @@ export const STEP_REQUIRED: Record<number, (keyof ProfileValues)[]> = {
   2: [],
   3: [],
   4: [],
-  5: [],
 };

@@ -39,18 +39,7 @@ class ProfileSchema(BaseModel):
     other_restrictions: Optional[str] = None
     allergens: List[str] = []
     cuisine_preferences: List[str] = []
-    # Habits
-    breakfast_time: str = '07:30'
-    lunch_time: str = '12:30'
-    dinner_time: str = '19:00'
     meals_per_day: int = Field(default=3, ge=1, le=8)
-    snacks_between_meals: bool = False
-    cooking_frequency: str = 'daily'
-    eating_out_frequency: int = Field(default=2, ge=0, le=7)
-    track_hydration: bool = True
-    avg_sleep_hours: float = Field(default=7.0, ge=3, le=12)
-    emotional_eater: bool = False
-    stress_level: Literal['low', 'moderate', 'high', 'very_high'] = 'moderate'
     # Health
     health_conditions: List[dict] = []
     notes: Optional[str] = None
@@ -88,18 +77,7 @@ class UpdateProfileSchema(BaseModel):
     other_restrictions: Optional[str] = None
     allergens: Optional[List[str]] = None
     cuisine_preferences: Optional[List[str]] = None
-    # Habits
-    breakfast_time: Optional[str] = None
-    lunch_time: Optional[str] = None
-    dinner_time: Optional[str] = None
     meals_per_day: Optional[int] = None
-    snacks_between_meals: Optional[bool] = None
-    cooking_frequency: Optional[str] = None
-    eating_out_frequency: Optional[int] = None
-    track_hydration: Optional[bool] = None
-    avg_sleep_hours: Optional[float] = None
-    emotional_eater: Optional[bool] = None
-    stress_level: Optional[Literal['low', 'moderate', 'high', 'very_high']] = None
     # Health
     health_conditions: Optional[List[dict]] = None
     notes: Optional[str] = None
@@ -246,17 +224,7 @@ def complete():
         'other_restrictions':   body.other_restrictions,
         'allergens':            json.dumps(body.allergens),
         'cuisine_preferences':  json.dumps(body.cuisine_preferences),
-        'breakfast_time':       body.breakfast_time,
-        'lunch_time':           body.lunch_time,
-        'dinner_time':          body.dinner_time,
         'meals_per_day':        body.meals_per_day,
-        'snacks_between_meals': body.snacks_between_meals,
-        'cooking_frequency':    body.cooking_frequency,
-        'eating_out_frequency': body.eating_out_frequency,
-        'track_hydration':      body.track_hydration,
-        'avg_sleep_hours':      body.avg_sleep_hours,
-        'emotional_eater':      body.emotional_eater,
-        'stress_level':         body.stress_level,
         'health_conditions':    json.dumps(body.health_conditions),
         'notes':                body.notes,
     }

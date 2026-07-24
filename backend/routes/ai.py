@@ -67,7 +67,7 @@ def _get_profile(cursor, user_id):
     cursor.execute(
         "SELECT current_weight_kg, height_cm, date_of_birth, gender, "
         "activity_level, primary_goal, fitness_level, meals_per_day, "
-        "avg_sleep_hours, stress_level, dietary_restrictions, allergens, "
+        "dietary_restrictions, allergens, "
         "cuisine_preferences, diet_type, daily_water_target_ml "
         "FROM user_profiles WHERE user_id = %s",
         (user_id,)
