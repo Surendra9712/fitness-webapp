@@ -5,7 +5,6 @@ import {
   ShoppingBag,
   Bell,
   Plus,
-  Minus,
   Trash2,
   Search,
   ChevronDown,
@@ -13,18 +12,8 @@ import {
   RefreshCw,
   Dumbbell,
   Droplets,
-  Droplet,
   CheckCircle2,
   XCircle,
-  Sunrise,
-  Sun,
-  Apple,
-  Moon,
-  Flame,
-  Wheat,
-  Lightbulb,
-  FlaskConical,
-  type LucideIcon,
 } from "lucide-react";
 import { api } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,8 +26,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ProfileSetup from "./profile/ProfileSetup";
 import type { DashboardStats } from "@/types";
-import { Progress } from "@/components/ui/progress";
-import { SearchInput } from "@/components/ui/search-input";
 
 interface MealLog {
   id: number;
@@ -101,40 +88,41 @@ const MEAL_TYPES = [
   {
     key: "breakfast",
     label: "Breakfast",
-    icon: Sunrise,
+    emoji: "\u{1F305}",
     class: "Light < 350 kcal",
   },
   {
     key: "lunch",
     label: "Lunch",
-    icon: Sun,
+    emoji: "\u2600\uFE0F",
     class: "Heavy 350–700 kcal",
   },
   {
     key: "snack",
     label: "Snack",
-    icon: Apple,
+    emoji: "\u{1F34E}",
     class: "Light < 220 kcal",
   },
   {
     key: "dinner",
     label: "Dinner",
-    icon: Moon,
+    emoji: "\u{1F319}",
     class: "Heavy 280–600 kcal",
   },
 ] as const;
 
+const UNITS = [
+  "serving",
+  "g",
+  "pieces",
+  "cup",
+  "bowl",
+  "plate",
+  "glass",
+  "tbsp",
+  "ml",
+];
 const WATER_AMOUNTS = [150, 200, 250, 300, 500];
-
-// "ml"/"g" style units pair with a number ("200 ml"); descriptive units
-// like "1 plate" or "2 slices" already read fine on their own.
-function servingHint(food: FoodResult): string | null {
-  if (!food.serving_unit) return null;
-  const isBareUnit = /^(g|kg|ml|l|oz|lb)s?$/i.test(food.serving_unit.trim());
-  return isBareUnit && food.serving_size
-    ? `1 serving = ${food.serving_size} ${food.serving_unit}`
-    : `1 serving = ${food.serving_unit}`;
-}
 
 // DEV/TESTING ONLY — keeps "End Meal Today" clickable even after the day has
 // already been ended, so the flow can be exercised repeatedly without
@@ -149,14 +137,14 @@ function MacroRing({
   target,
   unit,
   stroke,
-  icon: Icon,
+  emoji,
 }: {
   label: string;
   value: number;
   target: number;
   unit: string;
   stroke: string;
-  icon: LucideIcon;
+  emoji: string;
 }) {
   const pct =
     target > 0 ? Math.min(100, Math.round((value / target) * 100)) : 0;
@@ -186,8 +174,7 @@ function MacroRing({
             strokeLinecap="round"
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-          <Icon className="h-4 w-4" style={{ color: stroke }} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xs font-bold">{pct}%</span>
         </div>
       </div>
@@ -207,7 +194,7 @@ function MacroRing({
 
 function MealSection({
   mealType,
-  icon: Icon,
+  emoji,
   label,
   classLabel,
   logs,
@@ -217,7 +204,7 @@ function MealSection({
   disabled,
 }: {
   mealType: string;
-  icon: LucideIcon;
+  emoji: string;
   label: string;
   classLabel: string;
   logs: MealLog[];
@@ -237,6 +224,7 @@ function MealSection({
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<FoodResult | null>(null);
   const [qty, setQty] = useState("1");
+  const [unit, setUnit] = useState("serving");
   const [logging, setLogging] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -244,34 +232,34 @@ function MealSection({
     .filter((l) => l.is_consumed)
     .reduce((s, l) => s + Number(l.calories), 0);
 
-  const handleSearch = async (q: string) => {
+  const handleSearch = (q: string) => {
     setQuery(q);
     setSelected(null);
+    if (debRef.current) clearTimeout(debRef.current);
     if (q.trim().length < 2) {
       setResults([]);
       return;
     }
-    setSearching(true);
-    try {
-      const r = await api.get<{ results: FoodResult[] }>(
-        `/ai/food/search?q=${encodeURIComponent(q)}`,
-      );
-      setResults(r.results);
-    } catch {
-    } finally {
-      setSearching(false);
-    }
+    debRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await api.get<{ results: FoodResult[] }>(
+          `/ai/food/search?q=${encodeURIComponent(q)}`,
+        );
+        setResults(r.results);
+      } catch {
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
   };
 
   const selectFood = (f: FoodResult) => {
     setSelected(f);
     setQuery(f.name);
     setResults([]);
+    setUnit(f.serving_unit || "serving");
     setQty("1");
-  };
-
-  const adjustQty = (delta: number) => {
-    setQty((prev) => Math.max(0.5, (parseFloat(prev) || 1) + delta).toString());
   };
 
   const handleLog = async () => {
@@ -279,7 +267,7 @@ function MealSection({
     const q = parseFloat(qty) || 1;
     setLogging(true);
     try {
-      await onLog(mealType, selected, q, selected.serving_unit || "serving");
+      await onLog(mealType, selected, q, unit);
       setSelected(null);
       setQuery("");
       setQty("1");
@@ -328,7 +316,7 @@ function MealSection({
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center gap-3">
-          <Icon className="h-5 w-5 text-muted-foreground" />
+          <span className="text-xl">{emoji}</span>
           <div className="text-left">
             <p className="font-semibold text-sm">{label}</p>
             <p className="text-xs text-muted-foreground">{classLabel}</p>
@@ -369,23 +357,18 @@ function MealSection({
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {log.quantity}{" "}
-                      {log.quantity === 1 ? "serving" : "servings"}
-                      {log.unit && log.unit !== "serving"
-                        ? ` · ${log.unit}`
-                        : ""}{" "}
-                      · {Math.round(Number(log.calories))} kcal · P
+                      {log.quantity} {log.unit} ·{" "}
+                      {Math.round(Number(log.calories))} kcal · P
                       {Math.round(Number(log.protein_g))}g
                     </p>
                     {log.ai_explanation && (
-                      <p className="text-[10px] text-blue-500 mt-0.5 line-clamp-1 flex items-center gap-1">
-                        <Lightbulb className="h-2.5 w-2.5 shrink-0" />
-                        {log.ai_explanation}
+                      <p className="text-[10px] text-blue-500 mt-0.5 line-clamp-1">
+                        💡 {log.ai_explanation}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 ml-2">
-                    {/* <button
+                    <button
                       onClick={() =>
                         onToggleConsumed(log.id, log.is_consumed ? 0 : 1)
                       }
@@ -399,14 +382,13 @@ function MealSection({
                       ) : (
                         <XCircle className="h-4 w-4" />
                       )}
-                    </button> */}
-                    <Button
-                      size={"icon"}
-                      variant={"danger-subtle"}
+                    </button>
+                    <button
                       onClick={() => onDelete(log.id)}
+                      className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -420,7 +402,13 @@ function MealSection({
           ) : (
             <div className="space-y-2 pt-1">
               <div className="relative">
-                <SearchInput onSearch={handleSearch} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-8 text-sm h-8"
+                  placeholder="Search food (Nepali, global, any language)..."
+                  value={query}
+                  onChange={(e) => handleSearch(e.target.value)}
+                />
               </div>
               {searching && (
                 <p className="text-xs text-muted-foreground pl-1">
@@ -456,87 +444,75 @@ function MealSection({
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 text-sm text-primary hover:bg-primary/10 transition-colors"
                   onClick={handleAiSuggest}
                 >
-                  AI: what should I eat for {label.toLowerCase()}?
+                  🤖 AI: what should I eat for {label.toLowerCase()}?
                 </button>
               )} */}
               {selected && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-                  <p className="text-sm font-semibold text-primary flex items-center gap-1.5">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    {selected.name}
+                  <p className="text-sm font-semibold text-primary">
+                    ✓ {selected.name}
                   </p>
                   {selected.ai_explanation && (
-                    <p className="text-[10px] text-blue-600 flex items-center gap-1">
-                      <Lightbulb className="h-2.5 w-2.5 shrink-0" />
-                      {selected.ai_explanation}
+                    <p className="text-[10px] text-blue-600">
+                      💡 {selected.ai_explanation}
                     </p>
                   )}
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">
-                      Servings
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => adjustQty(-0.5)}
-                        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md border hover:bg-muted transition-colors"
-                        aria-label="Decrease servings"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Quantity
+                      </label>
                       <Input
                         type="number"
-                        min="0.5"
-                        step="0.5"
+                        min="0.1"
+                        step="0.1"
                         value={qty}
                         onChange={(e) => setQty(e.target.value)}
-                        className="h-8 text-sm text-center w-16 shrink-0"
+                        className="h-8 text-sm"
                       />
-                      <button
-                        type="button"
-                        onClick={() => adjustQty(0.5)}
-                        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md border hover:bg-muted transition-colors"
-                        aria-label="Increase servings"
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Unit
+                      </label>
+                      <select
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        className="w-full h-8 text-sm border rounded-md px-2 bg-background"
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                      {servingHint(selected) && (
-                        <span className="text-xs text-muted-foreground truncate">
-                          {servingHint(selected)}
-                        </span>
-                      )}
+                        {UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 text-xs">
                     {[
-                      {
-                        Icon: Flame,
-                        value: Math.round(
-                          selected.calories * parseFloat(qty || "1"),
+                      [
+                        "🔥",
+                        Math.round(selected.calories * parseFloat(qty || "1")),
+                        "kcal",
+                      ],
+                      [
+                        "💪",
+                        (selected.protein_g * parseFloat(qty || "1")).toFixed(
+                          1,
                         ),
-                        label: "kcal",
-                      },
-                      {
-                        Icon: Dumbbell,
-                        value: (
-                          selected.protein_g * parseFloat(qty || "1")
-                        ).toFixed(1),
-                        label: "g protein",
-                      },
-                      {
-                        Icon: Wheat,
-                        value: (
-                          selected.carbs_g * parseFloat(qty || "1")
-                        ).toFixed(1),
-                        label: "g carbs",
-                      },
-                    ].map(({ Icon, value, label: badgeLabel }) => (
+                        "g protein",
+                      ],
+                      [
+                        "🌾",
+                        (selected.carbs_g * parseFloat(qty || "1")).toFixed(1),
+                        "g carbs",
+                      ],
+                    ].map(([ic, v, lb]) => (
                       <span
-                        key={badgeLabel}
-                        className="bg-muted px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                        key={String(lb)}
+                        className="bg-muted px-2 py-0.5 rounded-full"
                       >
-                        <Icon className="h-3 w-3" />
-                        {value} {badgeLabel}
+                        {ic} {v} {lb}
                       </span>
                     ))}
                   </div>
@@ -576,40 +552,50 @@ export default function UserDashboard() {
   > | null>(null);
   const hasProfile = Boolean(user?.full_name);
 
-  const loadData = useCallback(async () => {
-    setDataLoading(true);
-    setError("");
-    try {
-      // Computed fresh (not a frozen constant) so a session left open across
-      // midnight picks up the new calendar day on the next refresh instead
-      // of staying stuck on yesterday's date.
-      const dateStr = new Date().toISOString().split("T")[0];
-      const [s, m] = await Promise.all([
-        api.get<DashboardStats>(`/user/dashboard?date=${dateStr}`),
-        api.get<TodayMeals>(`/ai/meals/today?date=${dateStr}`),
-      ]);
-      setStats(s);
-      setTodayMeals(m);
-      setDayEnded(m.day_ended);
-      if (m.day_ended) {
-        // Day was already ended in a previous session (e.g. page reload) —
-        // re-fetch a plan preview since it isn't persisted server-side.
-        try {
-          const plan =
-            await api.get<Record<string, unknown>>("/ai/recommend/meal");
-          setTomorrowPlan(plan);
-        } catch {
-          // Non-critical — the "day ended" panel still renders without it.
+  const loadData = useCallback(
+    async (opts?: { preserveEndDayState?: boolean }) => {
+      setDataLoading(true);
+      setError("");
+      try {
+        // Computed fresh (not a frozen constant) so a session left open across
+        // midnight picks up the new calendar day on the next refresh instead
+        // of staying stuck on yesterday's date.
+        const dateStr = new Date().toISOString().split("T")[0];
+        const [s, m] = await Promise.all([
+          api.get<DashboardStats>(`/user/dashboard?date=${dateStr}`),
+          api.get<TodayMeals>(`/ai/meals/today?date=${dateStr}`),
+        ]);
+        setStats(s);
+        setTodayMeals(m);
+        // Skip syncing dayEnded/tomorrowPlan right after End Meal Today: in
+        // dev mode the effective day has already advanced by the time this
+        // refetch lands, so the server correctly reports day_ended:false for
+        // the *new* day — but blindly applying that here would immediately
+        // hide the "day ended / tomorrow's plan" confirmation we just showed.
+        if (!opts?.preserveEndDayState) {
+          setDayEnded(m.day_ended);
+          if (m.day_ended) {
+            // Day was already ended in a previous session (e.g. page reload) —
+            // re-fetch a plan preview since it isn't persisted server-side.
+            try {
+              const plan =
+                await api.get<Record<string, unknown>>("/ai/recommend/meal");
+              setTomorrowPlan(plan);
+            } catch {
+              // Non-critical — the "day ended" panel still renders without it.
+            }
+          } else {
+            setTomorrowPlan(null);
+          }
         }
-      } else {
-        setTomorrowPlan(null);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setDataLoading(false);
       }
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setDataLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!hasProfile) return;
@@ -693,7 +679,7 @@ export default function UserDashboard() {
       setDayEnded(true);
       setLastEndedDate(r.today_summary?.date || null);
       setTomorrowPlan(r.tomorrow_plan || null);
-      await loadData();
+      await loadData({ preserveEndDayState: true });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -881,7 +867,7 @@ export default function UserDashboard() {
             target={targets.calories}
             unit=" kcal"
             stroke="#f97316"
-            icon={Flame}
+            emoji="🔥"
           />
           <MacroRing
             label="Protein"
@@ -889,7 +875,7 @@ export default function UserDashboard() {
             target={targets.protein_g}
             unit="g"
             stroke="#3b82f6"
-            icon={Dumbbell}
+            emoji="💪"
           />
           <MacroRing
             label="Carbs"
@@ -897,7 +883,7 @@ export default function UserDashboard() {
             target={targets.carbs_g}
             unit="g"
             stroke="#22c55e"
-            icon={Wheat}
+            emoji="🌾"
           />
           <MacroRing
             label="Fat"
@@ -905,7 +891,7 @@ export default function UserDashboard() {
             target={targets.fat_g}
             unit="g"
             stroke="#eab308"
-            icon={Droplet}
+            emoji="🥑"
           />
         </div>
       )}
@@ -920,7 +906,12 @@ export default function UserDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Progress value={Math.min(100, water.pct)} className="mb-3" />
+            <div className="w-full bg-secondary rounded-full h-2 mb-3">
+              <div
+                className="h-2 rounded-full bg-blue-400 transition-all"
+                style={{ width: `${Math.min(100, water.pct)}%` }}
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
               {WATER_AMOUNTS.map((ml) => (
                 <button
@@ -943,7 +934,7 @@ export default function UserDashboard() {
             <MealSection
               key={mt.key}
               mealType={mt.key}
-              icon={mt.icon}
+              emoji={mt.emoji}
               label={mt.label}
               classLabel={mt.class}
               logs={todayMeals?.meals[mt.key] ?? []}
@@ -970,26 +961,29 @@ export default function UserDashboard() {
               check your exercise recommendation.
             </p>
             {DEV_ALWAYS_ALLOW_END_DAY && dayEnded && (
-              <p className="text-xs text-amber-600 mt-1 flex items-center justify-center gap-1">
-                <FlaskConical className="h-3 w-3 shrink-0" />
-                Dev mode: last ended day{" "}
+              <p className="text-xs text-amber-600 mt-1">
+                🧪 Dev mode: last ended day{" "}
                 {lastEndedDate ? `= ${lastEndedDate}` : ""} — clicking again
                 simulates the next day.
               </p>
             )}
           </div>
           <div className="flex gap-3">
-            <Button onClick={handleEndDay} disabled={endingDay}>
-              {endingDay ? "Saving..." : "End Meal Today"}
-            </Button>
-            <Button
-              variant={"primary-outline"}
+            <button
+              onClick={handleEndDay}
+              disabled={endingDay}
+              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              {endingDay ? "Saving..." : "✅ End Meal Today"}
+            </button>
+            <button
               onClick={() =>
                 navigate("/trainee/ai-recommendations?tab=exercise")
               }
+              className="px-6 py-2.5 border border-emerald-300 hover:bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-xl transition-colors"
             >
-              Check Exercise
-            </Button>
+              🏋️ Check Exercise
+            </button>
           </div>
         </div>
       )}
@@ -1032,12 +1026,12 @@ export default function UserDashboard() {
               })}
             </div>
           )}
-          <Button
-            variant={"primary-outline"}
+          <button
             onClick={() => navigate("/trainee/ai-recommendations?tab=exercise")}
+            className="w-full mt-2 py-2.5 border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-xl transition-colors"
           >
-            Check Exercise Recommendation
-          </Button>
+            🏋️ Check Exercise Recommendation
+          </button>
         </div>
       )}
 

@@ -239,7 +239,7 @@ def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
     elif not nepali_selected and intl_selected:
         cuisine_source = "international"
         for cuisine in intl_selected:
-            foods = _get_candidates_for_cuisine(cuisine, meal_type, dietary, recently_eaten, top_n=6)
+            foods = _get_candidates_for_cuisine(cuisine, meal_type, dietary, recently_eaten, top_n=15)
             for f in foods:
                 if f.get("name") not in seen_names:
                     f["_source"]  = "usda" if f.get("source") == "usda" else "local_kb"
@@ -260,7 +260,7 @@ def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
                 seen_names.add(f.get("name",""))
 
         for cuisine in intl_selected:
-            foods = _get_candidates_for_cuisine(cuisine, meal_type, dietary, recently_eaten, top_n=4)
+            foods = _get_candidates_for_cuisine(cuisine, meal_type, dietary, recently_eaten, top_n=10)
             for f in foods:
                 if f.get("name") not in seen_names:
                     f["_source"]  = "usda" if f.get("source") == "usda" else "local_kb"
@@ -283,37 +283,40 @@ def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
         name for name, detail in recently_eaten_detail.items()
         if detail.get("days_since", 999) <= 2
     }
-    fresh = [f for f in eligible if f.get("name") not in two_day_eaten]
-    pool  = fresh if len(fresh) >= top_n else eligible
+    fresh  = [f for f in eligible if f.get("name") not in two_day_eaten]
+    recent = [f for f in eligible if f.get("name") in two_day_eaten]
 
     # ── Score and rank ────────────────────────────────────────────────────────
-    if ml_is_loaded():
-        ml_ctx = {
-            "age":            dietary.get("_age", 25),
-            "bmi":            dietary.get("_bmi", 22),
-            "gender":         dietary.get("_gender", "male"),
-            "activity_level": dietary.get("_activity_level", "moderate"),
-            "fitness_level":  dietary.get("_fitness_level", "beginner"),
-            "goal":           goal,
-            "target_cal":     dietary.get("_target_cal", 2000),
-            "calorie_gap":    target_for_meal.get("calories", 0),
-            "protein_gap":    target_for_meal.get("protein_g", 0),
-            "calorie_ratio":  dietary.get("_calorie_ratio", 0.3),
-            "is_vegetarian":  dietary.get("is_vegetarian", False),
-            "is_vegan":       dietary.get("is_vegan", False),
-            "is_diabetic":    dietary.get("is_diabetic_friendly", False),
-            "meals_per_day":  meals_per_day,
-        }
-        top_results = rank_meal_candidates(
-            pool, meal_type, ml_ctx,
-            top_n=top_n, food_history=recently_eaten_detail
-        )
-        scoring = "lightgbm_v3"
-    else:
+    def _score(candidates):
+        if not candidates:
+            return [], "n/a"
+        if ml_is_loaded():
+            ml_ctx = {
+                "age":            dietary.get("_age", 25),
+                "bmi":            dietary.get("_bmi", 22),
+                "gender":         dietary.get("_gender", "male"),
+                "activity_level": dietary.get("_activity_level", "moderate"),
+                "fitness_level":  dietary.get("_fitness_level", "beginner"),
+                "goal":           goal,
+                "target_cal":     dietary.get("_target_cal", 2000),
+                "calorie_gap":    target_for_meal.get("calories", 0),
+                "protein_gap":    target_for_meal.get("protein_g", 0),
+                "calorie_ratio":  dietary.get("_calorie_ratio", 0.3),
+                "is_vegetarian":  dietary.get("is_vegetarian", False),
+                "is_vegan":       dietary.get("is_vegan", False),
+                "is_diabetic":    dietary.get("is_diabetic_friendly", False),
+                "meals_per_day":  meals_per_day,
+            }
+            ranked = rank_meal_candidates(
+                candidates, meal_type, ml_ctx,
+                top_n=len(candidates), food_history=recently_eaten_detail
+            )
+            return ranked, "lightgbm_v3"
+
         scored = []
-        for f in pool:
+        for f in candidates:
             s = 50.0
-            fname = f.get("name","")
+            fname = f.get("name", "")
             align = goal_food_alignment_score(f, goal)
             s += align * 30
             hist = recently_eaten_detail.get(fname, {})
@@ -325,10 +328,28 @@ def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
             elif days_since >= 1: s -= 15
             s -= times_week * 12
             s += random.uniform(-3, 3)
-            scored.append({**f, "ai_score": round(s/100, 3)})
+            scored.append({**f, "ai_score": round(s / 100, 3)})
         scored.sort(key=lambda x: x["ai_score"], reverse=True)
-        top_results = [f for f in scored if f.get("ai_score",0) > 0][:top_n]
-        scoring = "rule_based_v4"
+        return scored, "rule_based_v4"
+
+    # Rank the not-recently-eaten candidates first and fill top_n from them.
+    # Only reach into `recent` (foods eaten in the last 2 days) to pad out
+    # the remaining slots if there genuinely aren't enough fresh options —
+    # this guarantees variety whenever alternatives exist, instead of the
+    # previous behaviour of dropping the exclusion entirely (and therefore
+    # re-recommending the exact food you just ate) any time the candidate
+    # pool for a cuisine/meal type was smaller than top_n.
+    fresh_scored, scoring = _score(fresh)
+    top_results = [f for f in fresh_scored if f.get("ai_score", 0) > 0][:top_n]
+    if len(top_results) < top_n and recent:
+        recent_scored, recent_scoring = _score(recent)
+        scoring = scoring if scoring != "n/a" else recent_scoring
+        needed = top_n - len(top_results)
+        already = {f.get("name") for f in top_results}
+        top_results += [
+            f for f in recent_scored
+            if f.get("name") not in already
+        ][:needed]
 
     # ── Req 13: Add AI explanation to each recommendation ────────────────────
     for food in top_results:
@@ -371,36 +392,17 @@ def recommend_daily_meals(weight_kg, height_cm, age, gender, activity_level, goa
     targets = calculate_nutrition_targets(weight_kg, height_cm, age, gender, activity_level, goal)
     dietary["_target_cal"] = targets.daily_calories
 
-    # Always recommend all 4 meal types (Req snack fix). Processed sequentially,
-    # feeding each pick forward into the next meal type's history as if it had
-    # just been eaten (days_since=0). This reuses the same variety-aware
-    # scoring already applied to real meal-log history (both the ML model and
-    # the rule-based fallback already deprioritize a days_since=0 food) —
-    # so a same-day repeat is naturally discouraged but still allowed when
-    # it's genuinely the best fit (e.g. dal-bhat for both lunch and dinner),
-    # rather than being forcibly banned outright.
-    daily_plan  = {}
-    today_detail = dict(recently_eaten_detail)
-    for mt in ["breakfast", "lunch", "snack", "dinner"]:
-        result = recommend_meal_for_type(
+    # Always recommend all 4 meal types (Req snack fix)
+    daily_plan = {
+        mt: recommend_meal_for_type(
             mt, targets, meals_per_day, dietary,
             preferred_cuisines, top_n=3,
             recently_eaten=recently_eaten,
-            recently_eaten_detail=today_detail,
+            recently_eaten_detail=recently_eaten_detail,
             goal=goal,
         )
-        daily_plan[mt] = result
-        top_pick = result["recommendations"][0].get("name") if result["recommendations"] else None
-        if top_pick:
-            prev = today_detail.get(top_pick, {})
-            today_detail = {
-                **today_detail,
-                top_pick: {
-                    "days_since":  0,
-                    "times_week":  prev.get("times_week", 0) + 1,
-                    "times_total": prev.get("times_total", 0) + 1,
-                },
-            }
+        for mt in ["breakfast","lunch","snack","dinner"]
+    }
 
     return {
         "nutrition_targets": {
@@ -459,6 +461,18 @@ def generate_weekly_plan(weight_kg, height_cm, age, gender, activity_level, goal
 
 
 def search_food_unified(query, limit=5):
+    from ai_engine.nlp.fuzzy_matcher import fuzz  # rapidfuzz scorer, already a project dependency
+
+    def _is_relevant(name: str, min_score: int = 45) -> bool:
+        # External search APIs (USDA, Nutritionix) don't guarantee an empty
+        # result for a nonsense query — some return a generic/"closest"
+        # match instead of nothing. Re-check relevance ourselves before
+        # trusting anything they hand back.
+        try:
+            return fuzz.WRatio(query.lower(), (name or "").lower()) >= min_score
+        except Exception:
+            return True  # fail open rather than silently dropping real matches
+
     results, seen = [], set()
     for m in fuzzy_match_multiple(query, _FOOD_INDEX, limit=limit, threshold=70):
         if m["name"] not in seen:
@@ -466,11 +480,11 @@ def search_food_unified(query, limit=5):
             seen.add(m["name"])
     if len(results) < limit:
         for f in usda.search_food(query, page_size=limit-len(results)):
-            if f["name"] not in seen:
+            if f["name"] not in seen and _is_relevant(f["name"]):
                 results.append(f); seen.add(f["name"])
     if len(results) < limit and nutritionix.is_configured():
         for f in nutritionix.search_instant(query):
-            if f["name"] not in seen:
+            if f["name"] not in seen and _is_relevant(f["name"]):
                 results.append(f); seen.add(f["name"])
     return results[:limit]
 
@@ -507,7 +521,7 @@ def handle_natural_language_query(text, dietary=None):
 def recommend_exercise(goal, bmi, age, fitness_level, calorie_ratio,
                         activity_level="moderate", today_calories=1200,
                         protein_gap=0, today_protein=60, days_exercised_this_week=0,
-                        recently_done=None):
+                        recent_exercise_names=None):
     if ml_is_loaded():
         prediction = predict_exercise_category({
             "age":age,"bmi":bmi,"goal":goal,"fitness_level":fitness_level,
@@ -538,7 +552,9 @@ def recommend_exercise(goal, bmi, age, fitness_level, calorie_ratio,
         else: category,reason = "yoga_light","Within target — light activity recommended."
         scoring = "rule_based_v4"
 
-    exercises = exercisedb.get_exercises_for_category(category, limit_per_part=3, recently_done=recently_done)
+    exercises = exercisedb.get_exercises_for_category(
+        category, limit_per_part=3, exclude_names=recent_exercise_names,
+    )
     for ex in exercises:
         ex["has_animation"] = bool(ex.get("gif_url"))
     return {

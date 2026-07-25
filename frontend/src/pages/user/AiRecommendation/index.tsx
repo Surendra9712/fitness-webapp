@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Sparkles, Lock, Utensils, Dumbbell, Search } from "lucide-react";
+import { Sparkles, Lock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/api/client";
 import { Button } from "@/components/ui/button";
@@ -47,13 +47,13 @@ export default function AiRecommendation() {
   const [nlpResult, setNlpResult] = useState<NlpResponse | null>(null);
   const [nlpLoading, setNlpLoading] = useState(false);
 
-  const loadMealPlan = async () => {
+  const loadMealPlan = async (force = false) => {
     setLoadingMeal(true);
     setError("");
     try {
       const res = await api.get<{
         meal_plan: Record<string, MealRecommendation>;
-      }>("/ai/recommend/meal");
+      }>(`/ai/recommend/meal${force ? "?force=true" : ""}`);
       setMealPlan(res.meal_plan);
     } catch (e) {
       setError((e as Error).message);
@@ -62,10 +62,12 @@ export default function AiRecommendation() {
     }
   };
 
-  const loadExercise = async () => {
+  const loadExercise = async (force = false) => {
     setLoadingEx(true);
     try {
-      const res = await api.get<ExerciseRec>("/ai/recommend/exercise");
+      const res = await api.get<ExerciseRec>(
+        `/ai/recommend/exercise${force ? "?force=true" : ""}`,
+      );
       setExercise(res);
     } catch (e) {
       setError((e as Error).message);
@@ -167,28 +169,17 @@ export default function AiRecommendation() {
 
       <Tabs defaultValue={defaultTab}>
         <TabsList>
-          <TabsTrigger value="meals" className="flex gap-2">
-            {" "}
-            <Utensils size={14} />
-            Meal Plan
-          </TabsTrigger>
-          <TabsTrigger value="exercise" className="flex gap-2">
-            {" "}
-            <Dumbbell size={14} />
-            Exercise
-          </TabsTrigger>
-          <TabsTrigger value="search" className="flex gap-2">
-            <Search size={14} />
-            Food Search
-          </TabsTrigger>
-          {/* <TabsTrigger value="nlp">Ask AI</TabsTrigger> */}
+          <TabsTrigger value="meals">🍽️ Meal Plan</TabsTrigger>
+          <TabsTrigger value="exercise">🏋️ Exercise</TabsTrigger>
+          <TabsTrigger value="search">🔍 Food Search</TabsTrigger>
+          <TabsTrigger value="nlp">💬 Ask AI</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meals">
           <MealPlanTab
             mealPlan={mealPlan}
             loading={loadingMeal}
-            onRefresh={loadMealPlan}
+            onRefresh={() => loadMealPlan(true)}
           />
         </TabsContent>
 
@@ -196,23 +187,11 @@ export default function AiRecommendation() {
           <ExerciseTab
             exercise={exercise}
             loading={loadingEx}
-            onRefresh={loadExercise}
+            onRefresh={() => loadExercise(true)}
             completed={exerciseCompleted}
-            onExerciseComplete={(result) => {
-              setExerciseCompleted((prev) => [...prev, result]);
-              setExercise((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      exercises: prev.exercises.map((e) =>
-                        e.name === result.exercise_name
-                          ? { ...e, is_completed: true }
-                          : e,
-                      ),
-                    }
-                  : prev,
-              );
-            }}
+            onExerciseComplete={(result) =>
+              setExerciseCompleted((prev) => [...prev, result])
+            }
           />
         </TabsContent>
 
