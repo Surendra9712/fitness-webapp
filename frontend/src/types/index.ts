@@ -234,7 +234,7 @@ export interface BodyMetrics {
 export interface DashboardStats {
   date: string;
   calories_out: number;
-  exercise_mins_this_week: number;
+  exercise_mins_today: number;
   orders_count: number;
   pending_requests: number;
   metrics: BodyMetrics | null;

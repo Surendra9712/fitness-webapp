@@ -1,5 +1,4 @@
 import {
-  RefreshCw,
   Flame,
   Leaf,
   Sunrise,
@@ -9,10 +8,10 @@ import {
   Nut,
   type LucideIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageDate } from "@/components/PageDate";
 import { FoodCard } from "./FoodCard";
 import type { MealRecommendation } from "./types";
 
@@ -29,30 +28,22 @@ const MEAL_LABELS: Record<
 export function MealPlanTab({
   mealPlan,
   loading,
-  onRefresh,
+  planDate,
 }: {
   mealPlan: Record<string, MealRecommendation> | null;
   loading: boolean;
-  onRefresh: () => void;
+  planDate?: string | null;
 }) {
   return (
     <div className="space-y-4 mt-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           Breakfast &amp; snack ={" "}
           <span className="font-medium text-primary">light</span>{" "}
           &nbsp;•&nbsp; Lunch &amp; dinner ={" "}
           <span className="font-medium text-orange-500">heavy</span>
         </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <PageDate date={planDate} label="Plan for" />
       </div>
 
       {loading ? (

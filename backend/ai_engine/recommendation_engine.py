@@ -201,9 +201,10 @@ def _get_candidates_for_cuisine(cuisine: str, meal_type: str,
 def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
                               preferred_cuisines=None, top_n=3,
                               recently_eaten=None, recently_eaten_detail=None,
-                              goal="maintain"):
+                              goal="maintain", exclude_names=None):
     recently_eaten        = recently_eaten or set()
     recently_eaten_detail = recently_eaten_detail or {}
+    exclude_names         = exclude_names or set()
     preferred_cuisines    = [c.lower() for c in (preferred_cuisines or ["nepali"])]
 
     # Compute meal target
@@ -286,6 +287,15 @@ def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
     fresh = [f for f in eligible if f.get("name") not in two_day_eaten]
     pool  = fresh if len(fresh) >= top_n else eligible
 
+    # ── Cooldown: drop foods already served as a top pick recently ────────────
+    # Scoring is deterministic for a given profile, so the same food would win
+    # again tomorrow. exclude_names carries the recently-recommended top picks
+    # (see routes/ai.py) — relaxed only if it would empty the pool entirely.
+    if exclude_names:
+        off_cooldown = [f for f in pool if f.get("name") not in exclude_names]
+        if off_cooldown:
+            pool = off_cooldown
+
     # ── Score and rank ────────────────────────────────────────────────────────
     if ml_is_loaded():
         ml_ctx = {
@@ -364,10 +374,12 @@ def recommend_meal_for_type(meal_type, targets, meals_per_day, dietary,
 
 def recommend_daily_meals(weight_kg, height_cm, age, gender, activity_level, goal,
                             meals_per_day=3, dietary=None, preferred_cuisines=None,
-                            recently_eaten=None, recently_eaten_detail=None):
+                            recently_eaten=None, recently_eaten_detail=None,
+                            exclude_names=None):
     dietary               = dietary or {}
     recently_eaten        = recently_eaten or set()
     recently_eaten_detail = recently_eaten_detail or {}
+    exclude_names         = set(exclude_names or set())
     targets = calculate_nutrition_targets(weight_kg, height_cm, age, gender, activity_level, goal)
     dietary["_target_cal"] = targets.daily_calories
 
@@ -388,6 +400,7 @@ def recommend_daily_meals(weight_kg, height_cm, age, gender, activity_level, goa
             recently_eaten=recently_eaten,
             recently_eaten_detail=today_detail,
             goal=goal,
+            exclude_names=exclude_names,
         )
         daily_plan[mt] = result
         top_pick = result["recommendations"][0].get("name") if result["recommendations"] else None

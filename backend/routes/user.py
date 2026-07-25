@@ -181,8 +181,6 @@ def dashboard():
                 today_date = datetime.date.fromisoformat(date_str) if date_str else datetime.date.today()
             except ValueError:
                 today_date = datetime.date.today()
-        week_start = today_date - datetime.timedelta(days=today_date.weekday())
-        week_end = week_start + datetime.timedelta(days=6)
 
         cursor.execute(
             "SELECT COUNT(*) AS orders_count FROM orders WHERE user_id = %s",
@@ -196,19 +194,17 @@ def dashboard():
         )
         pending_requests = cursor.fetchone()['pending_requests']
 
+        # Both dashboard exercise stats cover the effective day only — the
+        # week-to-date view lives on the weekly report page.
         cursor.execute(
-            "SELECT COALESCE(SUM(calories_burned), 0) AS calories_out "
+            "SELECT COALESCE(SUM(calories_burned), 0) AS calories_out, "
+            "COALESCE(SUM(duration_minutes), 0) AS exercise_mins_today "
             "FROM exercise_logs WHERE user_id = %s AND logged_date = %s",
             (request.user_id, today_date.isoformat()),
         )
-        calories_out = float(cursor.fetchone()['calories_out'])
-
-        cursor.execute(
-            "SELECT COALESCE(SUM(duration_minutes), 0) AS exercise_mins_this_week "
-            "FROM exercise_logs WHERE user_id = %s AND logged_date BETWEEN %s AND %s",
-            (request.user_id, week_start.isoformat(), week_end.isoformat()),
-        )
-        exercise_mins_this_week = int(cursor.fetchone()['exercise_mins_this_week'])
+        exercise_today = cursor.fetchone()
+        calories_out = float(exercise_today['calories_out'])
+        exercise_mins_today = int(exercise_today['exercise_mins_today'])
 
         cursor.execute(
             "SELECT current_weight_kg, height_cm, date_of_birth, gender, activity_level, primary_goal "
@@ -221,7 +217,7 @@ def dashboard():
         return jsonify({
             'date': today_date.isoformat(),
             'calories_out': calories_out,
-            'exercise_mins_this_week': exercise_mins_this_week,
+            'exercise_mins_today': exercise_mins_today,
             'orders_count': int(orders_count),
             'pending_requests': int(pending_requests),
             'metrics': metrics,

@@ -10,7 +10,6 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  RefreshCw,
   Dumbbell,
   Droplets,
   Droplet,
@@ -26,19 +25,29 @@ import {
   FlaskConical,
   type LucideIcon,
 } from "lucide-react";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ProfileSetup from "./profile/ProfileSetup";
 import type { DashboardStats } from "@/types";
 import { Progress } from "@/components/ui/progress";
 import { SearchInput } from "@/components/ui/search-input";
+import { PageDate } from "@/components/PageDate";
+import type { ExerciseStatus } from "./AiRecommendation/types";
 
 interface MealLog {
   id: number;
@@ -590,10 +599,14 @@ export default function UserDashboard() {
   const [todayMeals, setTodayMeals] = useState<TodayMeals | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
   const [endingDay, setEndingDay] = useState(false);
   const [dayEnded, setDayEnded] = useState(false);
   const [lastEndedDate, setLastEndedDate] = useState<string | null>(null);
+  // Set when ending the day is blocked by unfinished exercises — drives the
+  // warning dialog that offers "End Meal Anyway".
+  const [exerciseWarning, setExerciseWarning] = useState<ExerciseStatus | null>(
+    null,
+  );
   const [tomorrowPlan, setTomorrowPlan] = useState<Record<
     string,
     unknown
@@ -647,7 +660,7 @@ export default function UserDashboard() {
         const signal = localStorage.getItem("smartdiet_exercise_completed");
         if (signal) {
           localStorage.removeItem("smartdiet_exercise_completed");
-          loadData(); // Refresh calories_burned + exercise_mins_this_week
+          loadData(); // Refresh calories_burned + exercise_mins_today
         }
       }
     };
@@ -661,12 +674,6 @@ export default function UserDashboard() {
     return () =>
       document.removeEventListener("visibilitychange", handleVisibility);
   }, [loadData]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
 
   const handleLogMeal = async (
     mealType: string,
@@ -705,21 +712,37 @@ export default function UserDashboard() {
     await loadData();
   };
 
-  const handleEndDay = async () => {
+  // Ending the day rolls tomorrow's session, so today's workout has to be done
+  // first. `force` is the "End Meal Anyway" escape hatch — the same flag the
+  // backend checks, so the guard can't be skipped by calling the API directly.
+  const handleEndDay = async (force = false) => {
     if (endingDay || (dayEnded && !DEV_ALWAYS_ALLOW_END_DAY)) return;
     setEndingDay(true);
     try {
+      if (!force) {
+        const status = await api.get<ExerciseStatus>("/ai/exercise/status");
+        if (!status.all_completed) {
+          setExerciseWarning(status);
+          return;
+        }
+      }
       const r = await api.post<{
         message: string;
         today_summary: { date?: string } & Record<string, unknown>;
         tomorrow_plan: Record<string, unknown>;
-      }>("/ai/meals/end-day", {});
+      }>("/ai/meals/end-day", { force });
+      setExerciseWarning(null);
       setDayEnded(true);
       setLastEndedDate(r.today_summary?.date || null);
       setTomorrowPlan(r.tomorrow_plan || null);
       await loadData();
     } catch (e) {
-      setError((e as Error).message);
+      // The backend re-checks and answers 409 with the same status payload —
+      // show the warning rather than a raw error if it got there first.
+      const err = e as ApiError;
+      const status = err.data?.exercise_status as ExerciseStatus | undefined;
+      if (err.status === 409 && status) setExerciseWarning(status);
+      else setError(err.message);
     } finally {
       setEndingDay(false);
     }
@@ -841,10 +864,11 @@ export default function UserDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground mt-0.5">
           Log your meals through the day — breakfast, lunch, snacks, then dinner
         </p>
+        <PageDate date={todayMeals?.date} />
       </div>
 
       {error && (
@@ -863,10 +887,10 @@ export default function UserDashboard() {
               sub: "kcal today",
             },
             {
-              label: "Exercise This Week",
-              value: `${stats.exercise_mins_this_week}m`,
+              label: "Exercise Today",
+              value: `${stats.exercise_mins_today}m`,
               icon: <Clock className="h-4 w-4 text-emerald-500" />,
-              sub: "minutes active",
+              sub: "minutes active today",
             },
             {
               label: "My Orders",
@@ -1003,7 +1027,7 @@ export default function UserDashboard() {
             )}
           </div>
           <div className="flex gap-3">
-            <Button onClick={handleEndDay} disabled={endingDay}>
+            <Button onClick={() => handleEndDay()} disabled={endingDay}>
               {endingDay ? "Saving..." : "End Meal Today"}
             </Button>
             <Button
@@ -1064,6 +1088,65 @@ export default function UserDashboard() {
           </Button>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(exerciseWarning)}
+        onOpenChange={(open) => {
+          if (!open) setExerciseWarning(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive shrink-0" />
+              Your exercise is not completed
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Complete the exercise before ending today's meals.
+              {exerciseWarning?.plan_available &&
+                ` You've finished ${exerciseWarning.completed} of ${exerciseWarning.total} recommended exercises.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {exerciseWarning && exerciseWarning.pending.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-800 mb-1 flex items-center gap-1.5">
+                <Dumbbell className="h-3.5 w-3.5 shrink-0" />
+                Still pending
+              </p>
+              <ul className="space-y-0.5">
+                {exerciseWarning.pending.map((name, i) => (
+                  <li key={`${name}-${i}`} className="text-xs text-amber-700">
+                    • {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setExerciseWarning(null)}
+              disabled={endingDay}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary-outline"
+              onClick={() => {
+                setExerciseWarning(null);
+                navigate("/trainee/ai-recommendations?tab=exercise");
+              }}
+            >
+              Complete Exercise
+            </Button>
+            <Button onClick={() => handleEndDay(true)} disabled={endingDay}>
+              {endingDay ? "Saving..." : "End Meal Anyway"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {stats?.metrics && (
         <Card>

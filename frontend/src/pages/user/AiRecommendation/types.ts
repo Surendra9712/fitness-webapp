@@ -41,6 +41,8 @@ export interface ExerciseItem {
 }
 
 export interface ExerciseRec {
+  /** Effective day this plan belongs to (YYYY-MM-DD, server-decided). */
+  date?: string;
   category: string;
   reason: string;
   scoring_method: string;
@@ -49,6 +51,17 @@ export interface ExerciseRec {
   target_calories: number;
   calorie_ratio: number;
   exercisedb_configured: boolean;
+}
+
+/** Progress against today's recommended exercises — gates "End Meal Today". */
+export interface ExerciseStatus {
+  date: string;
+  plan_available: boolean;
+  category?: string;
+  total: number;
+  completed: number;
+  pending: string[];
+  all_completed: boolean;
 }
 
 export interface NlpAnalysis {
