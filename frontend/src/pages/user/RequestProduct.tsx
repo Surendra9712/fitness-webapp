@@ -61,7 +61,7 @@ export default function RequestProduct() {
   });
 
   const { GetProductRequests, CreateProductRequest } = useUser();
-  const { data: requestsData } = GetProductRequests({
+  const { data: requestsData, refetch } = GetProductRequests({
     queryParams: { page, page_size: pageSize },
   });
   const requests = requestsData?.items ?? [];
@@ -88,6 +88,7 @@ export default function RequestProduct() {
       });
       toast.success("Request submitted! Admin will review it shortly.");
       form.reset();
+      refetch();
     } catch (e) {
       toast.error((e as Error).message);
     }

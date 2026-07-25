@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import type { TrainerAssignment } from "@/types";
 import { TrainerRequestDialog } from "./TrainerRequestDialog";
+import { TraineeDetailDialog } from "./TraineeDetailDialog";
 import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -44,6 +45,11 @@ export default function AssignmentRequests() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("pending_trainer");
   const [approveTarget, setApproveTarget] = useState<TrainerAssignment | null>(
+    null,
+  );
+  // The row whose trainee profile is open. Held as the whole assignment so the
+  // dialog can show its status/note/date without re-fetching them.
+  const [viewTrainee, setViewTrainee] = useState<TrainerAssignment | null>(
     null,
   );
 
@@ -100,7 +106,12 @@ export default function AssignmentRequests() {
             </TableHeader>
             <TableBody>
               {assignments.map((a) => (
-                <TableRow key={a.id}>
+                <TableRow
+                  key={a.id}
+                  className="cursor-pointer"
+                  title="View trainee profile"
+                  onClick={() => setViewTrainee(a)}
+                >
                   <TableCell>
                     <div className="font-medium">{a.customer_name}</div>
                     <div className="text-xs text-muted-foreground">
@@ -118,7 +129,9 @@ export default function AssignmentRequests() {
                       {STATUS_LABEL[a.status] ?? a.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  {/* Actions live inside a clickable row — stop the click here
+                      so approving doesn't also open the profile dialog. */}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     {a.status === "pending_trainer" && (
                       <div className="flex gap-1">
                         <Button
@@ -183,6 +196,13 @@ export default function AssignmentRequests() {
         onClose={() => setApproveTarget(null)}
         onSuccess={handleRequest}
       />
+
+      {viewTrainee && (
+        <TraineeDetailDialog
+          assignment={viewTrainee}
+          onClose={() => setViewTrainee(null)}
+        />
+      )}
     </div>
   );
 }

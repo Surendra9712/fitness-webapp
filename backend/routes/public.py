@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 from typing import List, Optional
 from database.connection import get_connection
-from middleware.auth import generate_token
+from middleware.auth import generate_token, decode_token_string
 from routes.dietitian import CertificationSchema
 from utils.notify import push_to_admins
 from utils.validation import pydantic_errors
@@ -38,6 +38,41 @@ class PublicBecomeTrainerSchema(BaseModel):
     @classmethod
     def normalise_email(cls, v):
         return str(v).strip().lower() if v else v
+
+
+class ContactMessageSchema(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    phone: Optional[str] = Field(default=None, max_length=30)
+    subject: str = Field(min_length=1, max_length=200)
+    message: str = Field(min_length=10, max_length=5000)
+
+    @field_validator('name', 'subject', 'message', 'phone', mode='before')
+    @classmethod
+    def strip_str(cls, v):
+        return str(v).strip() if isinstance(v, str) else v
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def normalise_contact_email(cls, v):
+        return str(v).strip().lower() if v else v
+
+    @field_validator('phone', mode='after')
+    @classmethod
+    def blank_phone_to_none(cls, v):
+        return v or None
+
+
+def _current_user_id():
+    """User id from the Authorization header if one was sent, else None.
+    Contact-us is open to anonymous visitors, so a missing or expired token
+    is not an error here — it just means the message isn't linked to an account."""
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '').strip()
+    if not token:
+        return None
+    data, err = decode_token_string(token)
+    return None if err else data.get('user_id')
 
 
 def _is_within_validity(valid_from, valid_to, today=None):
@@ -233,6 +268,56 @@ def list_product_reviews(product_id):
         reviews = cursor.fetchall()
         avg = sum(r['rating'] for r in reviews) / len(reviews) if reviews else 0
         return jsonify({'reviews': reviews, 'avg_rating': round(avg, 1), 'count': len(reviews)})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@public_bp.route('/contact', methods=['POST'])
+def submit_contact_message():
+    try:
+        body = ContactMessageSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    user_id = _current_user_id()
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Anyone can hit this endpoint unauthenticated, so cap how much a single
+        # sender can queue up before an admin has looked at any of it.
+        cursor.execute(
+            "SELECT COUNT(*) AS pending FROM contact_messages "
+            "WHERE email = %s AND status = 'new' AND deleted_at IS NULL "
+            "AND created_at > (NOW() - INTERVAL 1 HOUR)",
+            (body.email,),
+        )
+        if cursor.fetchone()['pending'] >= 5:
+            return jsonify({
+                'error': "You've sent several messages recently. "
+                         "Please wait for our reply before sending another."
+            }), 429
+
+        cursor.execute(
+            "INSERT INTO contact_messages (user_id, name, email, phone, subject, message) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (user_id, body.name, body.email, body.phone, body.subject, body.message),
+        )
+        message_id = cursor.lastrowid
+
+        push_to_admins(cursor, 'contact_message',
+                       'New Contact Message',
+                       f"{body.name} sent a message: {body.subject}",
+                       message_id)
+        conn.commit()
+        return jsonify({
+            'message': "Thanks for reaching out — we'll get back to you soon.",
+            'id': message_id,
+        }), 201
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
         conn.close()

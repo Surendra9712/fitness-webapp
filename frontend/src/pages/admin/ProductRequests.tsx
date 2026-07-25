@@ -51,6 +51,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ProductRequestDetailDialog,
+  htmlToText,
+} from "./ProductRequestDetailDialog";
+import { PRICE_STEP, priceSchema } from "@/lib/money";
 
 const statusVariant: Record<string, "info" | "success" | "destructive"> = {
   pending: "info",
@@ -59,7 +64,7 @@ const statusVariant: Record<string, "info" | "success" | "destructive"> = {
 };
 
 const approveSchema = z.object({
-  price: z.coerce.number().positive("Price must be greater than 0"),
+  price: priceSchema,
   stock_quantity: z.coerce.number().min(0, "Stock cannot be negative"),
   category: z.string().min(1, "Category is required"),
   admin_note: z.string().optional(),
@@ -77,6 +82,9 @@ export default function ProductRequests() {
     null,
   );
   const [rejectDialog, setRejectDialog] = useState<ProductRequest | null>(null);
+  // The row whose full request detail is open. Everything the dialog shows is
+  // already in the list response, so opening it costs no extra fetch.
+  const [detail, setDetail] = useState<ProductRequest | null>(null);
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
     initialPageSize: 20,
@@ -88,7 +96,7 @@ export default function ProductRequests() {
     RejectProductRequest,
     GetCategories,
   } = useAdmin();
-  const { data, isPlaceholderData, isFetching } = GetProductRequests({
+  const { data, isPlaceholderData, isFetching, refetch } = GetProductRequests({
     queryParams: { status: filter, page, page_size: pageSize },
   });
   const requests = data?.items ?? [];
@@ -145,6 +153,7 @@ export default function ProductRequests() {
         category: values.category,
         admin_note: values.admin_note,
       });
+      refetch();
       toast.success(
         `"${approveDialog.product_name}" approved and added to catalog`,
       );
@@ -161,6 +170,7 @@ export default function ProductRequests() {
         id: rejectDialog.id,
         admin_note: values.admin_note,
       });
+      refetch();
       toast.success("Request rejected");
       setRejectDialog(null);
     } catch (e) {
@@ -202,12 +212,17 @@ export default function ProductRequests() {
             ) : (
               <TableBody>
                 {requests.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow
+                    key={r.id}
+                    className="cursor-pointer"
+                    title="View request detail"
+                    onClick={() => setDetail(r)}
+                  >
                     <TableCell>
                       <div className="font-medium">{r.product_name}</div>
                       {r.description && (
                         <div className="max-w-xs truncate text-xs text-muted-foreground">
-                          {r.description}
+                          {htmlToText(r.description)}
                         </div>
                       )}
                     </TableCell>
@@ -236,7 +251,9 @@ export default function ProductRequests() {
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>
+                    {/* Actions sit inside a clickable row — stop the click so
+                        the menu doesn't also open the detail dialog. */}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {r.status === "pending" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -295,6 +312,23 @@ export default function ProductRequests() {
         onPageChange={goToPage}
       />
 
+      {detail && (
+        <ProductRequestDetailDialog
+          request={detail}
+          onClose={() => setDetail(null)}
+          // Hand off to the existing action dialogs rather than stacking two
+          // dialogs on top of each other.
+          onApprove={() => {
+            setApproveDialog(detail);
+            setDetail(null);
+          }}
+          onReject={() => {
+            setRejectDialog(detail);
+            setDetail(null);
+          }}
+        />
+      )}
+
       <Dialog
         open={!!approveDialog}
         onOpenChange={(o) => !o && setApproveDialog(null)}
@@ -305,10 +339,10 @@ export default function ProductRequests() {
           </DialogHeader>
           <Form {...approveForm}>
             <form onSubmit={approveForm.handleSubmit(onApprove)}>
-              <DialogBody>
+              <DialogBody className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Adding <strong>{approveDialog?.product_name}</strong> as a
-                  new product.
+                  Adding <strong>{approveDialog?.product_name}</strong> as a new
+                  product.
                 </p>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
@@ -322,7 +356,12 @@ export default function ProductRequests() {
                             <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
-                            <Input type="number" min="0" step="0.01" {...field} />
+                            <Input
+                              type="number"
+                              min="0"
+                              step={PRICE_STEP}
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -349,7 +388,10 @@ export default function ProductRequests() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />

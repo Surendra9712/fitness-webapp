@@ -39,6 +39,9 @@ api.interceptors.response.use(
         p === "/login" ||
         p === "/register" ||
         p === "/become-trainer" ||
+        p === "/contact" ||
+        p === "/terms" ||
+        p === "/privacy" ||
         p.startsWith("/products") ||
         p.startsWith("/payment");
 

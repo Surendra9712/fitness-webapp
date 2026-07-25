@@ -10,6 +10,7 @@ import {
   Tag,
   CheckCircle2,
   XCircle,
+  MoreHorizontal,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
@@ -42,6 +43,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { PromoCode } from "@/types";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -87,7 +96,8 @@ export default function PromoCodeManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PromoCode | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PromoCode | null>(null);
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
     initialPageSize: 20,
@@ -174,16 +184,22 @@ export default function PromoCodeManagement() {
     }
   }
 
-  async function handleDelete(id: number) {
-    setDeletingId(id);
+  function handleDeleteClick(p: PromoCode) {
+    setPendingDelete(p);
+    setConfirmOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
     try {
-      await deleteMut.mutateAsync(id);
-      toast.success("Promo code deleted");
+      await deleteMut.mutateAsync(pendingDelete.id);
+      toast.success(`Promo code "${pendingDelete.code}" deleted`);
       queryClient.invalidateQueries({ queryKey: ["adminPromoCodes"] });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
-      setDeletingId(null);
+      setPendingDelete(null);
+      setConfirmOpen(false);
     }
   }
 
@@ -278,19 +294,29 @@ export default function PromoCodeManagement() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(p)}>
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  disabled={deletingId === p.id}
-                  onClick={() => handleDelete(p.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+              <div className="shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="sr-only">Actions</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEdit(p)}>
+                      <Edit2 className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => handleDeleteClick(p)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           ))}
@@ -570,6 +596,15 @@ export default function PromoCodeManagement() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete promo code?"
+        description={`Delete "${pendingDelete?.code}"? Customers will no longer be able to redeem it. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

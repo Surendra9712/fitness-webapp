@@ -34,11 +34,13 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { Product, Category } from "@/types";
+import { PRICE_STEP, priceSchema } from "@/lib/money";
+import { QueryClient, useQueryClient } from "@tanstack/react-query";
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().min(1, "Description is required"),
-  price: z.coerce.number().positive("Price must be greater than 0"),
+  price: priceSchema,
   stock_quantity: z.coerce.number().min(0, "Stock cannot be negative"),
   category: z.string().min(1, "Category is required"),
   image_url: z.string().optional(),
@@ -63,10 +65,16 @@ interface Props {
   categories: Category[];
 }
 
-export function ProductFormDialog({ open, onOpenChange, editing, categories }: Props) {
+export function ProductFormDialog({
+  open,
+  onOpenChange,
+  editing,
+  categories,
+}: Props) {
   const { CreateProduct, UpdateProduct } = useAdmin();
   const createProduct = CreateProduct();
   const updateProduct = UpdateProduct();
+  const queryClient = useQueryClient();
 
   const form = useForm<ProductValues>({
     resolver: zodResolver(productSchema) as Resolver<ProductValues>,
@@ -116,6 +124,7 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
         await createProduct.mutateAsync(values);
       }
       toast.success(editing ? "Product updated" : "Product created");
+      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
       onOpenChange(false);
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors) {
@@ -136,15 +145,19 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <DialogBody>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <DialogBody className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>name<span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormLabel>
+                      Name<span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -155,9 +168,15 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>
+                      Description <span className="text-destructive">*</span>
+                    </FormLabel>
                     <FormControl>
-                      <RichTextEditor value={field.value ?? ""} onChange={field.onChange} placeholder="Describe the product…" />
+                      <RichTextEditor
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        placeholder="Describe the product…"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -170,8 +189,18 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Price (Rs.) <span className="text-destructive">*</span></FormLabel>
-                      <FormControl><Input type="number" min="0" placeholder="0" {...field} /></FormControl>
+                      <FormLabel>
+                        Price (Rs.) <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="0"
+                          step={PRICE_STEP}
+                          placeholder="0"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -183,7 +212,9 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Stock</FormLabel>
-                      <FormControl><Input type="number" min="0" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="number" min="0" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -197,13 +228,20 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {categories.map((c) => (
-                            <SelectItem key={c.slug} value={c.slug}>{c.name}</SelectItem>
+                            <SelectItem key={c.slug} value={c.slug}>
+                              {c.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -218,9 +256,14 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="active">Active</SelectItem>
@@ -253,9 +296,17 @@ export function ProductFormDialog({ open, onOpenChange, editing, categories }: P
             </DialogBody>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 {isSubmitting ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>

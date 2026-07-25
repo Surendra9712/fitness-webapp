@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
+import json
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 from pydantic import ConfigDict
 from typing import Literal, Optional
@@ -8,6 +9,7 @@ from middleware.auth import role_required
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_non_admins
+from utils.metrics import compute_body_metrics, age_from_dob
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -284,16 +286,34 @@ def list_users():
 
 
 @admin_bp.route('/users/<int:uid>', methods=['GET'])
-@role_required('admin')
+@role_required('admin', 'dietitian')
 def get_user(uid):
+    """Full user record. Admins may read anyone; a trainer only their own
+    trainees (any assignment status — a pending request is exactly when they
+    need the profile to decide whether to take the client on)."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        if request.user_role != 'admin':
+            cursor.execute(
+                "SELECT 1 FROM trainer_assignments "
+                "WHERE trainer_id = %s AND customer_id = %s AND deleted_at IS NULL "
+                "LIMIT 1",
+                (request.user_id, uid)
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'User not found'}), 404
+
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
+            "u.subscription_plan, u.subscription_status, "
             "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
             "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country, "
-            "p.experience_years, p.available_time "
+            "p.experience_years, p.available_time, p.occupation, "
+            "p.current_weight_kg, p.primary_goal, p.fitness_level, p.target_water_ml, "
+            "p.diet_type, p.dietary_restrictions, p.other_restrictions, p.allergens, "
+            "p.cuisine_preferences, p.meals_per_day, p.health_conditions, p.notes, "
+            "COALESCE(u.profile_image_url, p.profile_image_url) AS profile_image_url "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s AND u.deleted_at IS NULL",
             (uid,)
@@ -307,6 +327,19 @@ def get_user(uid):
                 user['available_time'] = _json.loads(user['available_time'])
             except Exception:
                 user['available_time'] = []
+        for field in ('dietary_restrictions', 'allergens',
+                      'cuisine_preferences', 'health_conditions'):
+            raw = user.get(field)
+            if isinstance(raw, str):
+                try:
+                    user[field] = json.loads(raw)
+                except Exception:
+                    user[field] = []
+            elif raw is None:
+                user[field] = []
+        if user.get('role') == 'trainee':
+            user['age'] = age_from_dob(user['date_of_birth']) if user.get('date_of_birth') else None
+            user['metrics'] = compute_body_metrics(user)
         if user.get('role') == 'dietitian':
             cursor.execute(
                 "SELECT id, name, file_url, file_type, created_at "
@@ -721,11 +754,14 @@ def approve_product_request(rid):
 
         category_id = _resolve_category_id(cursor, body.category)
 
+        # Carry the requester's suggested image over with the name/description —
+        # without it an approved product lands in the catalog with no picture.
         cursor.execute(
-            "INSERT INTO products (name, description, price, stock_quantity, category_id, status, created_by) "
-            "VALUES (%s,%s,%s,%s,%s,'active',%s)",
+            "INSERT INTO products (name, description, price, stock_quantity, category_id, image_url, status, created_by) "
+            "VALUES (%s,%s,%s,%s,%s,%s,'active',%s)",
             (req['product_name'], req['description'], body.price,
-             body.stock_quantity, category_id, request.user_id),
+             body.stock_quantity, category_id, req.get('image_url'),
+             request.user_id),
         )
         product_id = cursor.lastrowid
 
@@ -1486,6 +1522,136 @@ def set_product_discount(pid):
         )
         conn.commit()
         return jsonify({'message': 'Product discount set'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+class UpdateContactStatusSchema(BaseModel):
+    status: Literal['new', 'read', 'resolved']
+    admin_note: Optional[str] = None
+
+
+@admin_bp.route('/contact-messages', methods=['GET'])
+@role_required('admin')
+def list_contact_messages():
+    status_filter = request.args.get('status', 'all')
+    search = request.args.get('q', '').strip()
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        conditions = ["cm.deleted_at IS NULL"]
+        params = []
+        if status_filter and status_filter != 'all':
+            conditions.append("cm.status = %s")
+            params.append(status_filter)
+        if search:
+            conditions.append(
+                "(cm.name LIKE %s OR cm.email LIKE %s OR cm.subject LIKE %s "
+                "OR cm.message LIKE %s)"
+            )
+            params.extend([f"%{search}%"] * 4)
+        where = " WHERE " + " AND ".join(conditions)
+
+        base_join = "FROM contact_messages cm LEFT JOIN users h ON cm.handled_by = h.id" + where
+        cursor.execute("SELECT COUNT(*) AS total " + base_join, params)
+        total = cursor.fetchone()['total']
+
+        cursor.execute(
+            "SELECT cm.*, h.name AS handled_by_name " + base_join +
+            " ORDER BY FIELD(cm.status,'new','read','resolved'), cm.created_at DESC "
+            "LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = cursor.fetchall()
+
+        cursor.execute(
+            "SELECT status, COUNT(*) AS count FROM contact_messages "
+            "WHERE deleted_at IS NULL GROUP BY status"
+        )
+        counts = {r['status']: r['count'] for r in cursor.fetchall()}
+
+        return jsonify({
+            'items': rows,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+            # Tab badges need the unfiltered totals, not just this page's slice.
+            'counts': {
+                'new':      counts.get('new', 0),
+                'read':     counts.get('read', 0),
+                'resolved': counts.get('resolved', 0),
+            },
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/contact-messages/<int:mid>/status', methods=['PUT'])
+@role_required('admin')
+def update_contact_message_status(mid):
+    try:
+        body = UpdateContactStatusSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id FROM contact_messages WHERE id = %s AND deleted_at IS NULL",
+            (mid,),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'Message not found'}), 404
+
+        # Reopening back to 'new' clears the handler so the row reads as untouched.
+        if body.status == 'new':
+            cursor.execute(
+                "UPDATE contact_messages SET status = 'new', admin_note = %s, "
+                "handled_by = NULL, handled_at = NULL WHERE id = %s",
+                (body.admin_note, mid),
+            )
+        else:
+            cursor.execute(
+                "UPDATE contact_messages SET status = %s, admin_note = %s, "
+                "handled_by = %s, handled_at = NOW() WHERE id = %s",
+                (body.status, body.admin_note, request.user_id, mid),
+            )
+        conn.commit()
+        return jsonify({'message': 'Message updated'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/contact-messages/<int:mid>', methods=['DELETE'])
+@role_required('admin')
+def delete_contact_message(mid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id FROM contact_messages WHERE id = %s AND deleted_at IS NULL",
+            (mid,),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'Message not found'}), 404
+        cursor.execute(
+            "UPDATE contact_messages SET deleted_at = NOW() WHERE id = %s", (mid,)
+        )
+        conn.commit()
+        return jsonify({'message': 'Message deleted'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

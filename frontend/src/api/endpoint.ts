@@ -23,6 +23,9 @@ export const endpoint = {
   publicCategories: "public/categories",
   publicTrainers: "public/trainers",
   publicBecomeTrainer: "public/become-trainer",
+  publicContact: "public/contact",
+
+  adminContactMessages: "admin/contact-messages",
 
   dietitianProfile: "dietitian/profile",
   dietitianUsers: "dietitian/users",

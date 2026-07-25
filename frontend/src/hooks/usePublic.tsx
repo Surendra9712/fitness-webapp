@@ -17,6 +17,7 @@ import type {
   PublicBecomeTrainerPayload,
   BecomeTrainerResult,
   GlobalDiscount,
+  ContactMessagePayload,
 } from "@/types";
 
 interface UsePublicReturn {
@@ -39,6 +40,11 @@ interface UsePublicReturn {
     PublicBecomeTrainerPayload
   >;
   GetGlobalDiscount: (args?: QueryArgs) => UseQueryResult<GlobalDiscount>;
+  SubmitContactMessage: () => UseMutationResult<
+    { message: string; id: number },
+    Error,
+    ContactMessagePayload
+  >;
 }
 
 const usePublic = (): UsePublicReturn => {
@@ -118,6 +124,14 @@ const usePublic = (): UsePublicReturn => {
       },
     });
 
+  const SubmitContactMessage = () =>
+    useMutation({
+      mutationFn: async (payload: ContactMessagePayload) => {
+        const { data } = await api.post(endpoint.publicContact, payload);
+        return data as { message: string; id: number };
+      },
+    });
+
   return {
     GetProducts,
     GetProduct,
@@ -127,6 +141,8 @@ const usePublic = (): UsePublicReturn => {
     SubmitProductReview,
     DeleteProductReview,
     BecomeTrainer,
+    GetGlobalDiscount,
+    SubmitContactMessage,
   } as UsePublicReturn;
 };
 

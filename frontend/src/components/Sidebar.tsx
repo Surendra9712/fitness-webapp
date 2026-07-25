@@ -37,6 +37,7 @@ import {
   BarChart3,
   MessageCircle,
   ChevronsUpDown,
+  Inbox,
 } from "lucide-react";
 import type { Role } from "@/types";
 import useUser from "@/hooks/useUser";
@@ -112,6 +113,11 @@ const navLinks: Record<Role, NavItem[]> = {
       to: "/admin/discount-management",
       label: "Discounts",
       icon: <BadgePercent className="h-4 w-4" />,
+    },
+    {
+      to: "/admin/contact-messages",
+      label: "Messages",
+      icon: <Inbox className="h-4 w-4" />,
     },
     {
       to: "/admin/notifications",
@@ -333,11 +339,8 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-2.5 rounded-lg bg-white/5 px-3 py-2.5 text-left transition-colors hover:bg-white/10">
-              {/* <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-500/30 text-xs font-bold text-primary-300">
-                {user.name.charAt(0).toUpperCase()}
-              </div> */}
-              <Avatar>
-                <AvatarFallback className="text-lg">
+              <Avatar variant={"muted"}>
+                <AvatarFallback>
                   {avatarInitial(user?.name || user?.full_name)}
                 </AvatarFallback>
                 <AvatarImage src={user.profile_image_url} alt={user.name} />

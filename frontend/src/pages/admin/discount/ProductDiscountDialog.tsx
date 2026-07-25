@@ -145,8 +145,8 @@ export default function ProductDiscountDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <DialogBody>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <DialogBody className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Original price:{" "}
                 <strong>Rs. {Number(product.price).toFixed(2)}</strong>

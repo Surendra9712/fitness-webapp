@@ -12,6 +12,7 @@ import ChatMessages from "@/components/chat/ChatMessages";
 import ChatComposer from "@/components/chat/ChatComposer";
 import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import { cn } from "@/lib/utils";
+import { avatarInitial } from "@/lib/constant";
 
 export default function TrainerChat() {
   const { user } = useAuth();
@@ -93,7 +94,7 @@ export default function TrainerChat() {
               <Avatar>
                 <AvatarImage src={t.peer_image_url ?? undefined} />
                 <AvatarFallback className="text-sm">
-                  {t.peer_name.charAt(0).toUpperCase()}
+                  {avatarInitial(t?.peer_name)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
@@ -139,10 +140,10 @@ export default function TrainerChat() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Avatar className="h-8 w-8 shrink-0">
+                <Avatar>
                   <AvatarImage src={activeThread.peer_image_url ?? undefined} />
                   <AvatarFallback className="text-xs">
-                    {activeThread.peer_name.charAt(0).toUpperCase()}
+                    {avatarInitial(activeThread?.peer_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">

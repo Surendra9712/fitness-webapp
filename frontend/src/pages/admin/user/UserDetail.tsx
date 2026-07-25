@@ -1,6 +1,17 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, Pencil, UserX, UserCheck, Trash2, Clock, Award, Briefcase, FileBadge, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Pencil,
+  UserX,
+  UserCheck,
+  Trash2,
+  Clock,
+  Award,
+  Briefcase,
+  FileBadge,
+  ExternalLink,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +22,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { UserModal } from "./UserModal";
 import { toast } from "sonner";
-import { GENDER, ROLE_LABELS } from "@/lib/constant";
-import type { User, Role, Gender, AvailableSlot, TrainerCertification } from "@/types";
+import { avatarInitial, GENDER, ROLE_LABELS } from "@/lib/constant";
+import type {
+  User,
+  Role,
+  Gender,
+  AvailableSlot,
+  TrainerCertification,
+} from "@/types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const roleBadge: Record<Role, "destructive" | "info" | "success"> = {
   admin: "destructive",
@@ -152,13 +170,6 @@ export default function UserDetail() {
     certifications?: TrainerCertification[];
   };
 
-  const initials = u.name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -173,9 +184,12 @@ export default function UserDetail() {
         {/* Profile card */}
         <Card className="md:col-span-1">
           <CardContent className="flex flex-col items-center gap-4 pt-8 pb-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-2xl font-bold dark:bg-emerald-900/40 dark:text-emerald-300">
-              {initials}
-            </div>
+            <Avatar size="4xl">
+              <AvatarFallback size={"3xl"}>
+                {avatarInitial(u?.name)}
+              </AvatarFallback>
+              <AvatarImage src={u?.profile_image_url} />
+            </Avatar>
             <div className="text-center">
               <p className="text-lg font-semibold">{u.name}</p>
               <p className="text-sm text-muted-foreground">{u.email}</p>
@@ -234,7 +248,11 @@ export default function UserDetail() {
                   onClick={async () => {
                     try {
                       await verifyTrainer.mutateAsync(u.id);
-                      toast.success(u.is_verified ? "Trainer unverified" : "Trainer verified");
+                      toast.success(
+                        u.is_verified
+                          ? "Trainer unverified"
+                          : "Trainer verified",
+                      );
                       refetch();
                     } catch (err) {
                       toast.error((err as Error).message);
@@ -316,10 +334,17 @@ export default function UserDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="divide-y">
-                  <InfoRow label="Specialization" value={u.specialization || "N/A"} />
+                  <InfoRow
+                    label="Specialization"
+                    value={u.specialization || "N/A"}
+                  />
                   <InfoRow
                     label="Experience"
-                    value={u.experience_years != null ? `${u.experience_years} yr${u.experience_years !== 1 ? "s" : ""}` : null}
+                    value={
+                      u.experience_years != null
+                        ? `${u.experience_years} yr${u.experience_years !== 1 ? "s" : ""}`
+                        : null
+                    }
                   />
                   {u.bio && (
                     <div className="py-2">
@@ -345,8 +370,12 @@ export default function UserDetail() {
                           key={i}
                           className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2"
                         >
-                          <p className="text-xs font-semibold text-emerald-700">{slot.day}</p>
-                          <p className="text-xs text-emerald-600 mt-0.5">{slot.from} – {slot.to}</p>
+                          <p className="text-xs font-semibold text-emerald-700">
+                            {slot.day}
+                          </p>
+                          <p className="text-xs text-emerald-600 mt-0.5">
+                            {slot.from} – {slot.to}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -370,7 +399,9 @@ export default function UserDetail() {
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <FileBadge className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="text-sm font-medium truncate">{cert.name}</span>
+                          <span className="text-sm font-medium truncate">
+                            {cert.name}
+                          </span>
                           <span className="text-xs text-muted-foreground shrink-0">
                             ({cert.file_type === "pdf" ? "PDF" : "Image"})
                           </span>

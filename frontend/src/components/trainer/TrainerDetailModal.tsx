@@ -21,6 +21,7 @@ import { TrainerRequestDialog } from "./TrainerRequestDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { Review } from "@/types";
+import { avatarInitial } from "@/lib/constant";
 
 interface Props {
   trainerId: number | null;
@@ -130,10 +131,10 @@ export function TrainerDetailModal({ trainerId, onOpenChange }: Props) {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12">
+                  <Avatar>
                     <AvatarImage src={trainer.profile_image_url} />
-                    <AvatarFallback className="text-base font-bold">
-                      {trainer.name.charAt(0).toUpperCase()}
+                    <AvatarFallback>
+                      {avatarInitial(trainer.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">

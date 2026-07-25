@@ -34,6 +34,10 @@ export default function Navbar() {
               <Link to="/products">Products</Link>
             </Button>
 
+            <Button variant="ghost" className="max-sm:hidden" asChild>
+              <Link to="/contact">Contact</Link>
+            </Button>
+
             {user ? (
               <>
                 {/* Cart button — only for customer role */}

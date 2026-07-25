@@ -24,6 +24,8 @@ import type {
   UpdateOrderStatusPayload,
   AssignmentActionPayload,
   ApproveProductRequestPayload,
+  ContactMessagesResponse,
+  UpdateContactStatusPayload,
 } from "@/types";
 
 interface UseAdminReturn {
@@ -115,6 +117,13 @@ interface UseAdminReturn {
   UpdateGlobalDiscount: () => UseMutationResult<GlobalDiscount, Error, GlobalDiscount>;
   SetProductDiscount: () => UseMutationResult<void, Error, { id: number; discount_type: string; discount_value: number; valid_from?: string | null; valid_to?: string | null }>;
   ClearProductDiscount: () => UseMutationResult<void, Error, number>;
+  GetContactMessages: (args?: QueryArgs) => UseQueryResult<ContactMessagesResponse>;
+  UpdateContactMessageStatus: () => UseMutationResult<
+    void,
+    Error,
+    UpdateContactStatusPayload
+  >;
+  DeleteContactMessage: () => UseMutationResult<void, Error, number>;
 }
 
 const useAdmin = (): UseAdminReturn => {
@@ -321,6 +330,18 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
+  const { get: GetContactMessages, delete: DeleteContactMessage } = useApi({
+    endpoint: endpoint.adminContactMessages,
+    queryKey: "adminContactMessages",
+  });
+
+  const UpdateContactMessageStatus = () =>
+    useMutation({
+      mutationFn: async ({ id, ...rest }: UpdateContactStatusPayload) => {
+        await api.put(`${endpoint.adminContactMessages}/${id}/status`, rest);
+      },
+    });
+
   return {
     GetStats,
     GetStatsTrends,
@@ -362,6 +383,9 @@ const useAdmin = (): UseAdminReturn => {
     UpdateGlobalDiscount,
     SetProductDiscount,
     ClearProductDiscount,
+    GetContactMessages,
+    UpdateContactMessageStatus,
+    DeleteContactMessage,
   } as UseAdminReturn;
 };
 
