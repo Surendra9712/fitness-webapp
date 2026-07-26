@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS trainer_assignments (
     id                  INT AUTO_INCREMENT PRIMARY KEY,
     customer_id         INT NOT NULL,
     trainer_id          INT NOT NULL,
-    status              ENUM('pending_trainer','pending_admin','approved','rejected') NOT NULL DEFAULT 'pending_trainer',
+    status              ENUM('pending_trainer','pending_admin','approved','rejected','ended') NOT NULL DEFAULT 'pending_trainer',
     customer_note       TEXT,
     trainer_note        TEXT,
     admin_note          TEXT,

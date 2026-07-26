@@ -25,7 +25,10 @@ export type AssignmentStatus =
   | "pending_trainer"
   | "pending_admin"
   | "approved"
-  | "rejected";
+  /** Request was never accepted. */
+  | "rejected"
+  /** An approved pairing that an admin later unassigned. */
+  | "ended";
 
 export interface TrainerCertification {
   id: number;
@@ -362,6 +365,18 @@ export interface AssignmentActionPayload {
   admin_note?: string;
 }
 
+/** Statuses an admin can move an assignment to via the status endpoint. */
+export type AdminAssignmentAction = Extract<
+  AssignmentStatus,
+  "approved" | "rejected" | "ended"
+>;
+
+export interface UpdateAssignmentStatusPayload {
+  id: number;
+  status: AdminAssignmentAction;
+  admin_note?: string;
+}
+
 export interface TrainerAssignmentActionPayload {
   id: number;
   trainer_note?: string;
@@ -460,7 +475,8 @@ export type NotificationType =
   | "trainer_signup_request"
   | "trainer_accepted"
   | "trainer_approved"
-  | "trainer_rejected";
+  | "trainer_rejected"
+  | "trainer_unassigned";
 
 export interface Notification {
   id: number;

@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { CheckCircle, XCircle, UserCheck, MoreHorizontal } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  CheckCircle,
+  XCircle,
+  UserCheck,
+  MoreHorizontal,
+  UserMinus,
+} from "lucide-react";
 import useAdmin from "@/hooks/useAdmin";
 import { usePagination } from "@/hooks/usePagination";
 import { AppPagination } from "@/components/ui/app-pagination";
@@ -32,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import type { TrainerAssignment } from "@/types";
+import type { AdminAssignmentAction, TrainerAssignment } from "@/types";
 import { TableBodySkeleton } from "@/components/TableSkeleton";
 import {
   DropdownMenu,
@@ -47,6 +54,7 @@ const STATUS_BADGE: Record<string, string> = {
   pending_admin: "bg-blue-100 text-blue-800 border-blue-200",
   approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
   rejected: "bg-red-100 text-red-700 border-red-200",
+  ended: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -54,27 +62,86 @@ const STATUS_LABEL: Record<string, string> = {
   pending_admin: "Awaiting Admin",
   approved: "Approved",
   rejected: "Rejected",
+  ended: "Unassigned",
+};
+
+/** Per-action copy for the shared confirmation dialog. */
+const ACTION_META: Record<
+  AdminAssignmentAction,
+  {
+    title: string;
+    confirmLabel: string;
+    pendingLabel: string;
+    destructive: boolean;
+    noteLabel: string;
+    notePlaceholder: string;
+    description: (a: TrainerAssignment) => React.ReactNode;
+    toast: (a: TrainerAssignment) => string;
+  }
+> = {
+  approved: {
+    title: "Approve Assignment",
+    confirmLabel: "Approve",
+    pendingLabel: "Approving…",
+    destructive: false,
+    noteLabel: "Admin note (optional)",
+    notePlaceholder: "e.g. Approved — good match",
+    description: (a) => (
+      <>
+        Assigning <strong>{a.customer_name}</strong> to trainer{" "}
+        <strong>{a.trainer_name}</strong>.
+      </>
+    ),
+    toast: () => "Assignment approved",
+  },
+  rejected: {
+    title: "Reject Assignment",
+    confirmLabel: "Reject",
+    pendingLabel: "Rejecting…",
+    destructive: true,
+    noteLabel: "Reason (optional)",
+    notePlaceholder: "e.g. Trainer at capacity",
+    description: (a) => (
+      <>
+        Rejecting assignment of <strong>{a.customer_name}</strong> to{" "}
+        <strong>{a.trainer_name}</strong>.
+      </>
+    ),
+    toast: () => "Assignment rejected",
+  },
+  ended: {
+    title: "Unassign Trainer",
+    confirmLabel: "Unassign",
+    pendingLabel: "Unassigning…",
+    destructive: true,
+    noteLabel: "Reason (optional)",
+    notePlaceholder: "e.g. Trainee requested a change",
+    description: (a) => (
+      <>
+        This ends the active pairing between <strong>{a.customer_name}</strong>{" "}
+        and <strong>{a.trainer_name}</strong>. Their chat and calls stop
+        working, and the trainee can request a new trainer. Both are notified.
+      </>
+    ),
+    toast: (a) => `${a.trainer_name} unassigned from ${a.customer_name}`,
+  },
 };
 
 export default function TrainerAssignments() {
   const [filter, setFilter] = useState("pending_admin");
-  const [approveTarget, setApproveTarget] = useState<TrainerAssignment | null>(
-    null,
-  );
-  const [rejectTarget, setRejectTarget] = useState<TrainerAssignment | null>(
-    null,
-  );
+  // One dialog serves all three actions; the target status picks its copy.
+  const [target, setTarget] = useState<{
+    assignment: TrainerAssignment;
+    status: AdminAssignmentAction;
+  } | null>(null);
   const [adminNote, setAdminNote] = useState("");
+  const queryClient = useQueryClient();
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
     initialPageSize: 20,
   });
 
-  const {
-    GetTrainerAssignments,
-    ApproveTrainerAssignment,
-    RejectTrainerAssignment,
-  } = useAdmin();
+  const { GetTrainerAssignments, UpdateTrainerAssignmentStatus } = useAdmin();
   const { data, isPlaceholderData, isFetching } = GetTrainerAssignments({
     queryParams: { status: filter, page, page_size: pageSize },
   });
@@ -85,36 +152,37 @@ export default function TrainerAssignments() {
     setFilter(value);
     resetPage();
   }
-  const approveAssignment = ApproveTrainerAssignment();
-  const rejectAssignment = RejectTrainerAssignment();
 
-  async function approve() {
-    if (!approveTarget) return;
+  const updateStatus = UpdateTrainerAssignmentStatus();
+
+  function openAction(
+    assignment: TrainerAssignment,
+    status: AdminAssignmentAction,
+  ) {
+    setAdminNote("");
+    setTarget({ assignment, status });
+  }
+
+  async function submitAction() {
+    if (!target) return;
+    const { assignment, status } = target;
     try {
-      await approveAssignment.mutateAsync({
-        id: approveTarget.id,
+      await updateStatus.mutateAsync({
+        id: assignment.id,
+        status,
         admin_note: adminNote || undefined,
       });
-      toast.success("Assignment approved");
-      setApproveTarget(null);
+      toast.success(ACTION_META[status].toast(assignment));
+      setTarget(null);
+      // The row's badge and available actions both change, so refetch.
+      queryClient.invalidateQueries({ queryKey: ["adminTrainerAssignments"] });
+      queryClient.invalidateQueries({ queryKey: ["adminStats"] });
     } catch (e) {
       toast.error((e as Error).message);
     }
   }
 
-  async function reject() {
-    if (!rejectTarget) return;
-    try {
-      await rejectAssignment.mutateAsync({
-        id: rejectTarget.id,
-        admin_note: adminNote || undefined,
-      });
-      toast.success("Assignment rejected");
-      setRejectTarget(null);
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
-  }
+  const meta = target ? ACTION_META[target.status] : null;
 
   return (
     <div className="space-y-6">
@@ -130,6 +198,7 @@ export default function TrainerAssignments() {
             <SelectItem value="pending_admin">Pending Approval</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="ended">Unassigned</SelectItem>
             <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
@@ -182,41 +251,57 @@ export default function TrainerAssignments() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {/* {a.status === "pending_admin" && ( */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setAdminNote("");
-                              setApproveTarget(a);
-                            }}
-                          >
-                            <CheckCircle className="h-3.5 w-3.5 mr-1" /> Approve
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              setAdminNote("");
-                              setRejectTarget(a);
-                            }}
-                          >
-                            <XCircle className="h-3.5 w-3.5 mr-1" />
-                            Reject
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      {/* )} */}
+                      {/* Actions mirror what the API will actually accept:
+                          approve only from pending_admin, reject while either
+                          side is still pending, unassign only once approved. */}
+                      {a.status === "rejected" || a.status === "ended" ? (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {a.status === "pending_admin" && (
+                              <DropdownMenuItem
+                                onClick={() => openAction(a, "approved")}
+                              >
+                                <CheckCircle className="h-3.5 w-3.5 mr-1" />{" "}
+                                Approve
+                              </DropdownMenuItem>
+                            )}
+                            {a.status === "approved" && (
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => openAction(a, "ended")}
+                              >
+                                <UserMinus className="h-3.5 w-3.5 mr-1" />
+                                Unassign Trainer
+                              </DropdownMenuItem>
+                            )}
+                            {(a.status === "pending_admin" ||
+                              a.status === "pending_trainer") && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => openAction(a, "rejected")}
+                                >
+                                  <XCircle className="h-3.5 w-3.5 mr-1" />
+                                  Reject
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -245,69 +330,34 @@ export default function TrainerAssignments() {
           onPageChange={goToPage}
         />
       )}
-      <Dialog
-        open={!!approveTarget}
-        onOpenChange={() => setApproveTarget(null)}
-      >
+      <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Approve Assignment</DialogTitle>
+            <DialogTitle>{meta?.title}</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <p className="text-sm text-muted-foreground">
-              Assigning <strong>{approveTarget?.customer_name}</strong> to
-              trainer <strong>{approveTarget?.trainer_name}</strong>.
+            <p className="text-sm text-muted-foreground mb-2">
+              {target && meta?.description(target.assignment)}
             </p>
-            <div className="space-y-1.5">
-              <Label>Admin note (optional)</Label>
+            <div className="flex flex-col gap-2">
+              <Label>{meta?.noteLabel}</Label>
               <Input
-                placeholder="e.g. Approved — good match"
+                placeholder={meta?.notePlaceholder}
                 value={adminNote}
                 onChange={(e) => setAdminNote(e.target.value)}
               />
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveTarget(null)}>
-              Cancel
-            </Button>
-            <Button onClick={approve} disabled={approveAssignment.isPending}>
-              {approveAssignment.isPending ? "Approving…" : "Approve"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!rejectTarget} onOpenChange={() => setRejectTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Reject Assignment</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <p className="text-sm text-muted-foreground">
-              Rejecting assignment of{" "}
-              <strong>{rejectTarget?.customer_name}</strong> to{" "}
-              <strong>{rejectTarget?.trainer_name}</strong>.
-            </p>
-            <div className="space-y-1.5">
-              <Label>Reason (optional)</Label>
-              <Input
-                placeholder="e.g. Trainer at capacity"
-                value={adminNote}
-                onChange={(e) => setAdminNote(e.target.value)}
-              />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>
+            <Button variant="outline" onClick={() => setTarget(null)}>
               Cancel
             </Button>
             <Button
-              variant="destructive"
-              onClick={reject}
-              disabled={rejectAssignment.isPending}
+              variant={meta?.destructive ? "destructive" : "default"}
+              onClick={submitAction}
+              disabled={updateStatus.isPending}
             >
-              {rejectAssignment.isPending ? "Rejecting…" : "Reject"}
+              {updateStatus.isPending ? meta?.pendingLabel : meta?.confirmLabel}
             </Button>
           </DialogFooter>
         </DialogContent>

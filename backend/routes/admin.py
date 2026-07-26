@@ -119,11 +119,6 @@ class UpdateOrderStatusSchema(BaseModel):
     status: Literal['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
 
 
-class TrainerAssignmentNoteSchema(BaseModel):
-    model_config = ConfigDict(extra='ignore')
-    admin_note: Optional[str] = None
-
-
 # ── Categories ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/categories', methods=['GET'])
@@ -1003,80 +998,95 @@ def list_trainer_assignments():
         conn.close()
 
 
-@admin_bp.route('/trainer-assignments/<int:aid>/approve', methods=['PUT'])
+# Each admin-settable status: which statuses it may be reached from, the error
+# when it can't, and the notification both parties get. Keeping the rules in one
+# table is what lets a single endpoint serve approve / reject / unassign.
+_ASSIGNMENT_STATUS_RULES = {
+    'approved': {
+        'from':  ('pending_admin',),
+        'error': 'Assignment is not pending admin review',
+        'type':  'trainer_approved',
+        'customer': ('Trainer Assignment Approved',
+                     'Your trainer assignment has been fully approved. '
+                     'You can now connect with your trainer!'),
+        'trainer':  ('Assignment Approved by Admin',
+                     'The admin has approved your new client assignment.'),
+        'echo_note': False,
+        'message': 'Trainer assignment approved',
+    },
+    'rejected': {
+        'from':  ('pending_admin', 'pending_trainer'),
+        'error': 'Assignment cannot be rejected at this stage',
+        'type':  'trainer_rejected',
+        'customer': ('Trainer Assignment Declined',
+                     'Your trainer assignment request was not approved by the admin.'),
+        'trainer':  ('Assignment Declined by Admin',
+                     'The admin has declined the client assignment request.'),
+        'echo_note': True,
+        'message': 'Trainer assignment rejected',
+    },
+    'ended': {
+        'from':  ('approved',),
+        'error': 'Only an approved assignment can be unassigned',
+        'type':  'trainer_unassigned',
+        'customer': ('Trainer Unassigned',
+                     'An admin has ended your assignment with your trainer. '
+                     'You can request a new trainer at any time.'),
+        'trainer':  ('Client Assignment Ended',
+                     'An admin has ended one of your client assignments.'),
+        'echo_note': True,
+        'message': 'Trainer unassigned',
+    },
+}
+
+
+class UpdateAssignmentStatusSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    status: Literal['approved', 'rejected', 'ended']
+    admin_note: Optional[str] = None
+
+
+@admin_bp.route('/trainer-assignments/<int:aid>/status', methods=['PUT'])
 @role_required('admin')
-def approve_trainer_assignment(aid):
+def update_trainer_assignment_status(aid):
+    """Approve, reject or unassign an assignment — the target status comes in
+    the payload. 'ended' means an approved pairing was stopped; since every
+    access check elsewhere requires status = 'approved', that alone revokes
+    chat/calls, drops the trainee from the trainer's client list, and frees the
+    trainee to request a new trainer, while keeping the row for audit."""
     try:
-        body = TrainerAssignmentNoteSchema.model_validate(request.get_json() or {})
+        body = UpdateAssignmentStatusSchema.model_validate(request.get_json() or {})
     except ValidationError as exc:
         return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    rule = _ASSIGNMENT_STATUS_RULES[body.status]
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT * FROM trainer_assignments WHERE id = %s", (aid,))
+        cursor.execute(
+            "SELECT * FROM trainer_assignments WHERE id = %s AND deleted_at IS NULL",
+            (aid,),
+        )
         row = cursor.fetchone()
         if not row:
             return jsonify({'error': 'Assignment not found'}), 404
-        if row['status'] != 'pending_admin':
-            return jsonify({'error': 'Assignment is not pending admin review'}), 400
+        if row['status'] not in rule['from']:
+            return jsonify({'error': rule['error']}), 400
 
         cursor.execute(
-            "UPDATE trainer_assignments SET status='approved', admin_note=%s, "
+            "UPDATE trainer_assignments SET status=%s, admin_note=%s, "
             "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
-            (body.admin_note, request.user_id, aid),
+            (body.status, body.admin_note, request.user_id, aid),
         )
-        push(cursor, row['customer_id'], 'trainer_approved',
-             'Trainer Assignment Approved',
-             'Your trainer assignment has been fully approved. You can now connect with your trainer!',
-             aid)
-        push(cursor, row['trainer_id'], 'trainer_approved',
-             'Assignment Approved by Admin',
-             'The admin has approved your new client assignment.',
-             aid)
+
+        suffix = f' Reason: {body.admin_note}' if body.admin_note and rule['echo_note'] else ''
+        for user_key, party in (('customer_id', 'customer'), ('trainer_id', 'trainer')):
+            title, message = rule[party]
+            push(cursor, row[user_key], rule['type'], title, message + suffix, aid)
+
         conn.commit()
-        return jsonify({'message': 'Trainer assignment approved'})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@admin_bp.route('/trainer-assignments/<int:aid>/reject', methods=['PUT'])
-@role_required('admin')
-def reject_trainer_assignment(aid):
-    try:
-        body = TrainerAssignmentNoteSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute("SELECT * FROM trainer_assignments WHERE id = %s", (aid,))
-        row = cursor.fetchone()
-        if not row:
-            return jsonify({'error': 'Assignment not found'}), 404
-        if row['status'] not in ('pending_admin', 'pending_trainer'):
-            return jsonify({'error': 'Assignment cannot be rejected at this stage'}), 400
-
-        cursor.execute(
-            "UPDATE trainer_assignments SET status='rejected', admin_note=%s, "
-            "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
-            (body.admin_note, request.user_id, aid),
-        )
-        push(cursor, row['customer_id'], 'trainer_rejected',
-             'Trainer Assignment Declined',
-             'Your trainer assignment request was not approved by the admin.',
-             aid)
-        push(cursor, row['trainer_id'], 'trainer_rejected',
-             'Assignment Declined by Admin',
-             'The admin has declined the client assignment request.',
-             aid)
-        conn.commit()
-        return jsonify({'message': 'Trainer assignment rejected'})
+        return jsonify({'message': rule['message']})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

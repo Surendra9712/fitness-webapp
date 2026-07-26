@@ -23,6 +23,7 @@ import type {
   UpdateUserPayload,
   UpdateOrderStatusPayload,
   AssignmentActionPayload,
+  UpdateAssignmentStatusPayload,
   ApproveProductRequestPayload,
   ContactMessagesResponse,
   UpdateContactStatusPayload,
@@ -82,15 +83,10 @@ interface UseAdminReturn {
   GetTrainerAssignments: (
     args?: QueryArgs,
   ) => UseQueryResult<PaginatedResponse<TrainerAssignment>>;
-  ApproveTrainerAssignment: () => UseMutationResult<
+  UpdateTrainerAssignmentStatus: () => UseMutationResult<
     void,
     Error,
-    AssignmentActionPayload
-  >;
-  RejectTrainerAssignment: () => UseMutationResult<
-    void,
-    Error,
-    AssignmentActionPayload
+    UpdateAssignmentStatusPayload
   >;
   GetProductRequests: (
     args?: QueryArgs,
@@ -198,35 +194,14 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
-  const ApproveTrainerAssignment = () =>
+  // Approve / reject / unassign are all the same call — the target status is
+  // the payload.
+  const UpdateTrainerAssignmentStatus = () =>
     useMutation({
-      mutationFn: async ({
-        id,
-        admin_note,
-      }: {
-        id: number;
-        admin_note?: string;
-      }) => {
+      mutationFn: async ({ id, ...rest }: UpdateAssignmentStatusPayload) => {
         const { data } = await api.put(
-          `${endpoint.adminTrainerAssignments}/${id}/approve`,
-          { admin_note },
-        );
-        return data;
-      },
-    });
-
-  const RejectTrainerAssignment = () =>
-    useMutation({
-      mutationFn: async ({
-        id,
-        admin_note,
-      }: {
-        id: number;
-        admin_note?: string;
-      }) => {
-        const { data } = await api.put(
-          `${endpoint.adminTrainerAssignments}/${id}/reject`,
-          { admin_note },
+          `${endpoint.adminTrainerAssignments}/${id}/status`,
+          rest,
         );
         return data;
       },
@@ -366,8 +341,7 @@ const useAdmin = (): UseAdminReturn => {
     DeleteOrder,
     UpdateOrderStatus,
     GetTrainerAssignments,
-    ApproveTrainerAssignment,
-    RejectTrainerAssignment,
+    UpdateTrainerAssignmentStatus,
     GetProductRequests,
     ApproveProductRequest,
     RejectProductRequest,

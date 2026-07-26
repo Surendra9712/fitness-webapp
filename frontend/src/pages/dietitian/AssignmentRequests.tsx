@@ -32,6 +32,7 @@ const STATUS_BADGE: Record<string, string> = {
   pending_admin: "bg-blue-100 text-blue-800 border-blue-200",
   approved: "bg-emerald-100 text-emerald-800 border-emerald-200",
   rejected: "bg-red-100 text-red-700 border-red-200",
+  ended: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -39,6 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   pending_admin: "Awaiting Admin",
   approved: "Approved",
   rejected: "Rejected",
+  ended: "Unassigned by Admin",
 };
 
 export default function AssignmentRequests() {
@@ -87,6 +89,7 @@ export default function AssignmentRequests() {
             <SelectItem value="pending_admin">Pending Admin</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="ended">Unassigned</SelectItem>
             <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
