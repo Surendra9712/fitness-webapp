@@ -258,13 +258,10 @@ export default function BecomeTrainer() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Become a Trainer</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Fill out your trainer profile to request approval. This information
-          will be visible to customers once an admin verifies your account.
-        </p>
-      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Fill out your trainer profile to request approval. This information will
+        be visible to customers once an admin verifies your account.
+      </p>
 
       <Form {...form}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

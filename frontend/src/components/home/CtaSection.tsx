@@ -57,7 +57,7 @@ export default function CtaSection() {
                 </Button>
                 {user.role === "trainee" && (
                   <Button size="lg" variant="accent" asChild>
-                    <Link to="/customer/become-trainer">
+                    <Link to="/become-trainer">
                       <Award className="mr-2 h-5 w-5" /> Become a Trainer
                     </Link>
                   </Button>

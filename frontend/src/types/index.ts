@@ -25,7 +25,10 @@ export type AssignmentStatus =
   | "pending_trainer"
   | "pending_admin"
   | "approved"
-  | "rejected";
+  /** Request was never accepted. */
+  | "rejected"
+  /** An approved pairing that an admin later unassigned. */
+  | "ended";
 
 export interface TrainerCertification {
   id: number;
@@ -240,6 +243,35 @@ export interface DashboardStats {
   metrics: BodyMetrics | null;
 }
 
+/**
+ * The onboarding profile fields that `GET admin/users/:id` adds on top of
+ * `User` for a trainee. Trainers get the same payload for their own trainees.
+ */
+export interface TraineeDetail extends User {
+  // Personal
+  date_of_birth?: string | null;
+  phone_number?: string | null;
+  city?: string | null;
+  country?: string | null;
+  occupation?: string | null;
+  // Body & goals
+  current_weight_kg?: number | null;
+  primary_goal?: string | null;
+  fitness_level?: string | null;
+  target_water_ml?: number | null;
+  // Diet
+  diet_type?: string | null;
+  dietary_restrictions: string[];
+  other_restrictions?: string | null;
+  allergens: string[];
+  cuisine_preferences: string[];
+  meals_per_day?: number | null;
+  // Health
+  health_conditions: { name?: string; condition?: string; notes?: string }[];
+  notes?: string | null;
+  metrics: BodyMetrics | null;
+}
+
 export interface Review {
   id: number;
   user_id: number;
@@ -330,6 +362,18 @@ export interface UpdateOrderStatusPayload {
 
 export interface AssignmentActionPayload {
   id: number;
+  admin_note?: string;
+}
+
+/** Statuses an admin can move an assignment to via the status endpoint. */
+export type AdminAssignmentAction = Extract<
+  AssignmentStatus,
+  "approved" | "rejected" | "ended"
+>;
+
+export interface UpdateAssignmentStatusPayload {
+  id: number;
+  status: AdminAssignmentAction;
   admin_note?: string;
 }
 
@@ -431,7 +475,8 @@ export type NotificationType =
   | "trainer_signup_request"
   | "trainer_accepted"
   | "trainer_approved"
-  | "trainer_rejected";
+  | "trainer_rejected"
+  | "trainer_unassigned";
 
 export interface Notification {
   id: number;
@@ -526,6 +571,43 @@ export interface PublicBecomeTrainerPayload {
 export interface BecomeTrainerResult {
   token: string;
   user: { id: number; name: string; email: string; role: "dietitian" };
+}
+
+export type ContactMessageStatus = "new" | "read" | "resolved";
+
+export interface ContactMessage {
+  id: number;
+  user_id?: number | null;
+  name: string;
+  email: string;
+  phone?: string | null;
+  subject: string;
+  message: string;
+  status: ContactMessageStatus;
+  admin_note?: string | null;
+  handled_by?: number | null;
+  handled_by_name?: string | null;
+  handled_at?: string | null;
+  created_at: string;
+}
+
+export interface ContactMessagePayload {
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+}
+
+export interface ContactMessagesResponse
+  extends PaginatedResponse<ContactMessage> {
+  counts: Record<ContactMessageStatus, number>;
+}
+
+export interface UpdateContactStatusPayload {
+  id: number;
+  status: ContactMessageStatus;
+  admin_note?: string | null;
 }
 
 export interface UpdateProfilePayload {

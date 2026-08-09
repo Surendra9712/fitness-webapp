@@ -1,5 +1,7 @@
 import os
+from decimal import Decimal
 from flask import Flask
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -20,7 +22,30 @@ import sockets.call_events  # noqa: F401 - registers socketio event handlers
 
 load_dotenv()
 
+
+class TrimmedDecimalJSONProvider(DefaultJSONProvider):
+    """Serialise DECIMAL columns as the number that was saved, not a padded string.
+
+    MySQL DECIMAL(10,2) always renders two decimal places, so a price saved as
+    1000 reads back as Decimal('1000.00') and Flask's default provider turns
+    that into the string "1000.00". Money stays DECIMAL in the database — exact,
+    unlike float — but the API now hands back exactly what the client sent
+    (1000, 99.9, 1234.56), which also matches the `number` types the frontend
+    already declares for these fields.
+    """
+
+    @staticmethod
+    def default(o):
+        if isinstance(o, Decimal):
+            trimmed = o.normalize()
+            if trimmed == trimmed.to_integral_value():
+                return int(trimmed)
+            return float(trimmed)
+        return DefaultJSONProvider.default(o)
+
+
 app = Flask(__name__)
+app.json = TrimmedDecimalJSONProvider(app)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 socketio.init_app(
     app,

@@ -237,7 +237,10 @@ export default function ProductDetail() {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <meta.Icon className="h-28 w-28 opacity-30 text-white" strokeWidth={1.5} />
+                <meta.Icon
+                  className="h-28 w-28 opacity-30 text-white"
+                  strokeWidth={1.5}
+                />
               )}
               {outOfStock && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
@@ -273,20 +276,20 @@ export default function ProductDetail() {
               {product.discounted_price != null ? (
                 <div className="flex items-baseline gap-3">
                   <span className="text-4xl font-black tracking-tight text-primary-700">
-                    RS. {Number(product.discounted_price).toFixed(2)}
+                    RS. {product.discounted_price}
                   </span>
                   <span className="text-xl line-through text-muted-foreground font-medium">
-                    RS. {Number(product.price).toFixed(2)}
+                    RS. {product.price}
                   </span>
                   <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white">
                     {product.discount_type === "percentage"
-                      ? `${Number(product.discount_value).toFixed(0)}% OFF`
-                      : `RS. ${Number(product.discount_value).toFixed(0)} OFF`}
+                      ? `${product.discount_value}% OFF`
+                      : `RS. ${product.discount_value} OFF`}
                   </span>
                 </div>
               ) : (
                 <span className="text-4xl font-black tracking-tight text-foreground">
-                  RS. {Number(product.price).toFixed(2)}
+                  RS. {product.price}
                 </span>
               )}
               <div className="mt-1 text-sm">
@@ -330,7 +333,7 @@ export default function ProductDetail() {
                   <span className="text-sm text-muted-foreground">
                     ={" "}
                     <strong className="text-foreground">
-                      RS. {orderTotal.toFixed(2)}
+                      RS. {orderTotal}
                     </strong>
                   </span>
                 </div>

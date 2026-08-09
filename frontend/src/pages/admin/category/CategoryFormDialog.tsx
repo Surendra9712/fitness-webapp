@@ -47,7 +47,11 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-export default function CategoryFormDialog({ open, onOpenChange, category }: Props) {
+export default function CategoryFormDialog({
+  open,
+  onOpenChange,
+  category,
+}: Props) {
   const { CreateCategory, UpdateCategory } = useAdmin();
   const createCategory = CreateCategory();
   const updateCategory = UpdateCategory();
@@ -61,7 +65,11 @@ export default function CategoryFormDialog({ open, onOpenChange, category }: Pro
   useEffect(() => {
     if (!open) return;
     if (category) {
-      form.reset({ name: category.name, slug: category.slug, description: category.description ?? "" });
+      form.reset({
+        name: category.name,
+        slug: category.slug,
+        description: category.description ?? "",
+      });
     } else {
       form.reset({ name: "", slug: "", description: "" });
     }
@@ -93,12 +101,14 @@ export default function CategoryFormDialog({ open, onOpenChange, category }: Pro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{category ? "Edit Category" : "Add Category"}</DialogTitle>
+          <DialogTitle>
+            {category ? "Edit Category" : "Add Category"}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <DialogBody>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <DialogBody className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
@@ -158,7 +168,11 @@ export default function CategoryFormDialog({ open, onOpenChange, category }: Pro
             </DialogBody>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={saving}>

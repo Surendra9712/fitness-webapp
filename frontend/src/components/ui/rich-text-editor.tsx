@@ -1,4 +1,5 @@
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEffect } from "react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
   Bold, Italic, List, ListOrdered, Heading2, Heading3,
@@ -11,6 +12,15 @@ interface RichTextEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   className?: string;
+}
+
+/**
+ * TipTap spells an empty document as `<p></p>`; callers use "" for empty.
+ * Both directions go through this so the sync check below compares like values.
+ */
+function readValue(editor: Editor): string {
+  const html = editor.getHTML();
+  return html === "<p></p>" ? "" : html;
 }
 
 function ToolbarBtn({
@@ -59,10 +69,21 @@ export function RichTextEditor({
       },
     },
     onUpdate({ editor }) {
-      const html = editor.getHTML();
-      onChange(html === "<p></p>" ? "" : html);
+      onChange(readValue(editor));
     },
   });
+
+  // `content` above only seeds the document on the first render, so a later
+  // `value` change from outside — form.reset() after submit, or loading a
+  // different record to edit — would leave stale text sitting in the editor.
+  // Push those in, but only once the two have actually diverged: re-setting on
+  // every keystroke would rebuild the document and drop the caret. emitUpdate
+  // is off because syncing inward must not fire onChange back at the parent.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    if (value === readValue(editor)) return;
+    editor.commands.setContent(value || "", { emitUpdate: false });
+  }, [value, editor]);
 
   if (!editor) return null;
 

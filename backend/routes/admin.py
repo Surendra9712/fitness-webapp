@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
+import json
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 from pydantic import ConfigDict
 from typing import Literal, Optional
@@ -8,6 +9,7 @@ from middleware.auth import role_required
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_non_admins
+from utils.metrics import compute_body_metrics, age_from_dob
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -115,11 +117,6 @@ class RejectRequestSchema(BaseModel):
 
 class UpdateOrderStatusSchema(BaseModel):
     status: Literal['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
-
-
-class TrainerAssignmentNoteSchema(BaseModel):
-    model_config = ConfigDict(extra='ignore')
-    admin_note: Optional[str] = None
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
@@ -284,16 +281,34 @@ def list_users():
 
 
 @admin_bp.route('/users/<int:uid>', methods=['GET'])
-@role_required('admin')
+@role_required('admin', 'dietitian')
 def get_user(uid):
+    """Full user record. Admins may read anyone; a trainer only their own
+    trainees (any assignment status — a pending request is exactly when they
+    need the profile to decide whether to take the client on)."""
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
+        if request.user_role != 'admin':
+            cursor.execute(
+                "SELECT 1 FROM trainer_assignments "
+                "WHERE trainer_id = %s AND customer_id = %s AND deleted_at IS NULL "
+                "LIMIT 1",
+                (request.user_id, uid)
+            )
+            if not cursor.fetchone():
+                return jsonify({'error': 'User not found'}), 404
+
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
+            "u.subscription_plan, u.subscription_status, "
             "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
             "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country, "
-            "p.experience_years, p.available_time "
+            "p.experience_years, p.available_time, p.occupation, "
+            "p.current_weight_kg, p.primary_goal, p.fitness_level, p.target_water_ml, "
+            "p.diet_type, p.dietary_restrictions, p.other_restrictions, p.allergens, "
+            "p.cuisine_preferences, p.meals_per_day, p.health_conditions, p.notes, "
+            "COALESCE(u.profile_image_url, p.profile_image_url) AS profile_image_url "
             "FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
             "WHERE u.id = %s AND u.deleted_at IS NULL",
             (uid,)
@@ -307,6 +322,19 @@ def get_user(uid):
                 user['available_time'] = _json.loads(user['available_time'])
             except Exception:
                 user['available_time'] = []
+        for field in ('dietary_restrictions', 'allergens',
+                      'cuisine_preferences', 'health_conditions'):
+            raw = user.get(field)
+            if isinstance(raw, str):
+                try:
+                    user[field] = json.loads(raw)
+                except Exception:
+                    user[field] = []
+            elif raw is None:
+                user[field] = []
+        if user.get('role') == 'trainee':
+            user['age'] = age_from_dob(user['date_of_birth']) if user.get('date_of_birth') else None
+            user['metrics'] = compute_body_metrics(user)
         if user.get('role') == 'dietitian':
             cursor.execute(
                 "SELECT id, name, file_url, file_type, created_at "
@@ -721,11 +749,14 @@ def approve_product_request(rid):
 
         category_id = _resolve_category_id(cursor, body.category)
 
+        # Carry the requester's suggested image over with the name/description —
+        # without it an approved product lands in the catalog with no picture.
         cursor.execute(
-            "INSERT INTO products (name, description, price, stock_quantity, category_id, status, created_by) "
-            "VALUES (%s,%s,%s,%s,%s,'active',%s)",
+            "INSERT INTO products (name, description, price, stock_quantity, category_id, image_url, status, created_by) "
+            "VALUES (%s,%s,%s,%s,%s,%s,'active',%s)",
             (req['product_name'], req['description'], body.price,
-             body.stock_quantity, category_id, request.user_id),
+             body.stock_quantity, category_id, req.get('image_url'),
+             request.user_id),
         )
         product_id = cursor.lastrowid
 
@@ -967,80 +998,95 @@ def list_trainer_assignments():
         conn.close()
 
 
-@admin_bp.route('/trainer-assignments/<int:aid>/approve', methods=['PUT'])
+# Each admin-settable status: which statuses it may be reached from, the error
+# when it can't, and the notification both parties get. Keeping the rules in one
+# table is what lets a single endpoint serve approve / reject / unassign.
+_ASSIGNMENT_STATUS_RULES = {
+    'approved': {
+        'from':  ('pending_admin',),
+        'error': 'Assignment is not pending admin review',
+        'type':  'trainer_approved',
+        'customer': ('Trainer Assignment Approved',
+                     'Your trainer assignment has been fully approved. '
+                     'You can now connect with your trainer!'),
+        'trainer':  ('Assignment Approved by Admin',
+                     'The admin has approved your new client assignment.'),
+        'echo_note': False,
+        'message': 'Trainer assignment approved',
+    },
+    'rejected': {
+        'from':  ('pending_admin', 'pending_trainer'),
+        'error': 'Assignment cannot be rejected at this stage',
+        'type':  'trainer_rejected',
+        'customer': ('Trainer Assignment Declined',
+                     'Your trainer assignment request was not approved by the admin.'),
+        'trainer':  ('Assignment Declined by Admin',
+                     'The admin has declined the client assignment request.'),
+        'echo_note': True,
+        'message': 'Trainer assignment rejected',
+    },
+    'ended': {
+        'from':  ('approved',),
+        'error': 'Only an approved assignment can be unassigned',
+        'type':  'trainer_unassigned',
+        'customer': ('Trainer Unassigned',
+                     'An admin has ended your assignment with your trainer. '
+                     'You can request a new trainer at any time.'),
+        'trainer':  ('Client Assignment Ended',
+                     'An admin has ended one of your client assignments.'),
+        'echo_note': True,
+        'message': 'Trainer unassigned',
+    },
+}
+
+
+class UpdateAssignmentStatusSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    status: Literal['approved', 'rejected', 'ended']
+    admin_note: Optional[str] = None
+
+
+@admin_bp.route('/trainer-assignments/<int:aid>/status', methods=['PUT'])
 @role_required('admin')
-def approve_trainer_assignment(aid):
+def update_trainer_assignment_status(aid):
+    """Approve, reject or unassign an assignment — the target status comes in
+    the payload. 'ended' means an approved pairing was stopped; since every
+    access check elsewhere requires status = 'approved', that alone revokes
+    chat/calls, drops the trainee from the trainer's client list, and frees the
+    trainee to request a new trainer, while keeping the row for audit."""
     try:
-        body = TrainerAssignmentNoteSchema.model_validate(request.get_json() or {})
+        body = UpdateAssignmentStatusSchema.model_validate(request.get_json() or {})
     except ValidationError as exc:
         return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    rule = _ASSIGNMENT_STATUS_RULES[body.status]
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT * FROM trainer_assignments WHERE id = %s", (aid,))
+        cursor.execute(
+            "SELECT * FROM trainer_assignments WHERE id = %s AND deleted_at IS NULL",
+            (aid,),
+        )
         row = cursor.fetchone()
         if not row:
             return jsonify({'error': 'Assignment not found'}), 404
-        if row['status'] != 'pending_admin':
-            return jsonify({'error': 'Assignment is not pending admin review'}), 400
+        if row['status'] not in rule['from']:
+            return jsonify({'error': rule['error']}), 400
 
         cursor.execute(
-            "UPDATE trainer_assignments SET status='approved', admin_note=%s, "
+            "UPDATE trainer_assignments SET status=%s, admin_note=%s, "
             "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
-            (body.admin_note, request.user_id, aid),
+            (body.status, body.admin_note, request.user_id, aid),
         )
-        push(cursor, row['customer_id'], 'trainer_approved',
-             'Trainer Assignment Approved',
-             'Your trainer assignment has been fully approved. You can now connect with your trainer!',
-             aid)
-        push(cursor, row['trainer_id'], 'trainer_approved',
-             'Assignment Approved by Admin',
-             'The admin has approved your new client assignment.',
-             aid)
+
+        suffix = f' Reason: {body.admin_note}' if body.admin_note and rule['echo_note'] else ''
+        for user_key, party in (('customer_id', 'customer'), ('trainer_id', 'trainer')):
+            title, message = rule[party]
+            push(cursor, row[user_key], rule['type'], title, message + suffix, aid)
+
         conn.commit()
-        return jsonify({'message': 'Trainer assignment approved'})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
-
-
-@admin_bp.route('/trainer-assignments/<int:aid>/reject', methods=['PUT'])
-@role_required('admin')
-def reject_trainer_assignment(aid):
-    try:
-        body = TrainerAssignmentNoteSchema.model_validate(request.get_json() or {})
-    except ValidationError as exc:
-        return jsonify({'errors': pydantic_errors(exc)}), 422
-
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute("SELECT * FROM trainer_assignments WHERE id = %s", (aid,))
-        row = cursor.fetchone()
-        if not row:
-            return jsonify({'error': 'Assignment not found'}), 404
-        if row['status'] not in ('pending_admin', 'pending_trainer'):
-            return jsonify({'error': 'Assignment cannot be rejected at this stage'}), 400
-
-        cursor.execute(
-            "UPDATE trainer_assignments SET status='rejected', admin_note=%s, "
-            "reviewed_by_admin=%s, admin_reviewed_at=NOW() WHERE id = %s",
-            (body.admin_note, request.user_id, aid),
-        )
-        push(cursor, row['customer_id'], 'trainer_rejected',
-             'Trainer Assignment Declined',
-             'Your trainer assignment request was not approved by the admin.',
-             aid)
-        push(cursor, row['trainer_id'], 'trainer_rejected',
-             'Assignment Declined by Admin',
-             'The admin has declined the client assignment request.',
-             aid)
-        conn.commit()
-        return jsonify({'message': 'Trainer assignment rejected'})
+        return jsonify({'message': rule['message']})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1486,6 +1532,136 @@ def set_product_discount(pid):
         )
         conn.commit()
         return jsonify({'message': 'Product discount set'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+class UpdateContactStatusSchema(BaseModel):
+    status: Literal['new', 'read', 'resolved']
+    admin_note: Optional[str] = None
+
+
+@admin_bp.route('/contact-messages', methods=['GET'])
+@role_required('admin')
+def list_contact_messages():
+    status_filter = request.args.get('status', 'all')
+    search = request.args.get('q', '').strip()
+    page, page_size, offset = parse_page_params(default_size=20, max_size=100)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        conditions = ["cm.deleted_at IS NULL"]
+        params = []
+        if status_filter and status_filter != 'all':
+            conditions.append("cm.status = %s")
+            params.append(status_filter)
+        if search:
+            conditions.append(
+                "(cm.name LIKE %s OR cm.email LIKE %s OR cm.subject LIKE %s "
+                "OR cm.message LIKE %s)"
+            )
+            params.extend([f"%{search}%"] * 4)
+        where = " WHERE " + " AND ".join(conditions)
+
+        base_join = "FROM contact_messages cm LEFT JOIN users h ON cm.handled_by = h.id" + where
+        cursor.execute("SELECT COUNT(*) AS total " + base_join, params)
+        total = cursor.fetchone()['total']
+
+        cursor.execute(
+            "SELECT cm.*, h.name AS handled_by_name " + base_join +
+            " ORDER BY FIELD(cm.status,'new','read','resolved'), cm.created_at DESC "
+            "LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
+        rows = cursor.fetchall()
+
+        cursor.execute(
+            "SELECT status, COUNT(*) AS count FROM contact_messages "
+            "WHERE deleted_at IS NULL GROUP BY status"
+        )
+        counts = {r['status']: r['count'] for r in cursor.fetchall()}
+
+        return jsonify({
+            'items': rows,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': max(1, -(-total // page_size)),
+            # Tab badges need the unfiltered totals, not just this page's slice.
+            'counts': {
+                'new':      counts.get('new', 0),
+                'read':     counts.get('read', 0),
+                'resolved': counts.get('resolved', 0),
+            },
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/contact-messages/<int:mid>/status', methods=['PUT'])
+@role_required('admin')
+def update_contact_message_status(mid):
+    try:
+        body = UpdateContactStatusSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id FROM contact_messages WHERE id = %s AND deleted_at IS NULL",
+            (mid,),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'Message not found'}), 404
+
+        # Reopening back to 'new' clears the handler so the row reads as untouched.
+        if body.status == 'new':
+            cursor.execute(
+                "UPDATE contact_messages SET status = 'new', admin_note = %s, "
+                "handled_by = NULL, handled_at = NULL WHERE id = %s",
+                (body.admin_note, mid),
+            )
+        else:
+            cursor.execute(
+                "UPDATE contact_messages SET status = %s, admin_note = %s, "
+                "handled_by = %s, handled_at = NOW() WHERE id = %s",
+                (body.status, body.admin_note, request.user_id, mid),
+            )
+        conn.commit()
+        return jsonify({'message': 'Message updated'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/contact-messages/<int:mid>', methods=['DELETE'])
+@role_required('admin')
+def delete_contact_message(mid):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id FROM contact_messages WHERE id = %s AND deleted_at IS NULL",
+            (mid,),
+        )
+        if not cursor.fetchone():
+            return jsonify({'error': 'Message not found'}), 404
+        cursor.execute(
+            "UPDATE contact_messages SET deleted_at = NOW() WHERE id = %s", (mid,)
+        )
+        conn.commit()
+        return jsonify({'message': 'Message deleted'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

@@ -23,7 +23,10 @@ import type {
   UpdateUserPayload,
   UpdateOrderStatusPayload,
   AssignmentActionPayload,
+  UpdateAssignmentStatusPayload,
   ApproveProductRequestPayload,
+  ContactMessagesResponse,
+  UpdateContactStatusPayload,
 } from "@/types";
 
 interface UseAdminReturn {
@@ -80,15 +83,10 @@ interface UseAdminReturn {
   GetTrainerAssignments: (
     args?: QueryArgs,
   ) => UseQueryResult<PaginatedResponse<TrainerAssignment>>;
-  ApproveTrainerAssignment: () => UseMutationResult<
+  UpdateTrainerAssignmentStatus: () => UseMutationResult<
     void,
     Error,
-    AssignmentActionPayload
-  >;
-  RejectTrainerAssignment: () => UseMutationResult<
-    void,
-    Error,
-    AssignmentActionPayload
+    UpdateAssignmentStatusPayload
   >;
   GetProductRequests: (
     args?: QueryArgs,
@@ -115,6 +113,13 @@ interface UseAdminReturn {
   UpdateGlobalDiscount: () => UseMutationResult<GlobalDiscount, Error, GlobalDiscount>;
   SetProductDiscount: () => UseMutationResult<void, Error, { id: number; discount_type: string; discount_value: number; valid_from?: string | null; valid_to?: string | null }>;
   ClearProductDiscount: () => UseMutationResult<void, Error, number>;
+  GetContactMessages: (args?: QueryArgs) => UseQueryResult<ContactMessagesResponse>;
+  UpdateContactMessageStatus: () => UseMutationResult<
+    void,
+    Error,
+    UpdateContactStatusPayload
+  >;
+  DeleteContactMessage: () => UseMutationResult<void, Error, number>;
 }
 
 const useAdmin = (): UseAdminReturn => {
@@ -189,35 +194,14 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
-  const ApproveTrainerAssignment = () =>
+  // Approve / reject / unassign are all the same call — the target status is
+  // the payload.
+  const UpdateTrainerAssignmentStatus = () =>
     useMutation({
-      mutationFn: async ({
-        id,
-        admin_note,
-      }: {
-        id: number;
-        admin_note?: string;
-      }) => {
+      mutationFn: async ({ id, ...rest }: UpdateAssignmentStatusPayload) => {
         const { data } = await api.put(
-          `${endpoint.adminTrainerAssignments}/${id}/approve`,
-          { admin_note },
-        );
-        return data;
-      },
-    });
-
-  const RejectTrainerAssignment = () =>
-    useMutation({
-      mutationFn: async ({
-        id,
-        admin_note,
-      }: {
-        id: number;
-        admin_note?: string;
-      }) => {
-        const { data } = await api.put(
-          `${endpoint.adminTrainerAssignments}/${id}/reject`,
-          { admin_note },
+          `${endpoint.adminTrainerAssignments}/${id}/status`,
+          rest,
         );
         return data;
       },
@@ -321,6 +305,18 @@ const useAdmin = (): UseAdminReturn => {
       },
     });
 
+  const { get: GetContactMessages, delete: DeleteContactMessage } = useApi({
+    endpoint: endpoint.adminContactMessages,
+    queryKey: "adminContactMessages",
+  });
+
+  const UpdateContactMessageStatus = () =>
+    useMutation({
+      mutationFn: async ({ id, ...rest }: UpdateContactStatusPayload) => {
+        await api.put(`${endpoint.adminContactMessages}/${id}/status`, rest);
+      },
+    });
+
   return {
     GetStats,
     GetStatsTrends,
@@ -345,8 +341,7 @@ const useAdmin = (): UseAdminReturn => {
     DeleteOrder,
     UpdateOrderStatus,
     GetTrainerAssignments,
-    ApproveTrainerAssignment,
-    RejectTrainerAssignment,
+    UpdateTrainerAssignmentStatus,
     GetProductRequests,
     ApproveProductRequest,
     RejectProductRequest,
@@ -362,6 +357,9 @@ const useAdmin = (): UseAdminReturn => {
     UpdateGlobalDiscount,
     SetProductDiscount,
     ClearProductDiscount,
+    GetContactMessages,
+    UpdateContactMessageStatus,
+    DeleteContactMessage,
   } as UseAdminReturn;
 };
 

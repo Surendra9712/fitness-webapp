@@ -187,7 +187,7 @@ export default function PublicBecomeTrainer() {
       <Navigate
         to={
           user.role === "trainee"
-            ? "/customer/become-trainer"
+            ? "/trainee/become-trainer"
             : getDashboardPath(user.role)
         }
         replace

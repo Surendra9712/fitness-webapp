@@ -1,4 +1,4 @@
-import { Clock, CheckCircle2, XCircle, X } from 'lucide-react'
+import { Clock, CheckCircle2, XCircle, X, UserMinus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,12 @@ export const STATUS_META: Record<string, {
     color: 'bg-red-100 text-red-700 border-red-200',
     icon: <XCircle className="h-4 w-4" />,
     description: 'Your request was rejected. You can request a different trainer.',
+  },
+  ended: {
+    label: 'Ended',
+    color: 'bg-gray-100 text-gray-700 border-gray-200',
+    icon: <UserMinus className="h-4 w-4" />,
+    description: 'An admin ended this assignment. You can request a different trainer.',
   },
 }
 

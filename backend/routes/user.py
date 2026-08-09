@@ -18,6 +18,7 @@ from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_admins
 from utils.fx import npr_to_usd_cents
+from utils.metrics import compute_body_metrics
 from utils.devtime import DEV_MODE, get_effective_today
 
 ESEWA_SECRET       = os.getenv('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q')
@@ -91,78 +92,6 @@ class UpdateProfileSchema(BaseModel):
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
-def _compute_metrics(profile: dict) -> Optional[dict]:
-    """Return BMI / BMR / TDEE / macros from a user_profiles row, or None if data missing."""
-    w = profile.get('current_weight_kg')
-    h = profile.get('height_cm')
-    if not w or not h:
-        return None
-    w, h = float(w), float(h)
-
-    dob = profile.get('date_of_birth')
-    try:
-        if isinstance(dob, (datetime.date, datetime.datetime)):
-            today_d = datetime.date.today()
-            age = today_d.year - dob.year - ((today_d.month, today_d.day) < (dob.month, dob.day))
-        elif dob:
-            d = datetime.date.fromisoformat(str(dob)[:10])
-            today_d = datetime.date.today()
-            age = today_d.year - d.year - ((today_d.month, today_d.day) < (d.month, d.day))
-        else:
-            age = 30
-    except Exception:
-        age = 30
-
-    gender = profile.get('gender', 'male')
-    if gender == 'female':
-        bmr = 10 * w + 6.25 * h - 5 * age - 161
-    else:
-        bmr = 10 * w + 6.25 * h - 5 * age + 5
-
-    multipliers = {
-        'sedentary': 1.2, 'light': 1.375, 'moderate': 1.55,
-        'active': 1.725, 'very_active': 1.9,
-    }
-    activity = profile.get('activity_level', 'moderate')
-    tdee = bmr * multipliers.get(activity, 1.55)
-
-    goal = profile.get('primary_goal', 'maintain')
-    if goal == 'lose_weight':
-        calories = tdee - 500
-    elif goal == 'gain_muscle':
-        calories = tdee + 300
-    else:
-        calories = tdee
-    calories = max(calories, 1200)
-
-    protein = w * 1.6
-    fat = calories * 0.25 / 9
-    carbs = max((calories - protein * 4 - fat * 9) / 4, 0)
-
-    bmi = w / ((h / 100) ** 2)
-    if bmi < 18.5:
-        bmi_category = 'Underweight'
-    elif bmi < 25:
-        bmi_category = 'Normal'
-    elif bmi < 30:
-        bmi_category = 'Overweight'
-    else:
-        bmi_category = 'Obese'
-
-    return {
-        'bmi': round(bmi, 1),
-        'bmi_category': bmi_category,
-        'bmr': round(bmr),
-        'tdee': round(tdee),
-        'daily_calories': round(calories),
-        'macros': {
-            'protein': round(protein),
-            'carbs': round(carbs),
-            'fat': round(fat),
-        },
-    }
-
-
 @user_bp.route('/dashboard', methods=['GET'])
 @role_required('trainee')
 def dashboard():
@@ -212,7 +141,7 @@ def dashboard():
             (request.user_id,),
         )
         profile = cursor.fetchone() or {}
-        metrics = _compute_metrics(profile)
+        metrics = compute_body_metrics(profile)
 
         return jsonify({
             'date': today_date.isoformat(),

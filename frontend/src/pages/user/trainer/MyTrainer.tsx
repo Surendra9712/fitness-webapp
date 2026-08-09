@@ -21,6 +21,7 @@ import TrainerRequest from "./TrainerRequest";
 import { toast } from "sonner";
 import { ListRowSkeleton } from "@/components/ListRowSkeleton";
 import type { TrainerAssignment } from "@/types";
+import { avatarInitial } from "@/lib/constant";
 
 // Shared detail view — used for the "single trainer" inline case (My Trainers tab).
 // The multi-trainer list case and Find-a-Trainer browsing both use TrainerDetailModal instead.
@@ -154,7 +155,7 @@ export default function MyTrainer() {
                         src={assignment.trainer_profile_image_url ?? undefined}
                       />
                       <AvatarFallback className="text-sm font-bold">
-                        {assignment.trainer_name?.charAt(0).toUpperCase()}
+                        {avatarInitial(assignment?.trainer_name || "")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">

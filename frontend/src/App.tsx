@@ -14,6 +14,9 @@ import IncomingCallDialog from "@/components/call/IncomingCallDialog";
 import ActiveCallOverlay from "@/components/call/ActiveCallOverlay";
 
 import Home from "@/pages/Home";
+import Contact from "@/pages/Contact";
+import Terms from "@/pages/legal/Terms";
+import Privacy from "@/pages/legal/Privacy";
 import PublicBecomeTrainer from "@/pages/PublicBecomeTrainer";
 import Products from "@/pages/product/Products";
 import ProductDetail from "@/pages/product/ProductDetail";
@@ -30,6 +33,7 @@ import TrainerAssignments from "@/pages/admin/TrainerAssignments";
 import TrainerVerification from "@/pages/admin/TrainerVerification";
 import SubscriptionManagement from "@/pages/admin/subscription/SubscriptionManagement";
 import PromoCodeManagement from "@/pages/admin/PromoCodeManagement";
+import ContactMessages from "@/pages/admin/ContactMessages";
 import DiscountManagement from "@/pages/admin/discount/DiscountManagement";
 import SubscriptionPaymentReturn from "@/pages/user/subscription/SubscriptionPaymentReturn";
 
@@ -128,6 +132,17 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/become-trainer" element={<PublicBecomeTrainer />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route
+            path="/privacy-policy"
+            element={<Navigate to="/privacy" replace />}
+          />
+          <Route
+            path="/terms-and-conditions"
+            element={<Navigate to="/terms" replace />}
+          />
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/payment/esewa/success" element={<PaymentReturn />} />
@@ -304,6 +319,16 @@ export default function App() {
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
                   <DiscountManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/contact-messages"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <ContactMessages />
                 </Layout>
               </ProtectedRoute>
             }

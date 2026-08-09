@@ -5,6 +5,7 @@ import { StarDisplay } from "@/components/ui/star-rating";
 import type { TrainerInfo } from "@/types";
 import { AvatarImage } from "@radix-ui/react-avatar";
 import { SearchInput } from "../ui/search-input";
+import { avatarInitial } from "@/lib/constant";
 
 const PAGE_SIZE = 5;
 
@@ -86,12 +87,8 @@ export function TrainerList({
               >
                 {/* Avatar + Name + status */}
                 <div className="flex items-center gap-3 sm:w-44 sm:shrink-0">
-                  <Avatar className="h-12 w-12 shrink-0">
-                    <AvatarFallback
-                      className={`bg-gradient-to-br ${avatarGradient(t.name)} text-white font-black text-lg`}
-                    >
-                      {t.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
+                  <Avatar>
+                    <AvatarFallback>{avatarInitial(t.name)}</AvatarFallback>
                     <AvatarImage src={t.profile_image_url} />
                   </Avatar>
 

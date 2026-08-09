@@ -209,7 +209,7 @@ CREATE TABLE IF NOT EXISTS trainer_assignments (
     id                  INT AUTO_INCREMENT PRIMARY KEY,
     customer_id         INT NOT NULL,
     trainer_id          INT NOT NULL,
-    status              ENUM('pending_trainer','pending_admin','approved','rejected') NOT NULL DEFAULT 'pending_trainer',
+    status              ENUM('pending_trainer','pending_admin','approved','rejected','ended') NOT NULL DEFAULT 'pending_trainer',
     customer_note       TEXT,
     trainer_note        TEXT,
     admin_note          TEXT,
@@ -520,6 +520,27 @@ CREATE TABLE IF NOT EXISTS water_logs (
 --  Add daily water target to user_profiles
 ALTER TABLE user_profiles
   ADD COLUMN daily_water_target_ml INT DEFAULT 2500;
+
+--  Contact-us submissions from the public site. user_id is filled in when the
+--  sender happened to be logged in, NULL for anonymous visitors.
+CREATE TABLE IF NOT EXISTS contact_messages (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NULL,
+    name        VARCHAR(120) NOT NULL,
+    email       VARCHAR(255) NOT NULL,
+    phone       VARCHAR(30)  NULL,
+    subject     VARCHAR(200) NOT NULL,
+    message     TEXT NOT NULL,
+    status      ENUM('new','read','resolved') NOT NULL DEFAULT 'new',
+    admin_note  TEXT NULL,
+    handled_by  INT NULL,
+    handled_at  TIMESTAMP NULL DEFAULT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at  TIMESTAMP NULL DEFAULT NULL,
+    FOREIGN KEY (user_id)    REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_contact_status (status, created_at)
+) ENGINE=InnoDB;
   
  
 

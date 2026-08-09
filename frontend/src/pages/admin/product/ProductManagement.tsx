@@ -8,7 +8,6 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
 import type { Product } from "@/types";
 import { SearchInput } from "@/components/ui/search-input";
-import { TableBodySkeleton, TableSkeleton } from "@/components/TableSkeleton";
+import { TableBodySkeleton } from "@/components/TableSkeleton";
 
 export default function ProductManagement() {
   const [search, setSearch] = useState("");
@@ -45,11 +44,10 @@ export default function ProductManagement() {
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   const { page, goToPage, resetPage, setPageSize, pageSize } = usePagination();
-  const queryClient = useQueryClient();
 
   const { GetProducts, GetCategories, UpdateProduct, DeleteProduct } =
     useAdmin();
-  const { data, isPlaceholderData, isFetching } = GetProducts({
+  const { data, isPlaceholderData, isFetching, refetch } = GetProducts({
     queryParams: {
       page,
       page_size: pageSize,
@@ -90,7 +88,7 @@ export default function ProductManagement() {
       toast.success(
         `Product ${newStatus === "active" ? "activated" : "deactivated"}`,
       );
-      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
+      refetch();
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -106,7 +104,7 @@ export default function ProductManagement() {
     try {
       await deleteProduct.mutateAsync(pendingDeleteId);
       toast.success("Product deleted");
-      queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
+      refetch();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
