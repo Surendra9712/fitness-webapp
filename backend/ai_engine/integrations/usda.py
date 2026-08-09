@@ -19,64 +19,64 @@ def _get_api_key():
 # These queries return real foods from USDA that match the cuisine
 CUISINE_MEAL_QUERIES = {
     "italian": {
-        "breakfast": ["italian frittata", "bruschetta", "cornetto", "italian yogurt"],
-        "lunch":     ["pasta marinara", "minestrone soup", "italian salad", "risotto", "pasta primavera"],
-        "snack":     ["bruschetta", "caprese", "italian breadstick", "focaccia"],
-        "dinner":    ["spaghetti bolognese", "penne arrabbiata", "lasagna", "pizza margherita", "chicken piccata"],
+        "breakfast": ["italian frittata", "bruschetta", "cornetto", "italian yogurt", "ricotta pancake", "biscotti", "panettone"],
+        "lunch":     ["pasta marinara", "minestrone soup", "italian salad", "risotto", "pasta primavera", "gnocchi", "panzanella salad"],
+        "snack":     ["bruschetta", "caprese", "italian breadstick", "focaccia", "arancini", "olive tapenade"],
+        "dinner":    ["spaghetti bolognese", "penne arrabbiata", "lasagna", "pizza margherita", "chicken piccata", "osso buco", "eggplant parmesan"],
     },
     "chinese": {
-        "breakfast": ["congee rice porridge", "dim sum", "chinese steamed bun", "egg drop soup"],
-        "lunch":     ["fried rice", "chow mein noodles", "kung pao chicken", "mapo tofu", "hot sour soup"],
-        "snack":     ["spring roll", "wonton", "chinese dumpling", "sesame ball"],
-        "dinner":    ["sweet sour pork", "beef broccoli stir fry", "chinese steamed fish", "mongolian beef"],
+        "breakfast": ["congee rice porridge", "dim sum", "chinese steamed bun", "egg drop soup", "scallion pancake", "soy milk", "chinese fried dough"],
+        "lunch":     ["fried rice", "chow mein noodles", "kung pao chicken", "mapo tofu", "hot sour soup", "beef broccoli", "general tso chicken", "wonton soup"],
+        "snack":     ["spring roll", "wonton", "chinese dumpling", "sesame ball", "chinese pickled vegetable", "prawn cracker"],
+        "dinner":    ["sweet sour pork", "beef broccoli stir fry", "chinese steamed fish", "mongolian beef", "char siu pork", "peking duck", "lo mein noodles"],
     },
     "japanese": {
-        "breakfast": ["miso soup", "japanese rice porridge", "tamagoyaki egg", "natto"],
-        "lunch":     ["sushi roll", "ramen noodle soup", "udon noodle", "teriyaki chicken", "bento box"],
-        "snack":     ["edamame", "onigiri rice ball", "mochi", "japanese green tea"],
-        "dinner":    ["salmon teriyaki", "tonkatsu pork", "yakitori chicken", "japanese curry rice"],
+        "breakfast": ["miso soup", "japanese rice porridge", "tamagoyaki egg", "natto", "grilled fish breakfast", "japanese pickles"],
+        "lunch":     ["sushi roll", "ramen noodle soup", "udon noodle", "teriyaki chicken", "bento box", "katsu curry", "soba noodle"],
+        "snack":     ["edamame", "onigiri rice ball", "mochi", "japanese green tea", "takoyaki", "senbei rice cracker"],
+        "dinner":    ["salmon teriyaki", "tonkatsu pork", "yakitori chicken", "japanese curry rice", "sukiyaki beef", "tempura shrimp", "miso salmon"],
     },
     "mexican": {
-        "breakfast": ["huevos rancheros", "mexican scrambled eggs", "tamale", "atole"],
-        "lunch":     ["chicken taco", "burrito bowl", "quesadilla", "mexican rice beans", "tortilla soup"],
-        "snack":     ["guacamole", "salsa chips", "mexican corn elote", "churro"],
-        "dinner":    ["enchilada", "fajita chicken", "chile relleno", "pozole soup"],
+        "breakfast": ["huevos rancheros", "mexican scrambled eggs", "tamale", "atole", "chilaquiles", "breakfast burrito"],
+        "lunch":     ["chicken taco", "burrito bowl", "quesadilla", "mexican rice beans", "tortilla soup", "ceviche", "torta sandwich"],
+        "snack":     ["guacamole", "salsa chips", "mexican corn elote", "churro", "nachos", "jicama"],
+        "dinner":    ["enchilada", "fajita chicken", "chile relleno", "pozole soup", "carnitas pork", "mole chicken"],
     },
     "indian": {
-        "breakfast": ["idli sambar", "dosa", "upma", "poha", "paratha", "chole bhature"],
-        "lunch":     ["butter chicken", "dal makhani", "palak paneer", "chicken biryani", "aloo gobi"],
-        "snack":     ["samosa", "pakora", "paneer tikka", "chaat", "masala chai"],
-        "dinner":    ["tandoori chicken", "lamb rogan josh", "fish curry", "vegetable korma", "naan bread"],
+        "breakfast": ["idli sambar", "dosa", "upma", "poha", "paratha", "chole bhature", "aloo paratha"],
+        "lunch":     ["butter chicken", "dal makhani", "palak paneer", "chicken biryani", "aloo gobi", "chana masala", "rajma curry"],
+        "snack":     ["samosa", "pakora", "paneer tikka", "chaat", "masala chai", "dhokla", "bhel puri"],
+        "dinner":    ["tandoori chicken", "lamb rogan josh", "fish curry", "vegetable korma", "naan bread", "chicken tikka masala", "mutton curry"],
     },
     "mediterranean": {
-        "breakfast": ["greek yogurt", "shakshuka", "pita hummus", "labneh", "mediterranean omelette"],
-        "lunch":     ["falafel wrap", "greek salad", "tabbouleh", "lentil soup", "fattoush salad"],
-        "snack":     ["hummus vegetables", "tzatziki", "olives feta", "stuffed grape leaves"],
-        "dinner":    ["lamb kebab", "grilled sea bass", "moussaka", "seafood paella", "chicken shawarma"],
+        "breakfast": ["greek yogurt", "shakshuka", "pita hummus", "labneh", "mediterranean omelette", "feta spinach pie"],
+        "lunch":     ["falafel wrap", "greek salad", "tabbouleh", "lentil soup", "fattoush salad", "chickpea salad", "spanakopita"],
+        "snack":     ["hummus vegetables", "tzatziki", "olives feta", "stuffed grape leaves", "pita chips", "baba ganoush"],
+        "dinner":    ["lamb kebab", "grilled sea bass", "moussaka", "seafood paella", "chicken shawarma", "stuffed peppers", "grilled octopus"],
     },
     "thai": {
-        "breakfast": ["thai rice congee", "pad kra pao", "thai omelette", "khao tom"],
-        "lunch":     ["pad thai noodles", "green curry", "tom yum soup", "mango sticky rice"],
-        "snack":     ["thai spring roll", "satay skewer", "thai papaya salad", "mango smoothie"],
-        "dinner":    ["massaman curry", "red curry chicken", "thai basil fried rice", "tom kha soup"],
+        "breakfast": ["thai rice congee", "pad kra pao", "thai omelette", "khao tom", "thai sticky rice", "thai coffee"],
+        "lunch":     ["pad thai noodles", "green curry", "tom yum soup", "mango sticky rice", "thai basil chicken", "larb salad", "khao soi"],
+        "snack":     ["thai spring roll", "satay skewer", "thai papaya salad", "mango smoothie", "thai fish cake", "coconut ice cream"],
+        "dinner":    ["massaman curry", "red curry chicken", "thai basil fried rice", "tom kha soup", "thai grilled fish", "panang curry"],
     },
     "korean": {
-        "breakfast": ["juk rice porridge", "korean soft tofu soup", "kimchi jjigae", "gyeran mari"],
-        "lunch":     ["bibimbap", "bulgogi beef", "japchae noodles", "doenjang jjigae", "sundubu jjigae"],
-        "snack":     ["kimchi", "tteok rice cake", "japchae", "korean fried chicken"],
-        "dinner":    ["galbi ribs", "samgyeopsal pork belly", "dakgalbi spicy chicken", "haemul pajeon"],
+        "breakfast": ["juk rice porridge", "korean soft tofu soup", "kimchi jjigae", "gyeran mari", "korean seaweed soup", "korean pancake"],
+        "lunch":     ["bibimbap", "bulgogi beef", "japchae noodles", "doenjang jjigae", "sundubu jjigae", "kimbap", "bibim naengmyeon"],
+        "snack":     ["kimchi", "tteok rice cake", "japchae", "korean fried chicken", "korean corn dog", "hotteok"],
+        "dinner":    ["galbi ribs", "samgyeopsal pork belly", "dakgalbi spicy chicken", "haemul pajeon", "budae jjigae"],
     },
     "american": {
-        "breakfast": ["avocado toast", "pancakes", "oatmeal", "scrambled eggs bacon", "granola yogurt"],
-        "lunch":     ["grilled chicken salad", "turkey sandwich", "caesar salad", "chicken soup", "veggie wrap"],
-        "snack":     ["apple peanut butter", "trail mix", "protein bar", "hummus vegetables"],
-        "dinner":    ["grilled salmon", "chicken breast vegetables", "beef steak", "veggie burger", "pasta chicken"],
+        "breakfast": ["avocado toast", "pancakes", "oatmeal", "scrambled eggs bacon", "granola yogurt", "breakfast burrito", "waffles"],
+        "lunch":     ["grilled chicken salad", "turkey sandwich", "caesar salad", "chicken soup", "veggie wrap", "blt sandwich", "cobb salad"],
+        "snack":     ["apple peanut butter", "trail mix", "protein bar", "hummus vegetables", "popcorn", "granola bar"],
+        "dinner":    ["grilled salmon", "chicken breast vegetables", "beef steak", "veggie burger", "pasta chicken", "meatloaf", "roast turkey"],
     },
     "french": {
-        "breakfast": ["croissant", "crepe", "pain au chocolat", "french omelette", "tartine"],
-        "lunch":     ["french onion soup", "nicoise salad", "croque monsieur", "quiche lorraine"],
-        "snack":     ["baguette cheese", "french macaron", "eclair", "madeleine"],
-        "dinner":    ["beef bourguignon", "chicken coq au vin", "ratatouille", "bouillabaisse"],
+        "breakfast": ["croissant", "crepe", "pain au chocolat", "french omelette", "tartine", "french toast", "brioche"],
+        "lunch":     ["french onion soup", "nicoise salad", "croque monsieur", "quiche lorraine", "ratatouille", "french baguette sandwich"],
+        "snack":     ["baguette cheese", "french macaron", "eclair", "madeleine", "crepe suzette", "cheese plate"],
+        "dinner":    ["beef bourguignon", "chicken coq au vin", "ratatouille", "bouillabaisse", "duck confit", "cassoulet", "sole meuniere"],
     },
 }
 
@@ -167,8 +167,8 @@ def get_foods_for_cuisine_meal(cuisine: str, meal_type: str,
     results = []
     seen    = set()
 
-    for query in queries[:3]:  # Try first 3 queries to get variety
-        foods = search_food(query, page_size=4, cuisine=cuisine)
+    for query in queries:  # try every curated query for this cuisine/meal, not just the first few
+        foods = search_food(query, page_size=6, cuisine=cuisine)
         for food in foods:
             name = food.get("name", "")
             cal  = food.get("calories", 0)

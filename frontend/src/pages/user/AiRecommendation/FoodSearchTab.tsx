@@ -64,6 +64,12 @@ export function FoodSearchTab({
           ))}
         </div>
       )}
+      {!searching && results.length === 0 && query.trim().length >= 2 && (
+        <div className="text-sm text-muted-foreground border rounded-lg p-4 text-center bg-card">
+          No food found for "{query.trim()}". Try a different spelling or a
+          more common food name.
+        </div>
+      )}
     </div>
   );
 }
