@@ -236,7 +236,7 @@ def list_users():
         )
         total = cursor.fetchone()['total']
         cursor.execute(
-            "SELECT u.id, u.name, u.email, ta.created_at AS assigned_at "
+            "SELECT u.id, u.name, u.email, u.profile_image_url, ta.created_at AS assigned_at "
             "FROM trainer_assignments ta "
             "JOIN users u ON ta.customer_id = u.id "
             "WHERE ta.trainer_id = %s AND ta.status = 'approved' "
