@@ -6,7 +6,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Pill, Tag } from "./ui";
+import { Pill, Stepper, Tag } from "./ui";
 import { togArr } from "./utils";
 import { DIETS, DIETARY_FLAGS, ALLERGENS, CUISINES } from "./constants";
 import type { ProfileValues } from "./schema";
@@ -127,6 +127,27 @@ export function Step3Diet() {
                   </Tag>
                 ))}
               </div>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="h-px bg-gray-100" />
+
+      <FormField
+        control={control}
+        name="meals_per_day"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Meals per Day</FormLabel>
+            <FormControl>
+              <Stepper
+                value={Number(field.value)}
+                min={1}
+                max={8}
+                onChange={field.onChange}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

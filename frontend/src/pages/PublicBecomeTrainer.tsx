@@ -80,7 +80,22 @@ const publicBecomeTrainerSchema = z.object({
         : "Invalid email format", // Handles bad formatting
   }),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  date_of_birth: z.string().min(1, "Date of birth is required"),
+  date_of_birth: z
+    .string()
+    .min(1, "Date of birth is required")
+    .refine((v) => !isNaN(Date.parse(v)), "Invalid date")
+    .refine(
+      (v) => new Date(v) <= new Date(),
+      "Date of birth cannot be in the future",
+    )
+    .refine((v) => {
+      const dob = new Date(v);
+      const now = new Date();
+      let age = now.getFullYear() - dob.getFullYear();
+      const m = now.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+      return age >= 25;
+    }, "Trainer must be at least 25 years old"),
   bio: z.string().optional(),
   specialization: z.string().min(1, "Specialization is required"),
   experience_years: z
@@ -387,7 +402,7 @@ export default function PublicBecomeTrainer() {
                   <FormField
                     control={control}
                     name="date_of_birth"
-                    render={({ field }) => (
+                    render={({ field, fieldState }) => (
                       <FormItem>
                         <FormLabel>
                           Date of Birth{" "}
@@ -395,12 +410,13 @@ export default function PublicBecomeTrainer() {
                         </FormLabel>
                         <FormControl>
                           <DatePicker
+                            error={fieldState?.error && true}
                             value={field.value}
                             onChange={field.onChange}
                             placeholder="Pick a date"
                             disabledDates={(d) => d > new Date()}
                             startYear={1940}
-                            endYear={new Date().getFullYear() - 18}
+                            endYear={new Date().getFullYear()}
                             defaultMonth={new Date(1990, 0)}
                           />
                         </FormControl>

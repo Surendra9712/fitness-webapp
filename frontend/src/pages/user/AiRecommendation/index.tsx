@@ -28,6 +28,7 @@ export default function AiRecommendation() {
     string,
     MealRecommendation
   > | null>(null);
+  const [mealPlanDate, setMealPlanDate] = useState<string | null>(null);
   const [exercise, setExercise] = useState<ExerciseRec | null>(null);
   const [loadingMeal, setLoadingMeal] = useState(false);
   const [loadingEx, setLoadingEx] = useState(false);
@@ -52,9 +53,11 @@ export default function AiRecommendation() {
     setError("");
     try {
       const res = await api.get<{
+        date?: string;
         meal_plan: Record<string, MealRecommendation>;
       }>(`/ai/recommend/meal${force ? "?force=true" : ""}`);
       setMealPlan(res.meal_plan);
+      setMealPlanDate(res.date ?? null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -139,7 +142,7 @@ export default function AiRecommendation() {
           animated GIFs, food search, and natural language logging.
         </p>
         <Button asChild className="mt-2">
-          <Link to="/customer/subscription">Upgrade to Pro</Link>
+          <Link to="/trainee/subscription">Upgrade to Pro</Link>
         </Button>
       </div>
     );
@@ -179,7 +182,7 @@ export default function AiRecommendation() {
           <MealPlanTab
             mealPlan={mealPlan}
             loading={loadingMeal}
-            onRefresh={() => loadMealPlan(true)}
+            planDate={mealPlanDate}
           />
         </TabsContent>
 
@@ -187,7 +190,6 @@ export default function AiRecommendation() {
           <ExerciseTab
             exercise={exercise}
             loading={loadingEx}
-            onRefresh={() => loadExercise(true)}
             completed={exerciseCompleted}
             onExerciseComplete={(result) =>
               setExerciseCompleted((prev) => [...prev, result])

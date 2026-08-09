@@ -28,7 +28,6 @@ import {
 import { Step1Personal } from "./Step1Personal";
 import { Step2Goals } from "./Step2Goals";
 import { Step3Diet } from "./Step3Diet";
-import { Step4Habits } from "./Step4Habits";
 import { Step5Health } from "./Step5Health";
 import { Dialog } from "@radix-ui/react-dialog";
 import {
@@ -82,17 +81,7 @@ export default function ProfileSetup({
       other_restrictions: "",
       allergens: [],
       cuisine_preferences: [],
-      breakfast_time: "07:30",
-      lunch_time: "12:30",
-      dinner_time: "19:00",
-      avg_sleep_hours: "7",
       meals_per_day: 3,
-      snacks_between_meals: false,
-      cooking_frequency: "daily",
-      eating_out_frequency: 2,
-      track_hydration: true,
-      emotional_eater: false,
-      stress_level: "moderate",
       health_conditions: [],
       notes: "",
     },
@@ -135,28 +124,7 @@ export default function ProfileSetup({
         data.cuisine_preferences,
         [],
       ),
-      breakfast_time: data.breakfast_time
-        ? String(data.breakfast_time).slice(0, 5)
-        : "07:30",
-      lunch_time: data.lunch_time
-        ? String(data.lunch_time).slice(0, 5)
-        : "12:30",
-      dinner_time: data.dinner_time
-        ? String(data.dinner_time).slice(0, 5)
-        : "19:00",
-      avg_sleep_hours: data.avg_sleep_hours
-        ? String(data.avg_sleep_hours)
-        : "7",
       meals_per_day: (data.meals_per_day as number) ?? 3,
-      snacks_between_meals: Boolean(data.snacks_between_meals),
-      cooking_frequency:
-        (data.cooking_frequency as ProfileValues["cooking_frequency"]) ??
-        "daily",
-      eating_out_frequency: (data.eating_out_frequency as number) ?? 2,
-      track_hydration: Boolean(data.track_hydration ?? true),
-      emotional_eater: Boolean(data.emotional_eater),
-      stress_level:
-        (data.stress_level as ProfileValues["stress_level"]) ?? "moderate",
       health_conditions: parseJsonField<ProfileValues["health_conditions"]>(
         data.health_conditions,
         [],
@@ -169,7 +137,7 @@ export default function ProfileSetup({
   const next = async () => {
     const required = STEP_REQUIRED[step] ?? [];
     if (required.length > 0 && !(await form.trigger(required))) return;
-    if (step < 5) {
+    if (step < 4) {
       setStep((s) => s + 1);
       return;
     }
@@ -196,17 +164,7 @@ export default function ProfileSetup({
         other_restrictions: v.other_restrictions,
         allergens: v.allergens,
         cuisine_preferences: v.cuisine_preferences,
-        breakfast_time: v.breakfast_time,
-        lunch_time: v.lunch_time,
-        dinner_time: v.dinner_time,
-        avg_sleep_hours: parseFloat(v.avg_sleep_hours as string) || 7,
         meals_per_day: v.meals_per_day,
-        snacks_between_meals: v.snacks_between_meals,
-        cooking_frequency: v.cooking_frequency,
-        eating_out_frequency: v.eating_out_frequency,
-        track_hydration: v.track_hydration,
-        emotional_eater: v.emotional_eater,
-        stress_level: v.stress_level,
         health_conditions: v.health_conditions,
         notes: v.notes,
       };
@@ -225,7 +183,7 @@ export default function ProfileSetup({
         }>("/onboarding/complete", payload);
         setResult(res);
       }
-      setStep(6);
+      setStep(5);
     } catch {
       /* add toast if desired */
     } finally {
@@ -233,14 +191,14 @@ export default function ProfileSetup({
     }
   };
 
-  const pct = ((step - 1) / 5) * 100;
+  const pct = ((step - 1) / 4) * 100;
 
   const StepIndicator = () =>
-    step <= 5 ? (
+    step <= 4 ? (
       <div>
         <div className="mb-2 flex items-center justify-between text-xs text-gray-500">
           <span className="font-semibold text-gray-700">
-            Step {step} of 5 — {STEPS[step - 1]}
+            Step {step} of 4 — {STEPS[step - 1]}
           </span>
           <span>{Math.round(pct)}%</span>
         </div>
@@ -394,7 +352,7 @@ export default function ProfileSetup({
 
         <Button
           className="mt-8 w-full h-12 text-base bg-primary-600 hover:bg-primary-500"
-          onClick={() => (onDone ? onDone() : navigate("/dashboard"))}
+          onClick={() => (onDone ? onDone() : navigate("/my-dashboard"))}
         >
           {onDone ? "Done" : "Go to Dashboard →"}
         </Button>
@@ -403,7 +361,7 @@ export default function ProfileSetup({
   };
 
   const NavButtons = () =>
-    step <= 5 ? (
+    step <= 4 ? (
       <>
         {/* <div> */}
         {step > 1 && (
@@ -422,13 +380,13 @@ export default function ProfileSetup({
           onClick={next}
           disabled={loading}
         >
-          {loading ? "Saving…" : step === 5 ? "Finish Setup" : "Continue →"}
+          {loading ? "Saving…" : step === 4 ? "Finish Setup" : "Continue →"}
         </Button>
       </>
     ) : null;
 
   if (inline) {
-    if (step === 6) {
+    if (step === 5) {
       return (
         <div className="max-w-2xl mx-auto">
           <DoneScreen />
@@ -453,8 +411,7 @@ export default function ProfileSetup({
               {step === 1 && <Step1Personal />}
               {step === 2 && <Step2Goals />}
               {step === 3 && <Step3Diet />}
-              {step === 4 && <Step4Habits />}
-              {step === 5 && <Step5Health />}
+              {step === 4 && <Step5Health />}
             </CardContent>
             <CardFooter className="w-full">
               <div className="w-full">
@@ -467,7 +424,7 @@ export default function ProfileSetup({
     );
   }
 
-  if (step === 6) {
+  if (step === 5) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden">
@@ -489,8 +446,7 @@ export default function ProfileSetup({
               {step === 1 && <Step1Personal />}
               {step === 2 && <Step2Goals />}
               {step === 3 && <Step3Diet />}
-              {step === 4 && <Step4Habits />}
-              {step === 5 && <Step5Health />}
+              {step === 4 && <Step5Health />}
             </div>
           </DialogBody>
           <DialogFooter className="justify-between!">

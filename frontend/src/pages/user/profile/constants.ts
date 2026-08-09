@@ -1,16 +1,9 @@
-import {
-  TrendingDown,
-  Dumbbell,
-  Scale,
-  Heart,
-  Activity,
-} from "lucide-react";
+import { TrendingDown, Dumbbell, Scale, Heart, Activity } from "lucide-react";
 
 export const STEPS = [
   "Personal Info",
   "Your Goal",
   "Diet & Allergens",
-  "Habits",
   "Health",
 ];
 
@@ -76,11 +69,15 @@ export const CUISINES = [
   "Nepali",
   "Indian",
   "Chinese",
-  "Continental",
+  // "Continental",
   "Italian",
   "Japanese",
+  "Korean",
   "Mexican",
+  "Thai",
   "Mediterranean",
+  "French",
+  "American",
 ];
 
 export const CONDITIONS = [
@@ -106,16 +103,3 @@ export const FITNESS: [string, string][] = [
   ["advanced", "Advanced"],
 ];
 
-export const COOKING: [string, string][] = [
-  ["daily", "Daily"],
-  ["few_times_week", "Few times/week"],
-  ["weekly", "Weekly"],
-  ["rarely", "Rarely"],
-];
-
-export const STRESS: [string, string][] = [
-  ["low", "Low"],
-  ["moderate", "Moderate"],
-  ["high", "High"],
-  ["very_high", "Very High"],
-];

@@ -1,21 +1,19 @@
-import { RefreshCw, Flame, Target, Info, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Flame, Target, Info, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageDate } from "@/components/PageDate";
 import { ExerciseCard } from "./ExerciseCard";
 import type { ExerciseRec } from "./types";
 
 export function ExerciseTab({
   exercise,
   loading,
-  onRefresh,
   completed,
   onExerciseComplete,
 }: {
   exercise: ExerciseRec | null;
   loading: boolean;
-  onRefresh: () => void;
   completed: { calories_burned: number; exercise_name: string }[];
   onExerciseComplete: (result: {
     calories_burned: number;
@@ -24,17 +22,11 @@ export function ExerciseTab({
 }) {
   return (
     <div className="space-y-4 mt-4">
-      <div className="flex items-center justify-between">
-        <div />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Complete every exercise below to wrap up your day
+        </p>
+        <PageDate date={exercise?.date} label="Workout for" />
       </div>
 
       {loading ? (

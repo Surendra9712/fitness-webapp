@@ -12,7 +12,22 @@ const positiveStr = (msg: string) =>
 export const profileSchema = z.object({
   // Step 1
   full_name: z.string().min(1, "Name is required"),
-  date_of_birth: z.string().min(1, "Date of birth is required"),
+  date_of_birth: z
+    .string()
+    .min(1, "Date of birth is required")
+    .refine((v) => !isNaN(Date.parse(v)), "Invalid date")
+    .refine(
+      (v) => new Date(v) <= new Date(),
+      "Date of birth cannot be in the future",
+    )
+    .refine((v) => {
+      const dob = new Date(v);
+      const now = new Date();
+      let age = now.getFullYear() - dob.getFullYear();
+      const m = now.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+      return age >= 16;
+    }, "You must be at least 16 years old"),
   gender: z.enum(["male", "female", "other", "prefer_not_to_say"]),
   phone_number: z.string(),
   city: z.string(),
@@ -52,26 +67,8 @@ export const profileSchema = z.object({
   other_restrictions: z.string(),
   allergens: z.array(z.string()),
   cuisine_preferences: z.array(z.string()),
-  // Step 4
-  breakfast_time: z.string(),
-  lunch_time: z.string(),
-  dinner_time: z.string(),
-  avg_sleep_hours: z
-    .string()
-    .refine(
-      (v) =>
-        v === "" ||
-        (!isNaN(parseFloat(v)) && parseFloat(v) >= 3 && parseFloat(v) <= 12),
-      "Must be 3–12",
-    ),
   meals_per_day: z.number().int().min(1).max(8),
-  snacks_between_meals: z.boolean(),
-  cooking_frequency: z.enum(["daily", "few_times_week", "weekly", "rarely"]),
-  eating_out_frequency: z.number().int().min(0).max(7),
-  track_hydration: z.boolean(),
-  emotional_eater: z.boolean(),
-  stress_level: z.enum(["low", "moderate", "high", "very_high"]),
-  // Step 5
+  // Step 4 (Health)
   health_conditions: z.array(
     z.object({ name: z.string(), type: z.string(), affects_diet: z.boolean() }),
   ),
@@ -85,5 +82,4 @@ export const STEP_REQUIRED: Record<number, (keyof ProfileValues)[]> = {
   2: [],
   3: [],
   4: [],
-  5: [],
 };

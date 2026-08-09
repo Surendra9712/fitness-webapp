@@ -5,27 +5,49 @@ import {
   ShoppingBag,
   Bell,
   Plus,
+  Minus,
   Trash2,
   Search,
   ChevronDown,
   ChevronUp,
-  RefreshCw,
   Dumbbell,
   Droplets,
+  Droplet,
   CheckCircle2,
   XCircle,
+  Sunrise,
+  Sun,
+  Apple,
+  Moon,
+  Flame,
+  Wheat,
+  Lightbulb,
+  FlaskConical,
+  type LucideIcon,
 } from "lucide-react";
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import ProfileSetup from "./profile/ProfileSetup";
 import type { DashboardStats } from "@/types";
+import { Progress } from "@/components/ui/progress";
+import { SearchInput } from "@/components/ui/search-input";
+import { PageDate } from "@/components/PageDate";
+import type { ExerciseStatus } from "./AiRecommendation/types";
 
 interface MealLog {
   id: number;
@@ -88,41 +110,52 @@ const MEAL_TYPES = [
   {
     key: "breakfast",
     label: "Breakfast",
-    emoji: "\u{1F305}",
+    icon: Sunrise,
     class: "Light < 350 kcal",
   },
   {
     key: "lunch",
     label: "Lunch",
-    emoji: "\u2600\uFE0F",
+    icon: Sun,
     class: "Heavy 350–700 kcal",
   },
   {
     key: "snack",
     label: "Snack",
-    emoji: "\u{1F34E}",
+    icon: Apple,
     class: "Light < 220 kcal",
   },
   {
     key: "dinner",
     label: "Dinner",
-    emoji: "\u{1F319}",
+    icon: Moon,
     class: "Heavy 280–600 kcal",
   },
 ] as const;
 
-const UNITS = [
-  "serving",
-  "g",
-  "pieces",
-  "cup",
-  "bowl",
-  "plate",
-  "glass",
-  "tbsp",
-  "ml",
-];
 const WATER_AMOUNTS = [150, 200, 250, 300, 500];
+
+// serving_unit is a self-describing portion string, e.g. "1 plate (250 g)",
+// "2 slices (70 g)", or "200 ml". Show it as-is; fall back to grams.
+function formatServing(food: FoodResult): string | null {
+  if (food.serving_unit) return food.serving_unit;
+  if (food.serving_size) return `${food.serving_size} g`;
+  return null;
+}
+
+// Whether the serving weight is measured in ml (drinks) or g (everything else),
+// inferred from the unit string ("… ml" / "… ml)").
+function servingMeasure(food: FoodResult): "g" | "ml" {
+  return /ml\)?\s*$/i.test(food.serving_unit ?? "") ? "ml" : "g";
+}
+
+// Total amount for the chosen number of servings, so the user can gauge how
+// much they're actually logging (e.g. "≈ 500 g" for 2 × 250 g).
+function totalQuantity(food: FoodResult, qty: number): string | null {
+  if (!food.serving_size || !Number.isFinite(qty) || qty <= 0) return null;
+  const total = Math.round(food.serving_size * qty);
+  return `≈ ${total} ${servingMeasure(food)}`;
+}
 
 // DEV/TESTING ONLY — keeps "End Meal Today" clickable even after the day has
 // already been ended, so the flow can be exercised repeatedly without
@@ -137,14 +170,14 @@ function MacroRing({
   target,
   unit,
   stroke,
-  emoji,
+  icon: Icon,
 }: {
   label: string;
   value: number;
   target: number;
   unit: string;
   stroke: string;
-  emoji: string;
+  icon: LucideIcon;
 }) {
   const pct =
     target > 0 ? Math.min(100, Math.round((value / target) * 100)) : 0;
@@ -174,7 +207,8 @@ function MacroRing({
             strokeLinecap="round"
           />
         </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+          <Icon className="h-4 w-4" style={{ color: stroke }} />
           <span className="text-xs font-bold">{pct}%</span>
         </div>
       </div>
@@ -194,7 +228,7 @@ function MacroRing({
 
 function MealSection({
   mealType,
-  emoji,
+  icon: Icon,
   label,
   classLabel,
   logs,
@@ -204,7 +238,7 @@ function MealSection({
   disabled,
 }: {
   mealType: string;
-  emoji: string;
+  icon: LucideIcon;
   label: string;
   classLabel: string;
   logs: MealLog[];
@@ -224,7 +258,6 @@ function MealSection({
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<FoodResult | null>(null);
   const [qty, setQty] = useState("1");
-  const [unit, setUnit] = useState("serving");
   const [logging, setLogging] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -232,34 +265,34 @@ function MealSection({
     .filter((l) => l.is_consumed)
     .reduce((s, l) => s + Number(l.calories), 0);
 
-  const handleSearch = (q: string) => {
+  const handleSearch = async (q: string) => {
     setQuery(q);
     setSelected(null);
-    if (debRef.current) clearTimeout(debRef.current);
     if (q.trim().length < 2) {
       setResults([]);
       return;
     }
-    debRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await api.get<{ results: FoodResult[] }>(
-          `/ai/food/search?q=${encodeURIComponent(q)}`,
-        );
-        setResults(r.results);
-      } catch {
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
+    setSearching(true);
+    try {
+      const r = await api.get<{ results: FoodResult[] }>(
+        `/ai/food/search?q=${encodeURIComponent(q)}`,
+      );
+      setResults(r.results);
+    } catch {
+    } finally {
+      setSearching(false);
+    }
   };
 
   const selectFood = (f: FoodResult) => {
     setSelected(f);
     setQuery(f.name);
     setResults([]);
-    setUnit(f.serving_unit || "serving");
     setQty("1");
+  };
+
+  const adjustQty = (delta: number) => {
+    setQty((prev) => Math.max(0.5, (parseFloat(prev) || 1) + delta).toString());
   };
 
   const handleLog = async () => {
@@ -267,7 +300,7 @@ function MealSection({
     const q = parseFloat(qty) || 1;
     setLogging(true);
     try {
-      await onLog(mealType, selected, q, unit);
+      await onLog(mealType, selected, q, selected.serving_unit || "serving");
       setSelected(null);
       setQuery("");
       setQty("1");
@@ -316,7 +349,7 @@ function MealSection({
         onClick={() => setOpen((v) => !v)}
       >
         <div className="flex items-center gap-3">
-          <span className="text-xl">{emoji}</span>
+          <Icon className="h-5 w-5 text-muted-foreground" />
           <div className="text-left">
             <p className="font-semibold text-sm">{label}</p>
             <p className="text-xs text-muted-foreground">{classLabel}</p>
@@ -357,18 +390,23 @@ function MealSection({
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {log.quantity} {log.unit} ·{" "}
-                      {Math.round(Number(log.calories))} kcal · P
+                      {log.quantity}{" "}
+                      {log.quantity === 1 ? "serving" : "servings"}
+                      {log.unit && log.unit !== "serving"
+                        ? ` · ${log.unit}`
+                        : ""}{" "}
+                      · {Math.round(Number(log.calories))} kcal · P
                       {Math.round(Number(log.protein_g))}g
                     </p>
                     {log.ai_explanation && (
-                      <p className="text-[10px] text-blue-500 mt-0.5 line-clamp-1">
-                        💡 {log.ai_explanation}
+                      <p className="text-[10px] text-blue-500 mt-0.5 line-clamp-1 flex items-center gap-1">
+                        <Lightbulb className="h-2.5 w-2.5 shrink-0" />
+                        {log.ai_explanation}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 ml-2">
-                    <button
+                    {/* <button
                       onClick={() =>
                         onToggleConsumed(log.id, log.is_consumed ? 0 : 1)
                       }
@@ -382,13 +420,14 @@ function MealSection({
                       ) : (
                         <XCircle className="h-4 w-4" />
                       )}
-                    </button>
-                    <button
+                    </button> */}
+                    <Button
+                      size={"icon"}
+                      variant={"danger-subtle"}
                       onClick={() => onDelete(log.id)}
-                      className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -402,13 +441,7 @@ function MealSection({
           ) : (
             <div className="space-y-2 pt-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-8 text-sm h-8"
-                  placeholder="Search food (Nepali, global, any language)..."
-                  value={query}
-                  onChange={(e) => handleSearch(e.target.value)}
-                />
+                <SearchInput onSearch={handleSearch} />
               </div>
               {searching && (
                 <p className="text-xs text-muted-foreground pl-1">
@@ -435,6 +468,11 @@ function MealSection({
                         {f.calories} kcal · P{f.protein_g}g · C{f.carbs_g}g · F
                         {f.fat_g}g
                       </p>
+                      {formatServing(f) && (
+                        <p className="text-[10px] text-muted-foreground">
+                          per serving: {formatServing(f)}
+                        </p>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -444,75 +482,94 @@ function MealSection({
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 text-sm text-primary hover:bg-primary/10 transition-colors"
                   onClick={handleAiSuggest}
                 >
-                  🤖 AI: what should I eat for {label.toLowerCase()}?
+                  AI: what should I eat for {label.toLowerCase()}?
                 </button>
               )} */}
               {selected && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
-                  <p className="text-sm font-semibold text-primary">
-                    ✓ {selected.name}
+                  <p className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    {selected.name}
                   </p>
                   {selected.ai_explanation && (
-                    <p className="text-[10px] text-blue-600">
-                      💡 {selected.ai_explanation}
+                    <p className="text-[10px] text-blue-600 flex items-center gap-1">
+                      <Lightbulb className="h-2.5 w-2.5 shrink-0" />
+                      {selected.ai_explanation}
                     </p>
                   )}
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-1 block">
-                        Quantity
-                      </label>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">
+                      Servings
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => adjustQty(-0.5)}
+                        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md border hover:bg-muted transition-colors"
+                        aria-label="Decrease servings"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
                       <Input
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.5"
+                        step="0.5"
                         value={qty}
                         onChange={(e) => setQty(e.target.value)}
-                        className="h-8 text-sm"
+                        className="h-8 text-sm text-center w-16 shrink-0"
                       />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-muted-foreground mb-1 block">
-                        Unit
-                      </label>
-                      <select
-                        value={unit}
-                        onChange={(e) => setUnit(e.target.value)}
-                        className="w-full h-8 text-sm border rounded-md px-2 bg-background"
+                      <button
+                        type="button"
+                        onClick={() => adjustQty(0.5)}
+                        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md border hover:bg-muted transition-colors"
+                        aria-label="Increase servings"
                       >
-                        {UNITS.map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </select>
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                      {formatServing(selected) && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          1 serving = {formatServing(selected)}
+                        </span>
+                      )}
                     </div>
+                    {totalQuantity(selected, parseFloat(qty || "1")) && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {qty || "1"}{" "}
+                        {parseFloat(qty || "1") === 1 ? "serving" : "servings"}{" "}
+                        {totalQuantity(selected, parseFloat(qty || "1"))}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-1 text-xs">
                     {[
-                      [
-                        "🔥",
-                        Math.round(selected.calories * parseFloat(qty || "1")),
-                        "kcal",
-                      ],
-                      [
-                        "💪",
-                        (selected.protein_g * parseFloat(qty || "1")).toFixed(
-                          1,
+                      {
+                        Icon: Flame,
+                        value: Math.round(
+                          selected.calories * parseFloat(qty || "1"),
                         ),
-                        "g protein",
-                      ],
-                      [
-                        "🌾",
-                        (selected.carbs_g * parseFloat(qty || "1")).toFixed(1),
-                        "g carbs",
-                      ],
-                    ].map(([ic, v, lb]) => (
+                        label: "kcal",
+                      },
+                      {
+                        Icon: Dumbbell,
+                        value: (
+                          selected.protein_g * parseFloat(qty || "1")
+                        ).toFixed(1),
+                        label: "g protein",
+                      },
+                      {
+                        Icon: Wheat,
+                        value: (
+                          selected.carbs_g * parseFloat(qty || "1")
+                        ).toFixed(1),
+                        label: "g carbs",
+                      },
+                    ].map(({ Icon, value, label: badgeLabel }) => (
                       <span
-                        key={String(lb)}
-                        className="bg-muted px-2 py-0.5 rounded-full"
+                        key={badgeLabel}
+                        className="bg-muted px-2 py-0.5 rounded-full inline-flex items-center gap-1"
                       >
-                        {ic} {v} {lb}
+                        <Icon className="h-3 w-3" />
+                        {value} {badgeLabel}
                       </span>
                     ))}
                   </div>
@@ -542,60 +599,54 @@ export default function UserDashboard() {
   const [todayMeals, setTodayMeals] = useState<TodayMeals | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
   const [endingDay, setEndingDay] = useState(false);
   const [dayEnded, setDayEnded] = useState(false);
   const [lastEndedDate, setLastEndedDate] = useState<string | null>(null);
+  // Set when ending the day is blocked by unfinished exercises — drives the
+  // warning dialog that offers "End Meal Anyway".
+  const [exerciseWarning, setExerciseWarning] = useState<ExerciseStatus | null>(
+    null,
+  );
   const [tomorrowPlan, setTomorrowPlan] = useState<Record<
     string,
     unknown
   > | null>(null);
   const hasProfile = Boolean(user?.full_name);
 
-  const loadData = useCallback(
-    async (opts?: { preserveEndDayState?: boolean }) => {
-      setDataLoading(true);
-      setError("");
-      try {
-        // Computed fresh (not a frozen constant) so a session left open across
-        // midnight picks up the new calendar day on the next refresh instead
-        // of staying stuck on yesterday's date.
-        const dateStr = new Date().toISOString().split("T")[0];
-        const [s, m] = await Promise.all([
-          api.get<DashboardStats>(`/user/dashboard?date=${dateStr}`),
-          api.get<TodayMeals>(`/ai/meals/today?date=${dateStr}`),
-        ]);
-        setStats(s);
-        setTodayMeals(m);
-        // Skip syncing dayEnded/tomorrowPlan right after End Meal Today: in
-        // dev mode the effective day has already advanced by the time this
-        // refetch lands, so the server correctly reports day_ended:false for
-        // the *new* day — but blindly applying that here would immediately
-        // hide the "day ended / tomorrow's plan" confirmation we just showed.
-        if (!opts?.preserveEndDayState) {
-          setDayEnded(m.day_ended);
-          if (m.day_ended) {
-            // Day was already ended in a previous session (e.g. page reload) —
-            // re-fetch a plan preview since it isn't persisted server-side.
-            try {
-              const plan =
-                await api.get<Record<string, unknown>>("/ai/recommend/meal");
-              setTomorrowPlan(plan);
-            } catch {
-              // Non-critical — the "day ended" panel still renders without it.
-            }
-          } else {
-            setTomorrowPlan(null);
-          }
+  const loadData = useCallback(async () => {
+    setDataLoading(true);
+    setError("");
+    try {
+      // Computed fresh (not a frozen constant) so a session left open across
+      // midnight picks up the new calendar day on the next refresh instead
+      // of staying stuck on yesterday's date.
+      const dateStr = new Date().toISOString().split("T")[0];
+      const [s, m] = await Promise.all([
+        api.get<DashboardStats>(`/user/dashboard?date=${dateStr}`),
+        api.get<TodayMeals>(`/ai/meals/today?date=${dateStr}`),
+      ]);
+      setStats(s);
+      setTodayMeals(m);
+      setDayEnded(m.day_ended);
+      if (m.day_ended) {
+        // Day was already ended in a previous session (e.g. page reload) —
+        // re-fetch a plan preview since it isn't persisted server-side.
+        try {
+          const plan =
+            await api.get<Record<string, unknown>>("/ai/recommend/meal");
+          setTomorrowPlan(plan);
+        } catch {
+          // Non-critical — the "day ended" panel still renders without it.
         }
-      } catch (e) {
-        setError((e as Error).message);
-      } finally {
-        setDataLoading(false);
+      } else {
+        setTomorrowPlan(null);
       }
-    },
-    [],
-  );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasProfile) return;
@@ -609,7 +660,7 @@ export default function UserDashboard() {
         const signal = localStorage.getItem("smartdiet_exercise_completed");
         if (signal) {
           localStorage.removeItem("smartdiet_exercise_completed");
-          loadData(); // Refresh calories_burned + exercise_mins_this_week
+          loadData(); // Refresh calories_burned + exercise_mins_today
         }
       }
     };
@@ -623,12 +674,6 @@ export default function UserDashboard() {
     return () =>
       document.removeEventListener("visibilitychange", handleVisibility);
   }, [loadData]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
 
   const handleLogMeal = async (
     mealType: string,
@@ -667,21 +712,37 @@ export default function UserDashboard() {
     await loadData();
   };
 
-  const handleEndDay = async () => {
+  // Ending the day rolls tomorrow's session, so today's workout has to be done
+  // first. `force` is the "End Meal Anyway" escape hatch — the same flag the
+  // backend checks, so the guard can't be skipped by calling the API directly.
+  const handleEndDay = async (force = false) => {
     if (endingDay || (dayEnded && !DEV_ALWAYS_ALLOW_END_DAY)) return;
     setEndingDay(true);
     try {
+      if (!force) {
+        const status = await api.get<ExerciseStatus>("/ai/exercise/status");
+        if (!status.all_completed) {
+          setExerciseWarning(status);
+          return;
+        }
+      }
       const r = await api.post<{
         message: string;
         today_summary: { date?: string } & Record<string, unknown>;
         tomorrow_plan: Record<string, unknown>;
-      }>("/ai/meals/end-day", {});
+      }>("/ai/meals/end-day", { force });
+      setExerciseWarning(null);
       setDayEnded(true);
       setLastEndedDate(r.today_summary?.date || null);
       setTomorrowPlan(r.tomorrow_plan || null);
-      await loadData({ preserveEndDayState: true });
+      await loadData();
     } catch (e) {
-      setError((e as Error).message);
+      // The backend re-checks and answers 409 with the same status payload —
+      // show the warning rather than a raw error if it got there first.
+      const err = e as ApiError;
+      const status = err.data?.exercise_status as ExerciseStatus | undefined;
+      if (err.status === 409 && status) setExerciseWarning(status);
+      else setError(err.message);
     } finally {
       setEndingDay(false);
     }
@@ -803,10 +864,11 @@ export default function UserDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground mt-0.5">
           Log your meals through the day — breakfast, lunch, snacks, then dinner
         </p>
+        <PageDate date={todayMeals?.date} />
       </div>
 
       {error && (
@@ -825,10 +887,10 @@ export default function UserDashboard() {
               sub: "kcal today",
             },
             {
-              label: "Exercise This Week",
-              value: `${stats.exercise_mins_this_week}m`,
+              label: "Exercise Today",
+              value: `${stats.exercise_mins_today}m`,
               icon: <Clock className="h-4 w-4 text-emerald-500" />,
-              sub: "minutes active",
+              sub: "minutes active today",
             },
             {
               label: "My Orders",
@@ -867,7 +929,7 @@ export default function UserDashboard() {
             target={targets.calories}
             unit=" kcal"
             stroke="#f97316"
-            emoji="🔥"
+            icon={Flame}
           />
           <MacroRing
             label="Protein"
@@ -875,7 +937,7 @@ export default function UserDashboard() {
             target={targets.protein_g}
             unit="g"
             stroke="#3b82f6"
-            emoji="💪"
+            icon={Dumbbell}
           />
           <MacroRing
             label="Carbs"
@@ -883,7 +945,7 @@ export default function UserDashboard() {
             target={targets.carbs_g}
             unit="g"
             stroke="#22c55e"
-            emoji="🌾"
+            icon={Wheat}
           />
           <MacroRing
             label="Fat"
@@ -891,7 +953,7 @@ export default function UserDashboard() {
             target={targets.fat_g}
             unit="g"
             stroke="#eab308"
-            emoji="🥑"
+            icon={Droplet}
           />
         </div>
       )}
@@ -906,12 +968,7 @@ export default function UserDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="w-full bg-secondary rounded-full h-2 mb-3">
-              <div
-                className="h-2 rounded-full bg-blue-400 transition-all"
-                style={{ width: `${Math.min(100, water.pct)}%` }}
-              />
-            </div>
+            <Progress value={Math.min(100, water.pct)} className="mb-3" />
             <div className="flex flex-wrap gap-2">
               {WATER_AMOUNTS.map((ml) => (
                 <button
@@ -934,7 +991,7 @@ export default function UserDashboard() {
             <MealSection
               key={mt.key}
               mealType={mt.key}
-              emoji={mt.emoji}
+              icon={mt.icon}
               label={mt.label}
               classLabel={mt.class}
               logs={todayMeals?.meals[mt.key] ?? []}
@@ -961,29 +1018,26 @@ export default function UserDashboard() {
               check your exercise recommendation.
             </p>
             {DEV_ALWAYS_ALLOW_END_DAY && dayEnded && (
-              <p className="text-xs text-amber-600 mt-1">
-                🧪 Dev mode: last ended day{" "}
+              <p className="text-xs text-amber-600 mt-1 flex items-center justify-center gap-1">
+                <FlaskConical className="h-3 w-3 shrink-0" />
+                Dev mode: last ended day{" "}
                 {lastEndedDate ? `= ${lastEndedDate}` : ""} — clicking again
                 simulates the next day.
               </p>
             )}
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={handleEndDay}
-              disabled={endingDay}
-              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
-            >
-              {endingDay ? "Saving..." : "✅ End Meal Today"}
-            </button>
-            <button
+            <Button onClick={() => handleEndDay()} disabled={endingDay}>
+              {endingDay ? "Saving..." : "End Meal Today"}
+            </Button>
+            <Button
+              variant={"primary-outline"}
               onClick={() =>
                 navigate("/trainee/ai-recommendations?tab=exercise")
               }
-              className="px-6 py-2.5 border border-emerald-300 hover:bg-emerald-50 text-emerald-700 text-sm font-semibold rounded-xl transition-colors"
             >
-              🏋️ Check Exercise
-            </button>
+              Check Exercise
+            </Button>
           </div>
         </div>
       )}
@@ -1026,14 +1080,73 @@ export default function UserDashboard() {
               })}
             </div>
           )}
-          <button
+          <Button
+            variant={"primary-outline"}
             onClick={() => navigate("/trainee/ai-recommendations?tab=exercise")}
-            className="w-full mt-2 py-2.5 border border-emerald-300 hover:bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-xl transition-colors"
           >
-            🏋️ Check Exercise Recommendation
-          </button>
+            Check Exercise Recommendation
+          </Button>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(exerciseWarning)}
+        onOpenChange={(open) => {
+          if (!open) setExerciseWarning(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive shrink-0" />
+              Your exercise is not completed
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Complete the exercise before ending today's meals.
+              {exerciseWarning?.plan_available &&
+                ` You've finished ${exerciseWarning.completed} of ${exerciseWarning.total} recommended exercises.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {exerciseWarning && exerciseWarning.pending.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-800 mb-1 flex items-center gap-1.5">
+                <Dumbbell className="h-3.5 w-3.5 shrink-0" />
+                Still pending
+              </p>
+              <ul className="space-y-0.5">
+                {exerciseWarning.pending.map((name, i) => (
+                  <li key={`${name}-${i}`} className="text-xs text-amber-700">
+                    • {name}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setExerciseWarning(null)}
+              disabled={endingDay}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary-outline"
+              onClick={() => {
+                setExerciseWarning(null);
+                navigate("/trainee/ai-recommendations?tab=exercise");
+              }}
+            >
+              Complete Exercise
+            </Button>
+            <Button onClick={() => handleEndDay(true)} disabled={endingDay}>
+              {endingDay ? "Saving..." : "End Meal Anyway"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {stats?.metrics && (
         <Card>

@@ -114,19 +114,24 @@ def _fallback_exercises(body_part: str) -> list:
     return list(_FALLBACK_DB.get(body_part, _FALLBACK_DB["cardio"]))
 
 
-def get_exercises_by_body_part(body_part: str, limit: int = 6,
-                                exclude_names: set | None = None,
-                                pool_multiplier: int = 4) -> list:
-    """Return `limit` exercises for a body part, randomly selected from a
-    larger pool so repeated calls (a new recommendation, a manual refresh,
-    a new day) don't keep handing back the exact same items in the exact
-    same order. Exercises in `exclude_names` (e.g. ones recommended/done
-    recently) are pushed to the back of the selection so they're rotated
-    out whenever the pool has enough alternatives, but are still used as a
-    fallback if the pool is too small to avoid them entirely."""
-    exclude_names = exclude_names or set()
-    pool_size = max(limit * pool_multiplier, limit)
+def _pick_variety(pool: list, limit: int, recently_done: dict | None) -> list:
+    """Rotate exercise picks instead of always returning the same deterministic
+    slice. Soft-avoids exercises done in the last 2 days (falling back to the
+    full pool if that would leave too few to choose from — a repeat is still
+    fine when there's genuinely nothing else to offer), then shuffles so the
+    same body part doesn't always surface the same exercises in the same order."""
+    recently_done = recently_done or {}
+    fresh = [e for e in pool if recently_done.get(e.get("name", ""), 999) > 2]
+    candidates = fresh if len(fresh) >= limit else pool
+    candidates = list(candidates)
+    random.shuffle(candidates)
+    return candidates[:limit]
 
+
+def get_exercises_by_body_part(body_part: str, limit: int = 6, recently_done: dict | None = None) -> list:
+    # Fetch a larger pool than needed so there's something to rotate between
+    # across requests, instead of always slicing the same deterministic top N.
+    pool_size = max(limit * 4, 12)
     if not is_configured():
         pool = _fallback_exercises(body_part)
     else:
@@ -141,6 +146,7 @@ def get_exercises_by_body_part(body_part: str, limit: int = 6,
                 data = r.json()
                 pool = [_normalize_exercise(e) for e in data] if isinstance(data, list) and data else []
                 if not pool:
+                    print(f"  ExerciseDB empty response for {body_part} — using fallback")
                     pool = _fallback_exercises(body_part)
             else:
                 print(f"  ExerciseDB {r.status_code} for {body_part} — using fallback")
@@ -149,19 +155,14 @@ def get_exercises_by_body_part(body_part: str, limit: int = 6,
             print(f"  ExerciseDB error: {ex} — using fallback")
             pool = _fallback_exercises(body_part)
 
-    fresh = [e for e in pool if e["name"] not in exclude_names]
-    seen  = [e for e in pool if e["name"] in exclude_names]
-    random.shuffle(fresh)
-    random.shuffle(seen)
-    return (fresh + seen)[:limit]
+    return _pick_variety(pool, limit, recently_done)
 
 
-def get_exercises_for_category(category: str, limit_per_part: int = 3,
-                                exclude_names: set | None = None) -> list:
+def get_exercises_for_category(category: str, limit_per_part: int = 3, recently_done: dict | None = None) -> list:
     body_parts = CATEGORY_TO_BODYPART.get(category, ["cardio"])
     result = []
     for bp in body_parts:
-        result.extend(get_exercises_by_body_part(bp, limit_per_part, exclude_names=exclude_names))
+        result.extend(get_exercises_by_body_part(bp, limit_per_part, recently_done))
     return result
 
 

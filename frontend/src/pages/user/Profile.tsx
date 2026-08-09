@@ -10,7 +10,6 @@ import {
   BarChart2,
   Target,
   Utensils,
-  Clock,
   Heart,
   MapPin,
   Activity,
@@ -21,21 +20,13 @@ import {
   Droplet,
   Award,
   Wheat,
-  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { api } from "@/api/client";
-import {
-  GOALS,
-  DIETS,
-  ACTIVITIES,
-  FITNESS,
-  COOKING,
-  STRESS,
-} from "./profile/constants";
+import { GOALS, DIETS, ACTIVITIES, FITNESS } from "./profile/constants";
 import ProfileSetup from "./profile/ProfileSetup";
 import { AvatarModal } from "./profile/AvatarModal";
 import { useAuth } from "@/context/AuthContext";
@@ -83,8 +74,6 @@ const GOAL_MAP = Object.fromEntries(
 const DIET_MAP = Object.fromEntries(DIETS);
 const ACTIVITY_MAP = Object.fromEntries(ACTIVITIES);
 const FITNESS_MAP = Object.fromEntries(FITNESS);
-const COOKING_MAP = Object.fromEntries(COOKING);
-const STRESS_MAP = Object.fromEntries(STRESS);
 
 function calcAge(dob: string): number | null {
   const d = new Date(dob);
@@ -107,36 +96,41 @@ function calcBMI(weight?: number, height?: number): number | null {
 const SAFE_WEEKLY_RATE_KG = 0.5; // sustainable rate of change (~500 kcal/day deficit/surplus)
 
 function calcWeightRecommendation(
-  weightKg: number,
-  heightCm: number,
+  weightKg: number | string,
+  heightCm: number | string,
   goal?: string,
 ) {
-  const heightM = heightCm / 100;
-  const bmi = weightKg / heightM ** 2;
+  // Coerce up front — the API delivers these as strings, and doing arithmetic
+  // on a string (e.g. `w + 2`) silently concatenates instead of adding.
+  const w = Number(weightKg);
+  const heightM = Number(heightCm) / 100;
+  const bmi = w / heightM ** 2;
   const healthyMinKg = Math.round(18.5 * heightM ** 2 * 10) / 10;
   const healthyMaxKg = Math.round(24.9 * heightM ** 2 * 10) / 10;
 
   let target: number;
   if (goal === "lose_weight") {
-    target = bmi > 24.9 ? Math.round(weightKg * 0.9 * 10) / 10 : weightKg;
+    target = bmi > 24.9 ? Math.round(w * 0.9 * 10) / 10 : w;
     target = Math.max(target, healthyMinKg);
   } else if (goal === "gain_muscle") {
-    target =
-      bmi < 18.5
-        ? Math.min(Math.round(weightKg * 1.05 * 10) / 10, healthyMaxKg)
-        : Math.round((weightKg + 2) * 10) / 10;
+    // Only suggest gaining when at/below a healthy weight; an already
+    // overweight/obese person is steered toward the top of the healthy range.
+    if (bmi < 18.5)
+      target = Math.min(Math.round(w * 1.05 * 10) / 10, healthyMaxKg);
+    else if (bmi > 24.9) target = healthyMaxKg;
+    else target = Math.round((w + 2) * 10) / 10;
   } else {
-    target = weightKg;
+    target = w;
     if (bmi > 24.9) target = healthyMaxKg;
     else if (bmi < 18.5) target = healthyMinKg;
   }
 
-  const diff = Math.abs(Math.round(weightKg * 10) / 10 - target);
+  const diff = Math.abs(Math.round(w * 10) / 10 - target);
   const weeksToTarget =
     diff >= SAFE_WEEKLY_RATE_KG ? Math.round(diff / SAFE_WEEKLY_RATE_KG) : 0;
 
   return {
-    currentWeightKg: Math.round(weightKg * 10) / 10,
+    currentWeightKg: Math.round(w * 10) / 10,
     targetWeightKg: target,
     healthyMinKg,
     healthyMaxKg,
@@ -546,9 +540,15 @@ export default function Profile() {
   const hasProfile = Boolean(data?.full_name);
 
   const [nutritionTargets, setNutritionTargets] = useState<{
-    calories: number; protein_g: number; carbs_g: number; fat_g: number;
-    bmi?: number; recommended_weight?: number; healthy_range_low?: number;
-    healthy_range_high?: number; weeks_to_target?: number;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    bmi?: number;
+    recommended_weight?: number;
+    healthy_range_low?: number;
+    healthy_range_high?: number;
+    weeks_to_target?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -560,7 +560,14 @@ export default function Profile() {
       .catch(() => {});
     // Fetch nutrition targets from AI engine
     api
-      .get<{ targets: { calories: number; protein_g: number; carbs_g: number; fat_g: number } }>(`/ai/meals/today?date=${today}`)
+      .get<{
+        targets: {
+          calories: number;
+          protein_g: number;
+          carbs_g: number;
+          fat_g: number;
+        };
+      }>(`/ai/meals/today?date=${today}`)
       .then((res) => {
         if (res?.targets) setNutritionTargets(res.targets);
       })
@@ -742,7 +749,7 @@ export default function Profile() {
                 className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50 h-7 px-3 text-xs"
                 asChild
               >
-                <Link to="/customer/become-trainer">
+                <Link to="/trainee/become-trainer">
                   <Award className="h-3.5 w-3.5" />
                   Become a Trainer
                 </Link>
@@ -939,60 +946,54 @@ export default function Profile() {
           {/* ── AI Nutrition Targets ──────────────────────── */}
           {nutritionTargets && (
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">AI Nutrition Targets</h2>
+              <h2 className="text-base font-semibold text-gray-800">
+                AI Nutrition Targets
+              </h2>
 
               {/* Daily macro targets */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { icon: Flame, label: "kcal/day", value: nutritionTargets.calories, color: "text-orange-500", bg: "bg-orange-50" },
-                  { icon: Dumbbell, label: "Protein", value: `${nutritionTargets.protein_g}g`, color: "text-blue-600", bg: "bg-blue-50" },
-                  { icon: Wheat, label: "Carbs", value: `${nutritionTargets.carbs_g}g`, color: "text-green-600", bg: "bg-green-50" },
-                  { icon: Droplet, label: "Fat", value: `${nutritionTargets.fat_g}g`, color: "text-yellow-600", bg: "bg-yellow-50" },
+                  {
+                    icon: Flame,
+                    label: "kcal/day",
+                    value: nutritionTargets.calories,
+                    color: "text-orange-500",
+                    bg: "bg-orange-50",
+                  },
+                  {
+                    icon: Dumbbell,
+                    label: "Protein",
+                    value: `${nutritionTargets.protein_g}g`,
+                    color: "text-blue-600",
+                    bg: "bg-blue-50",
+                  },
+                  {
+                    icon: Wheat,
+                    label: "Carbs",
+                    value: `${nutritionTargets.carbs_g}g`,
+                    color: "text-green-600",
+                    bg: "bg-green-50",
+                  },
+                  {
+                    icon: Droplet,
+                    label: "Fat",
+                    value: `${nutritionTargets.fat_g}g`,
+                    color: "text-yellow-600",
+                    bg: "bg-yellow-50",
+                  },
                 ].map((m) => (
-                  <div key={m.label} className={`${m.bg} rounded-2xl border border-gray-100 p-4 flex flex-col items-center gap-1`}>
+                  <div
+                    key={m.label}
+                    className={`${m.bg} rounded-2xl border border-gray-100 p-4 flex flex-col items-center gap-1`}
+                  >
                     <m.icon className={`h-6 w-6 ${m.color}`} />
-                    <span className={`text-xl font-bold ${m.color}`}>{m.value}</span>
+                    <span className={`text-xl font-bold ${m.color}`}>
+                      {m.value}
+                    </span>
                     <span className="text-xs text-gray-500">{m.label}</span>
                   </div>
                 ))}
               </div>
-
-              {/* AI Weight Recommendation card */}
-              {data?.current_weight_kg && data?.height_cm && (() => {
-                const w = parseFloat(data.current_weight_kg);
-                const h = parseFloat(data.height_cm) / 100;
-                const bmi = Math.round((w / (h * h)) * 10) / 10;
-                const low = Math.round(18.5 * h * h * 10) / 10;
-                const high = Math.round(24.9 * h * h * 10) / 10;
-                const rec = Math.round(((low + high) / 2) * 10) / 10;
-                const weeks = Math.round(Math.abs(w - rec) / 0.5);
-                return (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-800 flex items-center gap-2">
-                        <Bot className="h-4 w-4 shrink-0" />
-                        AI Target Weight Recommendation
-                      </span>
-                      <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-medium">BMI: {bmi}</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-8">
-                      <div className="text-center">
-                        <p className="text-4xl font-bold text-gray-900">{w}<span className="text-base font-normal text-gray-400">kg</span></p>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">Current</p>
-                      </div>
-                      <span className="text-gray-300 text-2xl">→</span>
-                      <div className="text-center">
-                        <p className="text-4xl font-bold text-emerald-500">{rec}<span className="text-base font-normal text-gray-400">kg</span></p>
-                        <p className="text-xs text-gray-500 uppercase tracking-wide mt-1">Recommended Target</p>
-                      </div>
-                    </div>
-                    <div className="text-center space-y-1 border-t border-gray-50 pt-3">
-                      <p className="text-sm text-gray-500">Healthy range for your height: <span className="font-semibold text-gray-800">{low}–{high}kg</span></p>
-                      {weeks > 0 && <p className="text-sm text-gray-500">Estimated time to reach target: <span className="font-bold text-gray-800">~{weeks} weeks</span> at a safe, sustainable rate.</p>}
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           )}
 
@@ -1079,55 +1080,9 @@ export default function Profile() {
                   items={asArr(data?.cuisine_preferences)}
                 />
               </div>
-            </div>
-          </SectionCard>
-
-          {/* ── Daily Habits ──────────────────────────────── */}
-          <SectionCard
-            icon={<Clock className="h-4 w-4" />}
-            title="Daily Habits"
-            iconBg="bg-purple-50"
-            iconColor="text-purple-600"
-          >
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <InfoItem label="Breakfast" value={data?.breakfast_time} />
-              <InfoItem label="Lunch" value={data?.lunch_time} />
-              <InfoItem label="Dinner" value={data?.dinner_time} />
-              <InfoItem
-                label="Sleep"
-                value={
-                  data?.avg_sleep_hours != null
-                    ? `${data.avg_sleep_hours} hrs`
-                    : undefined
-                }
-              />
-              <InfoItem label="Meals / Day" value={data?.meals_per_day} />
-              <InfoItem
-                label="Cooking Frequency"
-                value={
-                  data?.cooking_frequency
-                    ? COOKING_MAP[data.cooking_frequency]
-                    : undefined
-                }
-              />
-              <InfoItem
-                label="Eating Out / Week"
-                value={
-                  data?.eating_out_frequency != null
-                    ? `${data.eating_out_frequency}×`
-                    : undefined
-                }
-              />
-              <InfoItem
-                label="Stress Level"
-                value={
-                  data?.stress_level ? STRESS_MAP[data.stress_level] : undefined
-                }
-              />
-              <InfoItem
-                label="Snacks Between Meals"
-                value={data?.snacks_between_meals ? "Yes" : "No"}
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <InfoItem label="Meals / Day" value={data?.meals_per_day} />
+              </div>
             </div>
           </SectionCard>
 

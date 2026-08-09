@@ -153,18 +153,7 @@ class UpdateProfileSchema(BaseModel):
     other_restrictions: Optional[str] = None
     allergens: Optional[List[str]] = None
     cuisine_preferences: Optional[List[str]] = None
-    # Habits
-    breakfast_time: Optional[str] = None
-    lunch_time: Optional[str] = None
-    dinner_time: Optional[str] = None
     meals_per_day: Optional[int] = None
-    snacks_between_meals: Optional[bool] = None
-    cooking_frequency: Optional[str] = None
-    eating_out_frequency: Optional[int] = None
-    track_hydration: Optional[bool] = None
-    avg_sleep_hours: Optional[float] = None
-    emotional_eater: Optional[bool] = None
-    stress_level: Optional[Literal['low', 'moderate', 'high', 'very_high']] = None
     # Health
     notes: Optional[str] = None
     # Legacy
@@ -186,10 +175,7 @@ def me():
             "p.occupation, p.height_cm, p.current_weight_kg, p.activity_level, "
             "p.primary_goal, p.fitness_level, p.target_water_ml, "
             "p.diet_type, p.dietary_restrictions, p.other_restrictions, "
-            "p.allergens, p.cuisine_preferences, "
-            "p.breakfast_time, p.lunch_time, p.dinner_time, p.meals_per_day, "
-            "p.snacks_between_meals, p.cooking_frequency, p.eating_out_frequency, "
-            "p.track_hydration, p.avg_sleep_hours, p.emotional_eater, p.stress_level, "
+            "p.allergens, p.cuisine_preferences, p.meals_per_day, "
             "p.health_conditions, p.notes, "
             "p.age, p.weight_kg, p.goal, "
             "p.bio, p.specialization, p.experience_years, p.available_time "

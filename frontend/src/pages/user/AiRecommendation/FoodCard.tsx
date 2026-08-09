@@ -16,10 +16,9 @@ export function FoodCard({
           <span className="text-lg font-bold text-primary">#{rank}</span>
           <div className="min-w-0">
             <p className="font-medium text-sm truncate">{food.name}</p>
-            {food.serving_size && (
+            {(food.serving_unit || food.serving_size) && (
               <p className="text-xs text-muted-foreground">
-                per {food.serving_size}
-                {food.serving_unit || "g"}
+                per serving: {food.serving_unit || `${food.serving_size} g`}
               </p>
             )}
           </div>

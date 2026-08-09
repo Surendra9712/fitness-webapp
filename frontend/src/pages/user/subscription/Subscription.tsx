@@ -14,6 +14,16 @@ import useUser from "@/hooks/useUser";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import type { EsewaParams, SubscriptionPaymentMethod } from "@/types";
 
@@ -165,6 +175,7 @@ export default function Subscription() {
   const nprToUsdRate = fxRateData?.npr_to_usd_rate ?? NPR_TO_USD_RATE_FALLBACK;
 
   const [showDialog, setShowDialog] = useState(false);
+  const [showDowngradeConfirm, setShowDowngradeConfirm] = useState(false);
   const [esewaData, setEsewaData] = useState<{
     url: string;
     params: EsewaParams;
@@ -210,6 +221,7 @@ export default function Subscription() {
     try {
       await updatePlan.mutateAsync({ plan: "free" });
       await refreshUser();
+      setShowDowngradeConfirm(false);
       toast.success("Downgraded to Free plan.");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to downgrade");
@@ -232,6 +244,42 @@ export default function Subscription() {
           nprToUsdRate={nprToUsdRate}
         />
       )}
+
+      {/* Downgrade confirmation */}
+      <AlertDialog
+        open={showDowngradeConfirm}
+        onOpenChange={setShowDowngradeConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Downgrade to Free plan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll immediately lose access to Pro features — Trainer Requests
+              and AI Recommendations. You can upgrade back to Pro at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updatePlan.isPending}>
+              Keep Pro
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                downgradeToFree();
+              }}
+              disabled={updatePlan.isPending}
+            >
+              {updatePlan.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Downgrading…
+                </>
+              ) : (
+                "Downgrade to Free"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="space-y-6 max-w-3xl">
         <div>
@@ -292,7 +340,7 @@ export default function Subscription() {
                   variant="outline"
                   className="w-full"
                   disabled={updatePlan.isPending}
-                  onClick={downgradeToFree}
+                  onClick={() => setShowDowngradeConfirm(true)}
                 >
                   Downgrade to Free
                 </Button>

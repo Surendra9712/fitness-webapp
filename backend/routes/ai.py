@@ -29,17 +29,97 @@ except Exception as e:
 
 ai_bp = Blueprint("ai", __name__)
 
+# A food that wins the top slot for a meal type is benched for this many days
+# so the same "highest score" dish can't be served day after day.
+TOP_PICK_COOLDOWN_DAYS = 15
+
+# Onboarding's default when the user doesn't move the water slider
+# (see ProfileSchema.target_water_ml in routes/onboarding.py).
+DEFAULT_WATER_TARGET_ML = 2000
+
+
+def _water_target(profile):
+    """The user's daily water goal, in ml.
+
+    `target_water_ml` is what onboarding and the profile editor write, so it is
+    the goal the user actually chose. `daily_water_target_ml` is an older column
+    (added with its own DEFAULT 2500) that no writer populates — kept only as a
+    fallback for rows where it was set by hand.
+    """
+    return int(
+        profile.get("target_water_ml")
+        or profile.get("daily_water_target_ml")
+        or DEFAULT_WATER_TARGET_ML
+    )
+
 
 def _pydantic_errors(exc):
     return [{"field": e["loc"][-1], "message": e["msg"]} for e in exc.errors()]
+
+
+def _get_cached_recommendation(cursor, user_id, date_str, rec_type):
+    """Look up a previously-generated meal/exercise plan for this user+day.
+    Plans are pinned per effective day so repeated requests (page refreshes,
+    tab switches) return the same recommendation instead of a fresh one each
+    time — it should only change on a new day or after End Meal Today."""
+    cursor.execute(
+        "SELECT content FROM ai_recommendations "
+        "WHERE user_id=%s AND rec_date=%s AND rec_type=%s",
+        (user_id, date_str, rec_type)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["content"])
+    except Exception:
+        return None
+
+
+def _save_recommendation(cursor, conn, user_id, date_str, rec_type, content):
+    cursor.execute(
+        "INSERT INTO ai_recommendations (user_id, rec_date, rec_type, meal_type, content) "
+        "VALUES (%s,%s,%s,NULL,%s) "
+        "ON DUPLICATE KEY UPDATE content=VALUES(content)",
+        (user_id, date_str, rec_type, json.dumps(content))
+    )
+    conn.commit()
+
+
+def _foods_on_cooldown(cursor, user_id, for_date, days=TOP_PICK_COOLDOWN_DAYS):
+    """Top-4 picks (one per meal type) already recommended in the last `days`.
+
+    The scorer is deterministic for a given profile, so the highest-scoring
+    food would otherwise win again tomorrow and every day after. Replaying the
+    saved plans gives us that history without a second table: whatever sat in
+    the #1 slot of breakfast/lunch/snack/dinner on any day inside the window is
+    excluded from the next plan.
+    """
+    window_start = for_date - datetime.timedelta(days=days)
+    cursor.execute(
+        "SELECT content FROM ai_recommendations "
+        "WHERE user_id=%s AND rec_type='meal' AND rec_date >= %s AND rec_date < %s",
+        (user_id, window_start.isoformat(), for_date.isoformat())
+    )
+    names = set()
+    for row in cursor.fetchall():
+        try:
+            content = json.loads(row["content"])
+        except Exception:
+            continue
+        for meal in (content.get("meal_plan") or {}).values():
+            recs = (meal or {}).get("recommendations") or []
+            if recs and recs[0].get("name"):
+                names.add(recs[0]["name"])
+    return names
 
 
 def _get_profile(cursor, user_id):
     cursor.execute(
         "SELECT current_weight_kg, height_cm, date_of_birth, gender, "
         "activity_level, primary_goal, fitness_level, meals_per_day, "
-        "avg_sleep_hours, stress_level, dietary_restrictions, allergens, "
-        "cuisine_preferences, diet_type, daily_water_target_ml "
+        "dietary_restrictions, allergens, "
+        "cuisine_preferences, diet_type, target_water_ml, daily_water_target_ml "
         "FROM user_profiles WHERE user_id = %s",
         (user_id,)
     )
@@ -212,7 +292,7 @@ def get_todays_meals():
             (request.user_id, date_str)
         )
         water_consumed = int((cursor.fetchone() or {}).get("consumed_ml") or 0)
-        water_target = int(profile.get("daily_water_target_ml") or 2500)
+        water_target = _water_target(profile)
         water_pct = round(water_consumed / water_target * 100, 1) if water_target else 0
 
         return jsonify({
@@ -318,11 +398,26 @@ def end_meal_day():
     In dev mode (MODE=dev) that changes: if a summary already exists for
     today (or later), the day to finalize advances by one instead of
     re-targeting today, so repeated calls simulate consecutive days.
+
+    Ending the day is blocked while today's recommended exercises are still
+    unlogged. Body: { "force": true } overrides that (the "End Meal Anyway"
+    path in the UI).
     """
+    force = bool((request.get_json(silent=True) or {}).get("force"))
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
         today = get_effective_today(cursor, request.user_id).isoformat()
+
+        if not force:
+            status = _exercise_completion_status(cursor, conn, request.user_id, today)
+            if not status["all_completed"]:
+                return jsonify({
+                    "error": "Your exercise is not completed. Complete the exercise "
+                             "before ending today's meals.",
+                    "code": "exercise_incomplete",
+                    "exercise_status": status,
+                }), 409
 
         profile = _get_profile(cursor, request.user_id)
 
@@ -381,7 +476,13 @@ def end_meal_day():
         tomorrow_plan = {}
         if profile:
             try:
-                tomorrow_plan = _build_meal_recommendation(cursor, request.user_id, profile, reference_date=today)
+                tomorrow = datetime.date.fromisoformat(today) + datetime.timedelta(days=1)
+                tomorrow_plan = _build_meal_recommendation(
+                    cursor, request.user_id, profile, tomorrow
+                )
+                _save_recommendation(
+                    cursor, conn, request.user_id, tomorrow.isoformat(), "meal", tomorrow_plan
+                )
             except Exception:
                 tomorrow_plan = {}
 
@@ -458,134 +559,38 @@ def nlp_query():
     return jsonify(handle_natural_language_query(body.text, dietary=dietary))
 
 
-def _get_cached_recommendation(cursor, user_id, rec_date, rec_type):
-    """Returns (row_id, content_dict) for today's cached recommendation, or
-    None if nothing's cached yet. Content is stored as JSON text."""
-    ref = rec_date.isoformat() if hasattr(rec_date, "isoformat") else rec_date
-    cursor.execute(
-        "SELECT id, content FROM ai_recommendations "
-        "WHERE user_id=%s AND rec_date=%s AND rec_type=%s "
-        "ORDER BY id DESC LIMIT 1",
-        (user_id, ref, rec_type)
-    )
-    row = cursor.fetchone()
-    if not row:
-        return None
-    try:
-        content = row["content"]
-        return row["id"], (json.loads(content) if isinstance(content, str) else content)
-    except Exception:
-        return None
-
-
-def _save_recommendation_cache(cursor, conn, user_id, rec_date, rec_type, content, existing_id=None):
-    ref = rec_date.isoformat() if hasattr(rec_date, "isoformat") else rec_date
-    payload = json.dumps(content)
-    if existing_id:
-        cursor.execute(
-            "UPDATE ai_recommendations SET content=%s, created_at=CURRENT_TIMESTAMP WHERE id=%s",
-            (payload, existing_id)
-        )
-    else:
-        cursor.execute(
-            "INSERT INTO ai_recommendations (user_id, rec_date, rec_type, content) VALUES (%s,%s,%s,%s)",
-            (user_id, ref, rec_type, payload)
-        )
-    conn.commit()
-
-
-def _build_meal_recommendation(cursor, user_id, profile, reference_date=None):
+def _build_meal_recommendation(cursor, user_id, profile, for_date):
     """Fetch recent food history and build a fresh daily meal plan for the profile.
     Shared by /recommend/meal and /meals/end-day (tomorrow's plan).
 
-    reference_date: the "today" history should be measured against. Defaults
-    to the DB's own CURDATE(), but callers in dev mode should pass the
-    devtime-effective date — otherwise, once End Meal Today has advanced the
-    simulated day ahead of the real calendar date, days_since/times_week end
-    up computed against the wrong anchor."""
+    `for_date` is the day the plan is for — it anchors the 15-day top-pick
+    cooldown window so tomorrow's plan can't repeat today's top picks."""
     # Build detailed food history for v3 ML variety features
     # {food_name: {days_since, times_week, times_total}}
     recently_eaten = set()
     recently_eaten_detail = {}
     try:
-        ref = reference_date.isoformat() if hasattr(reference_date, "isoformat") else reference_date
-        if ref:
-            cursor.execute(
-                """SELECT food_name,
-                          MIN(DATEDIFF(%s, logged_date)) AS days_since,
-                          SUM(CASE WHEN logged_date >= DATE_SUB(%s, INTERVAL 7 DAY)
-                                   THEN 1 ELSE 0 END) AS times_week,
-                          COUNT(*) AS times_total
-                   FROM meal_logs
-                   WHERE user_id=%s
-                     AND logged_date >= DATE_SUB(%s, INTERVAL 30 DAY)
-                     AND deleted_at IS NULL
-                   GROUP BY food_name""",
-                (ref, ref, user_id, ref)
-            )
-        else:
-            cursor.execute(
-                """SELECT food_name,
-                          MIN(DATEDIFF(CURDATE(), logged_date)) AS days_since,
-                          SUM(CASE WHEN logged_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-                                   THEN 1 ELSE 0 END) AS times_week,
-                          COUNT(*) AS times_total
-                   FROM meal_logs
-                   WHERE user_id=%s
-                     AND logged_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-                     AND deleted_at IS NULL
-                   GROUP BY food_name""",
-                (user_id,)
-            )
+        cursor.execute(
+            """SELECT food_name,
+                      MIN(DATEDIFF(CURDATE(), logged_date)) AS days_since,
+                      SUM(CASE WHEN logged_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                               THEN 1 ELSE 0 END) AS times_week,
+                      COUNT(*) AS times_total
+               FROM meal_logs
+               WHERE user_id=%s
+                 AND logged_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                 AND deleted_at IS NULL
+               GROUP BY food_name""",
+            (user_id,)
+        )
         for row in cursor.fetchall():
             fname = row["food_name"]
             recently_eaten.add(fname)
             recently_eaten_detail[fname] = {
-                "days_since":  int(row["days_since"]) if row["days_since"] is not None else 999,
+                "days_since":  int(row["days_since"] or 999),
                 "times_week":  int(row["times_week"] or 0),
                 "times_total": int(row["times_total"] or 0),
             }
-    except Exception:
-        pass
-
-    # Even if nothing was logged, still rotate away from whatever was
-    # *recommended* on recent days — otherwise a day with no activity gets
-    # the identical plan repeated, since the scorer has no other signal to
-    # work from. Looks back a few days (not just yesterday) so a small food
-    # pool doesn't just alternate between two fixed sets. Treated as "eaten
-    # N days ago" so the same fresh-first/pad-with-recent logic in
-    # recommend_meal_for_type naturally deprioritizes it.
-    try:
-        ref_date_obj = (
-            reference_date if hasattr(reference_date, "isoformat")
-            else (datetime.date.fromisoformat(reference_date) if reference_date else datetime.date.today())
-        )
-        lookback_days = 3
-        prev_dates = [
-            (ref_date_obj - datetime.timedelta(days=n)).isoformat()
-            for n in range(1, lookback_days + 1)
-        ]
-        cursor.execute(
-            "SELECT rec_date, content FROM ai_recommendations "
-            "WHERE user_id=%s AND rec_type='meal' AND rec_date IN (%s,%s,%s) "
-            "ORDER BY rec_date DESC",
-            (user_id, *prev_dates)
-        )
-        for row in cursor.fetchall():
-            content = row["content"]
-            prev_plan = json.loads(content) if isinstance(content, str) else content
-            try:
-                days_back = (ref_date_obj - row["rec_date"]).days
-            except Exception:
-                days_back = 1
-            for meal_data in (prev_plan.get("meal_plan") or {}).values():
-                for f in meal_data.get("recommendations", []):
-                    fname = f.get("name")
-                    if fname and fname not in recently_eaten_detail:
-                        recently_eaten.add(fname)
-                        recently_eaten_detail[fname] = {
-                            "days_since": max(days_back, 1), "times_week": 1, "times_total": 1
-                        }
     except Exception:
         pass
 
@@ -601,6 +606,7 @@ def _build_meal_recommendation(cursor, user_id, profile, reference_date=None):
         preferred_cuisines=profile.get("cuisine_preferences") or ["nepali"],
         recently_eaten=recently_eaten,
         recently_eaten_detail=recently_eaten_detail,
+        exclude_names=_foods_on_cooldown(cursor, user_id, for_date),
     )
 
 
@@ -608,30 +614,152 @@ def _build_meal_recommendation(cursor, user_id, profile, reference_date=None):
 @role_required("trainee")
 def recommend_meal():
     meal_type = request.args.get("meal_type")
-    force = request.args.get("force", "").lower() in ("1", "true", "yes")
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        today = get_effective_today(cursor, request.user_id)
-        cached = _get_cached_recommendation(cursor, request.user_id, today, "meal")
-
-        if cached and not force:
-            _, result = cached
-        else:
+        effective_today = get_effective_today(cursor, request.user_id)
+        today = effective_today.isoformat()
+        result = _get_cached_recommendation(cursor, request.user_id, today, "meal")
+        if result is None:
             profile = _get_profile(cursor, request.user_id)
             if not profile:
                 return jsonify({"error": "Complete your profile first"}), 400
-            result = _build_meal_recommendation(cursor, request.user_id, profile, reference_date=today)
-            existing_id = cached[0] if cached else None
-            _save_recommendation_cache(cursor, conn, request.user_id, today, "meal", result, existing_id)
-
+            result = _build_meal_recommendation(
+                cursor, request.user_id, profile, effective_today
+            )
+            _save_recommendation(cursor, conn, request.user_id, today, "meal", result)
         if meal_type and meal_type in result.get("meal_plan", {}):
             return jsonify({
+                "date": today,
                 "nutrition_targets": result["nutrition_targets"],
                 "meal_type": meal_type,
                 "recommendation": result["meal_plan"][meal_type],
             })
-        return jsonify(result)
+        return jsonify({**result, "date": today})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def _get_or_build_exercise_recommendation(cursor, conn, user_id, today):
+    """Today's pinned exercise plan plus the calorie context it was built from.
+
+    Returns (result, extras) — or (None, None) when the profile is incomplete,
+    since the plan can't be computed without it. Shared by /recommend/exercise
+    and the End Meal Today completion check so both see the same exercise list.
+    """
+    cursor.execute(
+        "SELECT COALESCE(SUM(calories),0) AS consumed FROM meal_logs "
+        "WHERE user_id=%s AND logged_date=%s AND deleted_at IS NULL",
+        (user_id, today)
+    )
+    consumed = float((cursor.fetchone() or {}).get("consumed", 0))
+    profile = _get_profile(cursor, user_id)
+    if not profile:
+        return None, None
+    t = calculate_nutrition_targets(
+        weight_kg=float(profile.get("current_weight_kg") or 70),
+        height_cm=float(profile.get("height_cm") or 170),
+        age=profile.get("age", 25),
+        gender=profile.get("gender", "male"),
+        activity_level=profile.get("activity_level", "moderate"),
+        goal=profile.get("primary_goal", "maintain"),
+    )
+    calorie_ratio = round(consumed / t.daily_calories, 3) if t.daily_calories else 1.0
+
+    # The recommended category/exercise list is pinned per effective day —
+    # only regenerated on a new day (or after End Meal Today advances it),
+    # not on every refresh or when today_calories/calorie_ratio change.
+    result = _get_cached_recommendation(cursor, user_id, today, "exercise")
+    if result is None:
+        cursor.execute(
+            "SELECT COUNT(DISTINCT logged_date) AS cnt FROM exercise_logs "
+            "WHERE user_id=%s AND logged_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)",
+            (user_id,)
+        )
+        days_exercised_this_week = int((cursor.fetchone() or {}).get("cnt") or 0)
+
+        recently_done = {}
+        try:
+            cursor.execute(
+                "SELECT e.name AS name, MIN(DATEDIFF(CURDATE(), el.logged_date)) AS days_since "
+                "FROM exercise_logs el JOIN exercises e ON e.id = el.exercise_id "
+                "WHERE el.user_id=%s AND el.logged_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) "
+                "GROUP BY e.name",
+                (user_id,)
+            )
+            recently_done = {row["name"]: int(row["days_since"] or 0) for row in cursor.fetchall()}
+        except Exception:
+            pass
+
+        result = recommend_exercise(
+            goal=profile.get("primary_goal", "maintain"),
+            bmi=t.bmi,
+            age=profile.get("age", 25),
+            fitness_level=profile.get("fitness_level", "beginner"),
+            calorie_ratio=calorie_ratio,
+            activity_level=profile.get("activity_level", "moderate"),
+            today_calories=consumed,
+            days_exercised_this_week=days_exercised_this_week,
+            recently_done=recently_done,
+        )
+        _save_recommendation(cursor, conn, user_id, today, "exercise", result)
+
+    # Mark exercises already logged today so the UI can lock them until
+    # the day changes (real rollover, or an End Meal Today advance).
+    cursor.execute(
+        "SELECT DISTINCT e.name FROM exercise_logs el "
+        "JOIN exercises e ON e.id = el.exercise_id "
+        "WHERE el.user_id=%s AND el.logged_date=%s",
+        (user_id, today)
+    )
+    completed_names = {row["name"] for row in cursor.fetchall()}
+    for item in result.get("exercises", []):
+        item["is_completed"] = item.get("name") in completed_names
+
+    extras = {
+        "today_calories": consumed,
+        "target_calories": t.daily_calories,
+        "calorie_ratio": calorie_ratio,
+    }
+    return result, extras
+
+
+def _exercise_completion_status(cursor, conn, user_id, today):
+    """Whether every exercise recommended for `today` has been logged.
+
+    Used to gate End Meal Today. When the plan can't be determined (no profile,
+    or the plan legitimately has no exercises, e.g. a rest day) the day is
+    treated as complete rather than locking the user out of ending it.
+    """
+    result, _ = _get_or_build_exercise_recommendation(cursor, conn, user_id, today)
+    if result is None:
+        return {
+            "date": today, "plan_available": False, "total": 0,
+            "completed": 0, "pending": [], "all_completed": True,
+        }
+    exercises = result.get("exercises", []) or []
+    pending = [e.get("name") for e in exercises if not e.get("is_completed")]
+    return {
+        "date": today,
+        "plan_available": True,
+        "category": result.get("category"),
+        "total": len(exercises),
+        "completed": len(exercises) - len(pending),
+        "pending": pending,
+        "all_completed": not pending,
+    }
+
+
+@ai_bp.route("/exercise/status", methods=["GET"])
+@role_required("trainee")
+def exercise_status():
+    """Today's exercise progress — the dashboard checks this before ending the day."""
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        today = get_effective_today(cursor, request.user_id).isoformat()
+        return jsonify(_exercise_completion_status(cursor, conn, request.user_id, today))
     finally:
         cursor.close()
         conn.close()
@@ -640,89 +768,16 @@ def recommend_meal():
 @ai_bp.route("/recommend/exercise", methods=["GET"])
 @role_required("trainee")
 def recommend_exercise_endpoint():
-    force = request.args.get("force", "").lower() in ("1", "true", "yes")
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        today_date = get_effective_today(cursor, request.user_id)
-        today = today_date.isoformat()
-        cursor.execute(
-            "SELECT COALESCE(SUM(calories),0) AS consumed, COUNT(*) AS meal_count "
-            "FROM meal_logs WHERE user_id=%s AND logged_date=%s AND deleted_at IS NULL",
-            (request.user_id, today)
+        today = get_effective_today(cursor, request.user_id).isoformat()
+        result, extras = _get_or_build_exercise_recommendation(
+            cursor, conn, request.user_id, today
         )
-        row = cursor.fetchone() or {}
-        consumed = float(row.get("consumed", 0))
-        meal_count = int(row.get("meal_count", 0))
-
-        profile = _get_profile(cursor, request.user_id)
-        if not profile:
+        if result is None:
             return jsonify({"error": "Complete your profile first"}), 400
-        t = calculate_nutrition_targets(
-            weight_kg=float(profile.get("current_weight_kg") or 70),
-            height_cm=float(profile.get("height_cm") or 170),
-            age=profile.get("age", 25),
-            gender=profile.get("gender", "male"),
-            activity_level=profile.get("activity_level", "moderate"),
-            goal=profile.get("primary_goal", "maintain"),
-        )
-        calorie_ratio = round(consumed / t.daily_calories, 3) if t.daily_calories else 1.0
-
-        # Only pick new exercises when there's genuinely nothing cached yet for
-        # today, or the meal-log count has changed since the cached pick was
-        # made (i.e. the user logged/removed a meal, which shifts calorie_ratio) —
-        # not on every plain page load/reload.
-        cached = _get_cached_recommendation(cursor, request.user_id, today_date, "exercise")
-        stale = (not cached) or cached[1].get("_meal_count_snapshot") != meal_count
-        if force or stale:
-            # Exercises recommended/completed in the last 7 days, so a fresh
-            # pick rotates through the pool instead of handing back the same
-            # handful every time (Req: exercise variety).
-            cursor.execute(
-                "SELECT DISTINCT e.name FROM exercise_logs el "
-                "JOIN exercises e ON e.id = el.exercise_id "
-                "WHERE el.user_id=%s AND el.logged_date >= DATE_SUB(%s, INTERVAL 7 DAY)",
-                (request.user_id, today)
-            )
-            recent_names = {r["name"] for r in cursor.fetchall()}
-
-            result = recommend_exercise(
-                goal=profile.get("primary_goal", "maintain"),
-                bmi=t.bmi,
-                age=profile.get("age", 25),
-                fitness_level=profile.get("fitness_level", "beginner"),
-                calorie_ratio=calorie_ratio,
-                activity_level=profile.get("activity_level", "moderate"),
-                today_calories=consumed,
-                recent_exercise_names=recent_names,
-            )
-            result["_meal_count_snapshot"] = meal_count
-            existing_id = cached[0] if cached else None
-            _save_recommendation_cache(cursor, conn, request.user_id, today_date, "exercise", result, existing_id)
-        else:
-            _, result = cached
-
-        # Completion status is always recomputed fresh — it shouldn't wait
-        # for a meal log to update, only the exercise *selection* is cached.
-        cursor.execute(
-            "SELECT DISTINCT e.name FROM exercise_logs el "
-            "JOIN exercises e ON e.id = el.exercise_id "
-            "WHERE el.user_id=%s AND el.logged_date=%s",
-            (request.user_id, today)
-        )
-        completed_names = {r["name"] for r in cursor.fetchall()}
-        exercises_out = [
-            {**item, "is_completed": item.get("name") in completed_names}
-            for item in result.get("exercises", [])
-        ]
-
-        return jsonify({
-            **{k: v for k, v in result.items() if k not in ("exercises", "_meal_count_snapshot")},
-            "exercises": exercises_out,
-            "today_calories": consumed,
-            "target_calories": t.daily_calories,
-            "calorie_ratio": calorie_ratio,
-        })
+        return jsonify({**result, **extras, "date": today})
     finally:
         cursor.close()
         conn.close()
@@ -815,7 +870,7 @@ def weekly_report():
             pass
 
         profile = _get_profile(cursor, request.user_id)
-        water_target = int(profile.get("daily_water_target_ml") or 2500)
+        water_target = _water_target(profile)
         target_calories = 2000
         targets_data = {"calories": 2000, "protein_g": 150, "carbs_g": 200, "fat_g": 65,
                          "water_ml": water_target}

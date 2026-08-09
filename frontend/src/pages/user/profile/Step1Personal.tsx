@@ -52,7 +52,7 @@ export function Step1Personal() {
         <FormField
           control={control}
           name="date_of_birth"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormItem>
               <FormLabel>
                 Date of Birth <span className="text-destructive">*</span>
@@ -60,11 +60,12 @@ export function Step1Personal() {
               <FormControl>
                 <DatePicker
                   value={field.value}
+                  error={fieldState?.error && true}
                   onChange={field.onChange}
                   placeholder="Pick a date"
                   disabledDates={(d) => d > new Date()}
                   startYear={1940}
-                  endYear={new Date().getFullYear() - 5}
+                  endYear={new Date().getFullYear()}
                   defaultMonth={new Date(2000, 0)}
                 />
               </FormControl>

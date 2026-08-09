@@ -2,11 +2,22 @@ import axios, { type AxiosRequestConfig } from "axios";
 
 export class ApiError extends Error {
   fieldErrors?: Record<string, string>;
+  /** HTTP status, when the failure came back from the server. */
+  status?: number;
+  /** Raw error payload, for endpoints that return extra context alongside `error`. */
+  data?: Record<string, unknown>;
 
-  constructor(message: string, fieldErrors?: Record<string, string>) {
+  constructor(
+    message: string,
+    fieldErrors?: Record<string, string>,
+    status?: number,
+    data?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.fieldErrors = fieldErrors;
+    this.status = status;
+    this.data = data;
   }
 }
 
@@ -36,14 +47,15 @@ http.interceptors.response.use(
     }
 
     const data = err.response?.data;
+    const status = err.response?.status;
     if (data?.errors && typeof data.errors === "object") {
       const fieldErrors = data.errors as Record<string, string>;
       const firstMessage = Object.values(fieldErrors)[0] ?? "Validation failed";
-      return Promise.reject(new ApiError(firstMessage, fieldErrors));
+      return Promise.reject(new ApiError(firstMessage, fieldErrors, status, data));
     }
 
     const message = data?.error ?? err.message ?? "Request failed";
-    return Promise.reject(new ApiError(message));
+    return Promise.reject(new ApiError(message, undefined, status, data));
   },
 );
 

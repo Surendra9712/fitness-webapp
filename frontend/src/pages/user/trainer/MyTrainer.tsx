@@ -107,7 +107,7 @@ export default function MyTrainer() {
             : " Upgrade to connect with a certified trainer."}
         </p>
         <Button asChild className="mt-2 gap-2">
-          <Link to="/customer/subscription">
+          <Link to="/trainee/subscription">
             <Crown className="h-4 w-4" /> View Plans
           </Link>
         </Button>
@@ -150,7 +150,9 @@ export default function MyTrainer() {
                     className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/40"
                   >
                     <Avatar className="h-10 w-10 shrink-0">
-                      <AvatarImage src={assignment.trainer_profile_image_url ?? undefined} />
+                      <AvatarImage
+                        src={assignment.trainer_profile_image_url ?? undefined}
+                      />
                       <AvatarFallback className="text-sm font-bold">
                         {assignment.trainer_name?.charAt(0).toUpperCase()}
                       </AvatarFallback>
