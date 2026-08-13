@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { nameSchema } from "@/lib/name-validation";
 import {
   User,
   Save,
@@ -71,7 +72,7 @@ const slotSchema = z.object({
 });
 
 const publicBecomeTrainerSchema = z.object({
-  name: z.string().min(1, "Full name is required"),
+  name: nameSchema("Full name is required"),
   email: z.email({
     // The new functional error handler maps exactly to the issue
     error: (issue) =>

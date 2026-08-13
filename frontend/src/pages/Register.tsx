@@ -24,6 +24,7 @@ import {
 import { useForm, Controller } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { nameSchema } from "@/lib/name-validation";
 
 export default function Register() {
   const { register: registerUser, user, loading: authLoading } = useAuth();
@@ -42,7 +43,7 @@ export default function Register() {
   if (user) return <Navigate to={getDashboardPath(user.role)} replace />;
 
   const schema = z.object({
-    name: z.string().min(1, "Full name is required"),
+    name: nameSchema("Full name is required"),
     email: z.string().email("Invalid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     role: z.enum(["trainee", "dietitian"]),

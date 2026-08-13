@@ -115,6 +115,8 @@ export interface EsewaParams {
   signature: string;
 }
 
+export type TrainerRequestStatus = "none" | "pending" | "approved" | "rejected";
+
 export interface User {
   id: number;
   name: string;
@@ -122,7 +124,7 @@ export interface User {
   email: string;
   role: Role;
   status: UserStatus;
-  is_verified?: number;
+  trainer_request_status?: TrainerRequestStatus;
   subscription_plan?: SubscriptionPlan;
   subscription_status?: SubscriptionStatus;
   subscription_payment_method?: SubscriptionPaymentMethod;
@@ -569,6 +571,12 @@ export interface PublicBecomeTrainerPayload {
 }
 
 export interface BecomeTrainerResult {
+  trainer_request_status: TrainerRequestStatus;
+  user: { id: number; name: string; email: string; role: Role };
+}
+
+/** Public trainer signup still creates the account outright, so it returns a token. */
+export interface PublicBecomeTrainerResult {
   token: string;
   user: { id: number; name: string; email: string; role: "dietitian" };
 }

@@ -30,18 +30,21 @@ export default function TrainerVerification() {
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [verifying, setVerifying] = useState<number | null>(null);
+  const [rejecting, setRejecting] = useState<number | null>(null);
 
   const { page, pageSize, goToPage, setPageSize, resetPage } = usePagination({
     initialPageSize: 15,
   });
 
-  const { GetUsers, VerifyTrainer } = useAdmin();
+  const { GetUsers, VerifyTrainer, RejectTrainerRequest } = useAdmin();
   const verifyMutation = VerifyTrainer();
+  const rejectMutation = RejectTrainerRequest();
 
+  // Applicants are keyed off trainer_request_status, not role: a trainee who
+  // applied keeps role 'trainee' until an admin approves them here.
   const { data, isLoading } = GetUsers({
     queryParams: {
-      role: "dietitian",
-      is_verified: "0",
+      trainer_request_status: "pending",
       search: searchQuery,
       page,
       page_size: pageSize,
@@ -61,7 +64,7 @@ export default function TrainerVerification() {
     setVerifying(trainer.id);
     try {
       await verifyMutation.mutateAsync(trainer.id);
-      toast.success(`${trainer.name} verified`);
+      toast.success(`${trainer.name} approved as a trainer`);
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
       queryClient.invalidateQueries({ queryKey: ["adminStats"] });
     } catch (err) {
@@ -71,10 +74,26 @@ export default function TrainerVerification() {
     }
   }
 
+  async function handleReject(trainer: TrainerRow) {
+    setRejecting(trainer.id);
+    try {
+      await rejectMutation.mutateAsync({ uid: trainer.id });
+      toast.success(`${trainer.name}'s request declined`);
+      queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["adminStats"] });
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setRejecting(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <p className="mt-1 text-sm text-muted-foreground">
-        Trainers pending verification — verify to make them visible to trainees.
+        Trainer applications awaiting review. Approving promotes the applicant to
+        a trainer and makes them visible to trainees; declining leaves their
+        current role untouched.
       </p>
 
       {/* Search */}
@@ -97,8 +116,8 @@ export default function TrainerVerification() {
           <ShieldCheck className="h-12 w-12 text-emerald-300" />
           <p className="font-semibold text-muted-foreground">
             {searchQuery
-              ? "No matching trainers found"
-              : "All trainers are verified"}
+              ? "No matching applications found"
+              : "No trainer applications pending"}
           </p>
         </div>
       ) : (
@@ -118,8 +137,13 @@ export default function TrainerVerification() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{trainer.name}</span>
                   <Badge variant="warning" className="text-xs">
-                    Unverified
+                    Pending
                   </Badge>
+                  {trainer.role === "trainee" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Applied as trainee
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {trainer.email}
@@ -157,12 +181,22 @@ export default function TrainerVerification() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  disabled={rejecting === trainer.id || verifying === trainer.id}
+                  onClick={() => handleReject(trainer)}
+                >
+                  <ShieldOff className="h-4 w-4" />
+                  {rejecting === trainer.id ? "Declining…" : "Decline"}
+                </Button>
+                <Button
+                  size="sm"
                   className="gap-1.5"
-                  disabled={verifying === trainer.id}
+                  disabled={verifying === trainer.id || rejecting === trainer.id}
                   onClick={() => handleVerify(trainer)}
                 >
                   <ShieldCheck className="h-4 w-4" />
-                  {verifying === trainer.id ? "Verifying…" : "Verify"}
+                  {verifying === trainer.id ? "Approving…" : "Approve"}
                 </Button>
               </div>
             </div>

@@ -27,6 +27,8 @@ import type {
   ApproveProductRequestPayload,
   ContactMessagesResponse,
   UpdateContactStatusPayload,
+  Role,
+  TrainerRequestStatus,
 } from "@/types";
 
 interface UseAdminReturn {
@@ -101,7 +103,16 @@ interface UseAdminReturn {
     Error,
     AssignmentActionPayload
   >;
-  VerifyTrainer: () => UseMutationResult<{ is_verified: boolean }, Error, number>;
+  VerifyTrainer: () => UseMutationResult<
+    { role: Role; trainer_request_status: TrainerRequestStatus },
+    Error,
+    number
+  >;
+  RejectTrainerRequest: () => UseMutationResult<
+    { trainer_request_status: TrainerRequestStatus },
+    Error,
+    { uid: number; admin_note?: string }
+  >;
   GetSubscriptions: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<User>>;
   ApproveSubscription: () => UseMutationResult<void, Error, number>;
   RejectSubscription: () => UseMutationResult<void, Error, { id: number; admin_note: string }>;
@@ -248,7 +259,24 @@ const useAdmin = (): UseAdminReturn => {
     useMutation({
       mutationFn: async (uid: number) => {
         const { data } = await api.put(`${endpoint.adminUsers}/${uid}/verify`);
-        return data as { is_verified: boolean };
+        return data as { role: Role; trainer_request_status: TrainerRequestStatus };
+      },
+    });
+
+  const RejectTrainerRequest = () =>
+    useMutation({
+      mutationFn: async ({
+        uid,
+        admin_note,
+      }: {
+        uid: number;
+        admin_note?: string;
+      }) => {
+        const { data } = await api.put(
+          `${endpoint.adminUsers}/${uid}/trainer-request/reject`,
+          { admin_note },
+        );
+        return data as { trainer_request_status: TrainerRequestStatus };
       },
     });
 
@@ -346,6 +374,7 @@ const useAdmin = (): UseAdminReturn => {
     ApproveProductRequest,
     RejectProductRequest,
     VerifyTrainer,
+    RejectTrainerRequest,
     GetSubscriptions,
     ApproveSubscription,
     RejectSubscription,

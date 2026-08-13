@@ -12,7 +12,7 @@ import time
 import requests as http_req
 import stripe
 from database.connection import get_connection
-from middleware.auth import generate_token, role_required
+from middleware.auth import role_required
 from routes.dietitian import UpdateTrainerProfileSchema, CertificationSchema
 from utils.validation import pydantic_errors
 from utils.pagination import parse_page_params, paginated_response
@@ -720,7 +720,8 @@ def list_trainers():
             search_params = [f"%{search}%"]
 
         base_where = (
-            "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.is_verified = 1 "
+            "WHERE u.role = 'dietitian' AND u.status = 'active' "
+            "AND u.trainer_request_status = 'approved' "
             "AND u.deleted_at IS NULL "
             "AND NOT EXISTS ("
             "  SELECT 1 FROM trainer_assignments ta2 WHERE ta2.trainer_id = u.id "
@@ -800,7 +801,7 @@ def get_trainer(trainer_id):
             WHERE u.id = %s
             AND u.role = 'dietitian'
             AND u.status = 'active'
-            AND u.is_verified = 1
+            AND u.trainer_request_status = 'approved'
             AND u.deleted_at IS NULL
             """,
             (trainer_id,),
@@ -875,7 +876,8 @@ def request_trainer():
             return jsonify({'error': f"You already have a request with this trainer (status: {existing['status']})"}), 409
 
         cursor.execute(
-            "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND status = 'active' AND is_verified = 1 AND deleted_at IS NULL",
+            "SELECT id FROM users WHERE id = %s AND role = 'dietitian' AND status = 'active' "
+            "AND trainer_request_status = 'approved' AND deleted_at IS NULL",
             (body.trainer_id,),
         )
         if not cursor.fetchone():
@@ -1296,6 +1298,13 @@ def become_trainer():
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(
+            "SELECT trainer_request_status FROM users WHERE id = %s", (request.user_id,),
+        )
+        current = cursor.fetchone()
+        if current and current['trainer_request_status'] == 'pending':
+            return jsonify({'error': 'Your trainer request is already pending review'}), 409
+
+        cursor.execute(
             "SELECT full_name FROM user_profiles WHERE user_id = %s", (request.user_id,),
         )
         row = cursor.fetchone()
@@ -1321,6 +1330,11 @@ def become_trainer():
                 list(profile_fields.values()) + [request.user_id],
             )
 
+        # A re-application (previous request was rejected) replaces the old
+        # certifications rather than stacking a second copy on top of them.
+        cursor.execute(
+            "DELETE FROM trainer_certifications WHERE user_id = %s", (request.user_id,),
+        )
         for cert in body.certifications:
             cursor.execute(
                 "INSERT INTO trainer_certifications (user_id, name, issued_by, issued_date, file_url, file_type) "
@@ -1329,8 +1343,11 @@ def become_trainer():
                  cert.issued_date or None, cert.file_url or None, cert.file_type),
             )
 
+        # The role stays 'trainee' until an admin approves — flipping it here
+        # would lock the applicant out of every trainee-only page, this form
+        # included. The pending state lives in trainer_request_status.
         cursor.execute(
-            "UPDATE users SET role='dietitian', is_verified=0 WHERE id = %s",
+            "UPDATE users SET trainer_request_status='pending' WHERE id = %s",
             (request.user_id,),
         )
 
@@ -1342,10 +1359,10 @@ def become_trainer():
                        request.user_id)
         conn.commit()
 
-        token = generate_token(request.user_id, 'dietitian')
         return jsonify({
-            'token': token,
-            'user': {'id': request.user_id, 'name': user['name'], 'email': user['email'], 'role': 'dietitian'},
+            'trainer_request_status': 'pending',
+            'user': {'id': request.user_id, 'name': user['name'],
+                     'email': user['email'], 'role': 'trainee'},
         }), 201
     except Exception as e:
         conn.rollback()

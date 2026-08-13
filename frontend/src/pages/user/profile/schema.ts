@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nameSchema } from "@/lib/name-validation";
 
 const positiveStr = (msg: string) =>
   z
@@ -11,7 +12,7 @@ const positiveStr = (msg: string) =>
 
 export const profileSchema = z.object({
   // Step 1
-  full_name: z.string().min(1, "Name is required"),
+  full_name: nameSchema(),
   date_of_birth: z
     .string()
     .min(1, "Date of birth is required")

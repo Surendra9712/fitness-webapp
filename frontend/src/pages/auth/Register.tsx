@@ -17,9 +17,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { nameSchema } from "@/lib/name-validation";
 
 const registerSchema = z.object({
-  name: z.string().min(1, "Full name is required"),
+  name: nameSchema("Full name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
@@ -32,7 +33,7 @@ export const RegisterForm = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<RegisterValues>({
-    // resolver: zodResolver(registerSchema),
+    resolver: zodResolver(registerSchema),
     defaultValues: { name: "", email: "", password: "" },
   });
   const { isSubmitting } = form.formState;

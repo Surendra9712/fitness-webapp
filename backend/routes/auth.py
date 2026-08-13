@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validato
 from typing import Literal, Optional, List
 from database.connection import get_connection
 from middleware.auth import generate_token, token_required
-from utils.validation import pydantic_errors
+from utils.validation import pydantic_errors, clean_person_name, validate_person_name
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -37,7 +37,12 @@ class RegisterSchema(BaseModel):
     @field_validator('name', mode='before')
     @classmethod
     def strip_name(cls, v):
-        return str(v).strip() if v else v
+        return clean_person_name(v) if v else v
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def check_name(cls, v):
+        return validate_person_name(v)
 
     @field_validator('email', mode='before')
     @classmethod
@@ -161,6 +166,16 @@ class UpdateProfileSchema(BaseModel):
     weight_kg: Optional[float] = None
     goal: Optional[Literal['lose_weight', 'maintain', 'gain_muscle']] = None
 
+    @field_validator('full_name', mode='before')
+    @classmethod
+    def strip_full_name(cls, v):
+        return clean_person_name(v)
+
+    @field_validator('full_name', mode='after')
+    @classmethod
+    def check_full_name(cls, v):
+        return validate_person_name(v, allow_empty=True)
+
 
 @auth_bp.route('/me', methods=['GET'])
 @token_required
@@ -170,6 +185,7 @@ def me():
     try:
         cursor.execute(
             "SELECT u.id, u.name, u.email, u.role, u.profile_image_url, "
+            "u.trainer_request_status, "
             "u.subscription_plan, u.subscription_status, "
             "p.full_name, p.date_of_birth, p.gender, p.phone_number, p.city, p.country, "
             "p.occupation, p.height_cm, p.current_weight_kg, p.activity_level, "

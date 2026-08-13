@@ -5,7 +5,7 @@ import json
 from datetime import date
 from database.connection import get_connection
 from middleware.auth import token_required
-from utils.validation import pydantic_errors
+from utils.validation import pydantic_errors, clean_person_name, validate_person_name
 
 onboarding_bp = Blueprint('onboarding', __name__)
 
@@ -47,7 +47,12 @@ class ProfileSchema(BaseModel):
     @field_validator('full_name', mode='before')
     @classmethod
     def strip_name(cls, v):
-        return str(v).strip() if v else v
+        return clean_person_name(v) if v else v
+
+    @field_validator('full_name', mode='after')
+    @classmethod
+    def check_name(cls, v):
+        return validate_person_name(v)
 
 
 class UpdateProfileSchema(BaseModel):
@@ -81,6 +86,16 @@ class UpdateProfileSchema(BaseModel):
     # Health
     health_conditions: Optional[List[dict]] = None
     notes: Optional[str] = None
+
+    @field_validator('full_name', mode='before')
+    @classmethod
+    def strip_full_name(cls, v):
+        return clean_person_name(v)
+
+    @field_validator('full_name', mode='after')
+    @classmethod
+    def check_full_name(cls, v):
+        return validate_person_name(v, allow_empty=True)
 
 
 # ── Macro calculator ──────────────────────────────────────────────────────────

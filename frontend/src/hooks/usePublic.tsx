@@ -15,7 +15,7 @@ import type {
   ReviewPayload,
   TrainerInfo,
   PublicBecomeTrainerPayload,
-  BecomeTrainerResult,
+  PublicBecomeTrainerResult,
   GlobalDiscount,
   ContactMessagePayload,
 } from "@/types";
@@ -35,7 +35,7 @@ interface UsePublicReturn {
     productId?: string | number,
   ) => UseMutationResult<void, Error, void>;
   BecomeTrainer: () => UseMutationResult<
-    BecomeTrainerResult,
+    PublicBecomeTrainerResult,
     Error,
     PublicBecomeTrainerPayload
   >;
@@ -120,7 +120,7 @@ const usePublic = (): UsePublicReturn => {
     useMutation({
       mutationFn: async (payload: PublicBecomeTrainerPayload) => {
         const { data } = await api.post(endpoint.publicBecomeTrainer, payload);
-        return data as BecomeTrainerResult;
+        return data as PublicBecomeTrainerResult;
       },
     });
 

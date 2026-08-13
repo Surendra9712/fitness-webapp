@@ -63,11 +63,13 @@ export default function UserDetail() {
   const [toggleConfirm, setToggleConfirm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  const { GetUserDetail, UpdateUser, DeleteUser, VerifyTrainer } = useAdmin();
+  const { GetUserDetail, UpdateUser, DeleteUser, VerifyTrainer, RejectTrainerRequest } =
+    useAdmin();
   const { data: user, isLoading, refetch } = GetUserDetail({ id: Number(id) });
   const toggleActive = UpdateUser();
   const deleteUser = DeleteUser();
   const verifyTrainer = VerifyTrainer();
+  const rejectTrainerRequest = RejectTrainerRequest();
 
   async function confirmToggle() {
     if (!user) return;
@@ -199,10 +201,14 @@ export default function UserDetail() {
               <Badge variant={u.status === "active" ? "success" : "secondary"}>
                 {u.status === "active" ? "Active" : "Disabled"}
               </Badge>
-              {u.role === "dietitian" && (
-                <Badge variant={u.is_verified ? "success" : "warning"}>
-                  {u.is_verified ? "Verified" : "Unverified"}
-                </Badge>
+              {u.trainer_request_status === "approved" && (
+                <Badge variant="success">Listed trainer</Badge>
+              )}
+              {u.trainer_request_status === "pending" && (
+                <Badge variant="warning">Trainer request pending</Badge>
+              )}
+              {u.trainer_request_status === "rejected" && (
+                <Badge variant="secondary">Trainer request declined</Badge>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -239,20 +245,38 @@ export default function UserDetail() {
                     ? "Approve"
                     : "Enable"}
               </Button>
-              {u.role === "dietitian" && (
+              {u.trainer_request_status !== "approved" &&
+                (u.trainer_request_status === "pending" ||
+                  u.role === "dietitian") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-emerald-600 hover:text-emerald-700"
+                    disabled={verifyTrainer.isPending}
+                    onClick={async () => {
+                      try {
+                        await verifyTrainer.mutateAsync(u.id);
+                        toast.success("Trainer approved and listed");
+                        refetch();
+                      } catch (err) {
+                        toast.error((err as Error).message);
+                      }
+                    }}
+                  >
+                    <Award className="h-4 w-4 mr-2" />
+                    Approve Trainer Request
+                  </Button>
+                )}
+              {u.trainer_request_status === "pending" && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`w-full ${u.is_verified ? "text-orange-600 hover:text-orange-700" : "text-emerald-600 hover:text-emerald-700"}`}
-                  disabled={verifyTrainer.isPending}
+                  className="w-full text-destructive hover:text-destructive"
+                  disabled={rejectTrainerRequest.isPending}
                   onClick={async () => {
                     try {
-                      await verifyTrainer.mutateAsync(u.id);
-                      toast.success(
-                        u.is_verified
-                          ? "Trainer unverified"
-                          : "Trainer verified",
-                      );
+                      await rejectTrainerRequest.mutateAsync({ uid: u.id });
+                      toast.success("Trainer request declined");
                       refetch();
                     } catch (err) {
                       toast.error((err as Error).message);
@@ -260,7 +284,7 @@ export default function UserDetail() {
                   }}
                 >
                   <Award className="h-4 w-4 mr-2" />
-                  {u.is_verified ? "Unverify Trainer" : "Verify Trainer"}
+                  Decline Trainer Request
                 </Button>
               )}
               <Button

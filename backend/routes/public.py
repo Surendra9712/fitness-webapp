@@ -8,7 +8,7 @@ from database.connection import get_connection
 from middleware.auth import generate_token, decode_token_string
 from routes.dietitian import CertificationSchema
 from utils.notify import push_to_admins
-from utils.validation import pydantic_errors
+from utils.validation import pydantic_errors, clean_person_name, validate_person_name
 from utils.fx import get_npr_to_usd_rate
 
 public_bp = Blueprint('public', __name__)
@@ -32,7 +32,12 @@ class PublicBecomeTrainerSchema(BaseModel):
     @field_validator('name', mode='before')
     @classmethod
     def strip_name(cls, v):
-        return str(v).strip() if v else v
+        return clean_person_name(v) if v else v
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def check_name(cls, v):
+        return validate_person_name(v)
 
     @field_validator('email', mode='before')
     @classmethod
@@ -241,7 +246,8 @@ def list_trainers():
             "LEFT JOIN trainer_reviews r ON u.id = r.trainer_id "
             "LEFT JOIN trainer_assignments ta ON u.id = ta.trainer_id "
             "  AND ta.status = 'approved' AND ta.deleted_at IS NULL "
-            "WHERE u.role = 'dietitian' AND u.status = 'active' AND u.deleted_at IS NULL "
+            "WHERE u.role = 'dietitian' AND u.status = 'active' "
+            "AND u.trainer_request_status = 'approved' AND u.deleted_at IS NULL "
             "GROUP BY u.id "
             "ORDER BY (COALESCE(AVG(r.rating), 0) * COUNT(DISTINCT r.id)) DESC, "
             "COUNT(DISTINCT ta.id) DESC "
@@ -344,8 +350,8 @@ def become_trainer_public():
 
         password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
         cursor.execute(
-            "INSERT INTO users (name, email, password_hash, role, status, is_verified) "
-            "VALUES (%s, %s, %s, 'dietitian', 'active', 0)",
+            "INSERT INTO users (name, email, password_hash, role, status, trainer_request_status) "
+            "VALUES (%s, %s, %s, 'dietitian', 'active', 'pending')",
             (body.name, body.email, password_hash),
         )
         user_id = cursor.lastrowid

@@ -12,6 +12,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import useDietitian from "@/hooks/useDietitian";
+import { cleanName, nameIssue } from "@/lib/name-validation";
 import type { AddCertPayload } from "@/hooks/useDietitian";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -219,6 +220,20 @@ export default function TrainerProfile() {
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
 
+    if (!cleanName(form.full_name)) {
+      toast.error("Full name is required.");
+      return;
+    }
+    const fullNameIssue = nameIssue(form.full_name);
+    if (fullNameIssue) {
+      toast.error(fullNameIssue);
+      return;
+    }
+    const nameIssueMsg = nameIssue(form.name);
+    if (nameIssueMsg) {
+      toast.error(nameIssueMsg);
+      return;
+    }
     if (!form.date_of_birth) {
       toast.error("Date of birth is required.");
       return;
@@ -245,8 +260,8 @@ export default function TrainerProfile() {
     try {
       // 1. Update profile fields + availability
       await update.mutateAsync({
-        name: form.name,
-        full_name: form.full_name || undefined,
+        name: cleanName(form.name) || undefined,
+        full_name: cleanName(form.full_name) || undefined,
         date_of_birth: form.date_of_birth || undefined,
         bio: form.bio || undefined,
         specialization: form.specialization || undefined,

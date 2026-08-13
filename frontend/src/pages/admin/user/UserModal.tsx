@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { nameSchema } from "@/lib/name-validation";
 import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ import useAdmin from "@/hooks/useAdmin";
 import type { User } from "@/types";
 
 const schema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: nameSchema(),
   email: z.string().email({ message: "Invalid email address" }),
   password: z.string().optional(),
   role: z.enum(["trainee", "dietitian", "admin"]),

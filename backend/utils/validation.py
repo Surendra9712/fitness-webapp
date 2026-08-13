@@ -1,4 +1,56 @@
+import re
+import unicodedata
+
 from pydantic import ValidationError
+
+# Characters allowed in a person name besides letters and combining marks.
+NAME_SEPARATORS = " -'."
+
+NAME_MAX_LENGTH = 100
+
+NAME_ERROR = (
+    'Name can only contain letters, spaces, hyphens, apostrophes and periods'
+)
+
+
+def clean_person_name(v):
+    """Strip and collapse inner whitespace of a name-like value."""
+    if not isinstance(v, str):
+        return v
+    return re.sub(r'\s+', ' ', v).strip()
+
+
+def _is_name_letter(ch: str) -> bool:
+    # Letters plus combining marks, so scripts such as Devanagari that use
+    # vowel signs are accepted.
+    return unicodedata.category(ch)[0] in ('L', 'M')
+
+
+def validate_person_name(v, allow_empty: bool = False):
+    """Reject names containing digits or special characters.
+
+    Use as an `after` field validator. Values that are not strings pass
+    through untouched so Pydantic reports its own type error.
+    """
+    if v is None or not isinstance(v, str):
+        return v
+    if not v:
+        if allow_empty:
+            return v
+        raise ValueError('This field is required')
+    if len(v) > NAME_MAX_LENGTH:
+        raise ValueError(f'Name must be at most {NAME_MAX_LENGTH} characters')
+
+    for ch in v:
+        if not _is_name_letter(ch) and ch not in NAME_SEPARATORS:
+            raise ValueError(NAME_ERROR)
+    if not _is_name_letter(v[0]):
+        raise ValueError('Name must start with a letter')
+    if v[-1] in " -'":
+        raise ValueError('Name cannot end with a space, hyphen or apostrophe')
+    if re.search(r"[-'.]{2,}|[-']\s|\s[-'.]", v):
+        raise ValueError(NAME_ERROR)
+    return v
 
 
 def pydantic_errors(exc: ValidationError) -> dict:
@@ -9,6 +61,8 @@ def pydantic_errors(exc: ValidationError) -> dict:
         if field in out:
             continue
         msg = err['msg']
+        if msg.startswith('Value error, '):
+            msg = msg[len('Value error, '):]
         t = err.get('type', '')
         ctx = err.get('ctx', {})
         if 'too_short' in t:

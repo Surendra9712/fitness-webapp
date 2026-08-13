@@ -210,7 +210,7 @@ export default function AdminDashboard() {
           value={stats?.users !== undefined ? fmt(stats.users) : undefined}
           icon={<Users className="h-5 w-5 text-blue-600" />}
           iconBg="bg-blue-100 dark:bg-blue-900/30"
-          onClick={() => navigate("/admin/trainees")}
+          onClick={() => navigate("/admin/trainee-management")}
         />
         <StatCard
           label="Total Trainers"
@@ -219,7 +219,7 @@ export default function AdminDashboard() {
           }
           icon={<UserCheck className="h-5 w-5 text-purple-600" />}
           iconBg="bg-purple-100 dark:bg-purple-900/30"
-          onClick={() => navigate("/admin/trainers")}
+          onClick={() => navigate("/admin/trainer-management")}
         />
         <StatCard
           label="Active Products"
@@ -228,14 +228,14 @@ export default function AdminDashboard() {
           }
           icon={<Package className="h-5 w-5 text-emerald-600" />}
           iconBg="bg-emerald-100 dark:bg-emerald-900/30"
-          onClick={() => navigate("/admin/products")}
+          onClick={() => navigate("/admin/product-management")}
         />
         <StatCard
           label="Total Orders"
           value={stats?.orders !== undefined ? fmt(stats.orders) : undefined}
           icon={<ShoppingBag className="h-5 w-5 text-orange-600" />}
           iconBg="bg-orange-100 dark:bg-orange-900/30"
-          onClick={() => navigate("/admin/orders")}
+          onClick={() => navigate("/admin/order-management")}
         />
       </div>
 
@@ -253,7 +253,8 @@ export default function AdminDashboard() {
                 count: stats?.pending_approvals ?? 0,
                 icon: <UserPlus className="h-4 w-4 text-amber-600" />,
                 bg: "bg-amber-50 dark:bg-amber-900/20",
-                path: "/admin/users",
+                // pending_approvals counts trainer applications, so land on that tab
+                path: "/admin/users?tab=trainer_pending",
               },
               {
                 label: "Product Requests",
@@ -274,7 +275,7 @@ export default function AdminDashboard() {
                 count: stats?.orders ?? 0,
                 icon: <ShoppingBag className="h-4 w-4 text-orange-500" />,
                 bg: "bg-orange-50 dark:bg-orange-900/20",
-                path: "/admin/orders",
+                path: "/admin/order-management",
               },
             ].map((item) => (
               <button

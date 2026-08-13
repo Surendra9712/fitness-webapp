@@ -742,19 +742,26 @@ export default function Profile() {
                 {[data.city, data.country].filter(Boolean).join(", ")}
               </span>
             )}
-            {data?.role === "trainee" && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50 h-7 px-3 text-xs"
-                asChild
-              >
-                <Link to="/trainee/become-trainer">
-                  <Award className="h-3.5 w-3.5" />
-                  Become a Trainer
-                </Link>
-              </Button>
-            )}
+            {data?.role === "trainee" &&
+              (data?.trainer_request_status === "pending" ? (
+                <span className="px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                  Trainer request pending review
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 border-primary-200 text-primary-700 hover:bg-primary-50 h-7 px-3 text-xs"
+                  asChild
+                >
+                  <Link to="/trainee/become-trainer">
+                    <Award className="h-3.5 w-3.5" />
+                    {data?.trainer_request_status === "rejected"
+                      ? "Re-apply as Trainer"
+                      : "Become a Trainer"}
+                  </Link>
+                </Button>
+              ))}
           </div>
         </div>
       </div>

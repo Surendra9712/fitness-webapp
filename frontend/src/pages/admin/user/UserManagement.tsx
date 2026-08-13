@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
   MoreHorizontal,
@@ -8,6 +8,8 @@ import {
   UserCheck,
   Trash2,
   Eye,
+  ShieldCheck,
+  ShieldOff,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import useAdmin from "@/hooks/useAdmin";
@@ -51,13 +53,32 @@ const ENTITY_LABELS: Record<string, string> = {
   dietitian: "Trainer",
 };
 
+const TRAINER_REQUEST_TAB = "trainer_pending";
+
 interface Props {
   role?: "trainee" | "dietitian";
 }
 
+const STATUS_TABS = [
+  "all",
+  "active",
+  "inactive",
+  // "pending",
+  TRAINER_REQUEST_TAB,
+];
+
 export default function UserManagement({ role }: Props) {
   const navigate = useNavigate();
-  const [filters, setFilters] = useState({ search: "", role, status: "all" });
+  // ?tab= lets other pages deep-link straight to a tab (the dashboard's
+  // "User Approvals" card links to the trainer-request queue this way).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab") ?? "";
+  const initialTab = STATUS_TABS.includes(tabFromUrl) ? tabFromUrl : "all";
+  const [filters, setFilters] = useState({
+    search: "",
+    role,
+    status: initialTab,
+  });
   const [modal, setModal] = useState<{ open: boolean; user?: User }>({
     open: false,
   });
@@ -75,12 +96,27 @@ export default function UserManagement({ role }: Props) {
     initialPageSize: 20,
   });
 
-  const { GetUsers, UpdateUser, DeleteUser } = useAdmin();
+  const {
+    GetUsers,
+    UpdateUser,
+    DeleteUser,
+    VerifyTrainer,
+    RejectTrainerRequest,
+  } = useAdmin();
+  const verifyTrainer = VerifyTrainer();
+  const rejectTrainerRequest = RejectTrainerRequest();
+
+  // The "Trainer requests" tab filters on trainer_request_status; every other
+  // tab filters on the account status. They are separate columns, so only one
+  // of the two params is ever sent.
+  const isTrainerRequestTab = filters.status === TRAINER_REQUEST_TAB;
   const { data, isPlaceholderData, isFetching } = GetUsers({
     queryParams: {
       page,
       page_size: pageSize,
-      ...(filters.status !== "all" && { status: filters.status }),
+      ...(isTrainerRequestTab
+        ? { trainer_request_status: "pending" }
+        : filters.status !== "all" && { status: filters.status }),
       ...(filters.role && { role: filters.role }),
       ...(filters.search && { search: filters.search }),
     },
@@ -88,8 +124,9 @@ export default function UserManagement({ role }: Props) {
 
   useEffect(() => {
     resetPage();
-    setFilters({ status: "all", search: "", role });
-  }, [role]);
+    setFilters({ status: initialTab, search: "", role });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, initialTab]);
 
   const users = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -101,6 +138,10 @@ export default function UserManagement({ role }: Props) {
   function handleTabChange(val: string) {
     setFilters((prev) => ({ ...prev, status: val, search: "" }));
     goToPage(1);
+    const next = new URLSearchParams(searchParams);
+    if (val === "all") next.delete("tab");
+    else next.set("tab", val);
+    setSearchParams(next, { replace: true });
   }
 
   async function confirmToggle() {
@@ -135,6 +176,28 @@ export default function UserManagement({ role }: Props) {
       toast.error((err as Error).message);
     } finally {
       setDeleteConfirm({ open: false, id: null });
+    }
+  }
+
+  async function handleApproveRequest(u: User) {
+    try {
+      await verifyTrainer.mutateAsync(u.id);
+      toast.success(`${u.name} approved as a trainer`);
+      queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["adminStats"] });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  async function handleRejectRequest(u: User) {
+    try {
+      await rejectTrainerRequest.mutateAsync({ uid: u.id });
+      toast.success(`${u.name}'s trainer request declined`);
+      queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+      queryClient.invalidateQueries({ queryKey: ["adminStats"] });
+    } catch (err) {
+      toast.error((err as Error).message);
     }
   }
 
@@ -175,17 +238,25 @@ export default function UserManagement({ role }: Props) {
                     </TableCell>
                   )}
                   <TableCell>
-                    {u.status === "pending" ? (
-                      <Badge variant="warning">Pending</Badge>
-                    ) : (
-                      <Badge
-                        variant={
-                          u.status === "active" ? "success" : "secondary"
-                        }
-                      >
-                        {u.status === "active" ? "Active" : "Inactive"}
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {u.status === "pending" ? (
+                        <Badge variant="warning">Pending</Badge>
+                      ) : (
+                        <Badge
+                          variant={
+                            u.status === "active" ? "success" : "secondary"
+                          }
+                        >
+                          {u.status === "active" ? "Active" : "Inactive"}
+                        </Badge>
+                      )}
+                      {u.trainer_request_status === "pending" && (
+                        <Badge variant="warning">Trainer request</Badge>
+                      )}
+                      {u.trainer_request_status === "rejected" && (
+                        <Badge variant="secondary">Request declined</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(u.created_at!).toLocaleDateString()}
@@ -227,6 +298,23 @@ export default function UserManagement({ role }: Props) {
                               ? "Approve"
                               : "Enable"}
                         </DropdownMenuItem>
+                        {u.trainer_request_status === "pending" && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleApproveRequest(u)}
+                            >
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              Approve trainer request
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleRejectRequest(u)}
+                            >
+                              <ShieldOff className="h-4 w-4 mr-2" />
+                              Decline trainer request
+                            </DropdownMenuItem>
+                          </>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
@@ -248,7 +336,9 @@ export default function UserManagement({ role }: Props) {
                     colSpan={role ? 5 : 6}
                     className="text-center text-muted-foreground py-8"
                   >
-                    No {entityLabel.toLowerCase()}s found
+                    {isTrainerRequestTab
+                      ? "No trainer requests pending"
+                      : `No ${entityLabel.toLowerCase()}s found`}
                   </TableCell>
                 </TableRow>
               )}
@@ -271,7 +361,10 @@ export default function UserManagement({ role }: Props) {
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="active">Active</TabsTrigger>
             <TabsTrigger value="inactive">Inactive</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
+            {/* <TabsTrigger value="pending">Pending</TabsTrigger> */}
+            <TabsTrigger value={TRAINER_REQUEST_TAB}>
+              Trainer requests
+            </TabsTrigger>
           </TabsList>
           <Button onClick={() => setModal({ open: true })}>
             <Plus className="h-4 w-4" />

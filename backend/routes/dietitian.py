@@ -5,7 +5,7 @@ from pydantic import ConfigDict
 from typing import Optional, List
 from database.connection import get_connection
 from middleware.auth import role_required
-from utils.validation import pydantic_errors
+from utils.validation import pydantic_errors, clean_person_name, validate_person_name
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_admins
 
@@ -32,6 +32,16 @@ class UpdateTrainerProfileSchema(BaseModel):
     city:              Optional[str] = None
     country:           Optional[str] = None
     available_time:    Optional[List[dict]] = None  # [{"day":"Monday","from":"08:00","to":"17:00"}]
+
+    @field_validator('name', 'full_name', mode='before')
+    @classmethod
+    def strip_names(cls, v):
+        return clean_person_name(v)
+
+    @field_validator('name', 'full_name', mode='after')
+    @classmethod
+    def check_names(cls, v):
+        return validate_person_name(v)
 
 
 class CertificationSchema(BaseModel):

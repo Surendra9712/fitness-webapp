@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash     VARCHAR(255)  NOT NULL,
     role              ENUM('admin','dietitian','trainee') NOT NULL DEFAULT 'trainee',
     status            ENUM('inactive','active','pending') NOT NULL DEFAULT 'active',
-    is_verified         TINYINT(1) NOT NULL DEFAULT 0,
+    trainer_request_status ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none',
     subscription_plan           ENUM('free','pro') NOT NULL DEFAULT 'free',
     subscription_status         ENUM('active','pending','rejected') NOT NULL DEFAULT 'active',
     subscription_payment_method ENUM('cash','esewa','stripe') DEFAULT NULL,
@@ -281,12 +281,9 @@ CREATE TABLE IF NOT EXISTS trainer_certifications (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Add is_verified flag to users (for dietitians/trainers)
--- Unverified trainers won't appear in trainee search
-ALTER TABLE users ADD COLUMN is_verified TINYINT(1) NOT NULL DEFAULT 0;
-
--- Existing active dietitians are considered already verified
-UPDATE users SET is_verified = 1 WHERE role = 'dietitian' AND status = 'active';
+-- users.is_verified used to gate trainer visibility. It was dropped in
+-- migration 026 — trainer_request_status = 'approved' is now the single gate,
+-- and taking a trainer out of circulation is done with users.status.
 
 ALTER TABLE users ADD COLUMN subscription_plan   ENUM('free','pro') NOT NULL DEFAULT 'free';
 ALTER TABLE users ADD COLUMN subscription_status ENUM('active','pending','rejected') NOT NULL DEFAULT 'active';

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { nameSchema } from "@/lib/name-validation";
 import {
   User,
   Save,
@@ -65,7 +66,7 @@ const slotSchema = z.object({
 });
 
 const becomeTrainerSchema = z.object({
-  full_name: z.string().min(1, "Full name is required"),
+  full_name: nameSchema("Full name is required"),
   date_of_birth: z
     .string()
     .min(1, "Date of birth is required")
@@ -125,6 +126,7 @@ export default function BecomeTrainer() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const profile = user as any;
   const hasProfile = Boolean(profile?.full_name);
+  const requestStatus = user?.trainer_request_status ?? "none";
   const [certUploads, setCertUploads] = useState<
     Record<string, { uploading: boolean; error: string }>
   >({});
@@ -233,15 +235,46 @@ export default function BecomeTrainer() {
         })),
       });
 
-      localStorage.setItem("token", result.token);
+      // The role stays 'trainee' until an admin approves, so there is no new
+      // token to swap in and no trainer dashboard to jump to yet.
       await refreshUser();
-      toast.success("Trainer request submitted — pending admin verification");
-      navigate("/trainer");
+      toast.success(
+        result.trainer_request_status === "pending"
+          ? "Trainer request submitted — an admin will review it shortly"
+          : "Trainer request submitted",
+      );
+      navigate("/trainee/my-profile");
     } catch (e: any) {
       toast.error(
         e?.response?.data?.error ?? e?.message ?? "Submission failed",
       );
     }
+  }
+
+  if (requestStatus === "pending") {
+    return (
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Trainer request under review
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <p>
+            Your application is with our admins. You keep full access to your
+            trainee account while it is reviewed — nothing changes until it is
+            approved.
+          </p>
+          <p>
+            Once approved, your trainer dashboard appears automatically and
+            you'll get a notification.
+          </p>
+          <Button variant="outline" onClick={() => navigate("/trainee/my-profile")}>
+            Back to profile
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (!hasProfile && !profileConfirmed) {
@@ -258,9 +291,17 @@ export default function BecomeTrainer() {
 
   return (
     <div className="space-y-6">
+      {requestStatus === "rejected" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Your previous trainer request was declined. You can update the details
+          below and apply again.
+        </div>
+      )}
+
       <p className="mt-1 text-sm text-muted-foreground">
-        Fill out your trainer profile to request approval. This information will
-        be visible to customers once an admin verifies your account.
+        Fill out your trainer profile to request approval. Your role stays
+        <span className="font-medium"> trainee</span> until an admin approves —
+        this information becomes visible to customers only after that.
       </p>
 
       <Form {...form}>

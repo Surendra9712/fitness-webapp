@@ -6,7 +6,7 @@ from pydantic import ConfigDict
 from typing import Literal, Optional
 from database.connection import get_connection
 from middleware.auth import role_required
-from utils.validation import pydantic_errors
+from utils.validation import pydantic_errors, clean_person_name, validate_person_name
 from utils.pagination import parse_page_params, paginated_response
 from utils.notify import push, push_to_non_admins
 from utils.metrics import compute_body_metrics, age_from_dob
@@ -48,7 +48,12 @@ class CreateUserSchema(BaseModel):
     @field_validator('name', mode='before')
     @classmethod
     def strip_name(cls, v):
-        return str(v).strip() if isinstance(v, str) else v
+        return clean_person_name(v)
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def check_name(cls, v):
+        return validate_person_name(v)
 
     @field_validator('email', mode='before')
     @classmethod
@@ -61,6 +66,17 @@ class UpdateUserSchema(BaseModel):
     name: Optional[str] = None
     role: Optional[Literal['admin', 'dietitian', 'trainee']] = None
     status: Optional[Literal['inactive', 'active', 'pending']] = None
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def strip_name(cls, v):
+        return clean_person_name(v)
+
+    @field_validator('name', mode='after')
+    @classmethod
+    def check_name(cls, v):
+        # `name` writes straight to users.name, so an explicit blank is invalid.
+        return validate_person_name(v)
 
 
 class CreateProductSchema(BaseModel):
@@ -243,7 +259,7 @@ def list_users():
     search = request.args.get('search', '').strip()
     status_filter    = request.args.get('status', '').strip()
     role_filter      = request.args.get('role', '').strip()
-    verified_filter  = request.args.get('is_verified', '').strip()
+    request_filter   = request.args.get('trainer_request_status', '').strip()
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -259,15 +275,16 @@ def list_users():
         if role_filter:
             base_where += " AND u.role = %s"
             params_count = params_count + [role_filter]
-        if verified_filter in ('0', '1'):
-            base_where += " AND u.is_verified = %s"
-            params_count = params_count + [int(verified_filter)]
+        if request_filter in ('none', 'pending', 'approved', 'rejected'):
+            base_where += " AND u.trainer_request_status = %s"
+            params_count = params_count + [request_filter]
         cursor.execute(
             f"SELECT COUNT(*) AS total FROM users u {base_where}", params_count
         )
         total = cursor.fetchone()['total']
         cursor.execute(
-            f"SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
+            f"SELECT u.id, u.name, u.email, u.role, u.status, "
+            f"u.trainer_request_status, u.created_at, "
             f"p.specialization, p.bio, "
             f"(SELECT COUNT(*) FROM trainer_certifications tc WHERE tc.user_id = u.id) AS cert_count "
             f"FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id "
@@ -300,7 +317,8 @@ def get_user(uid):
                 return jsonify({'error': 'User not found'}), 404
 
         cursor.execute(
-            "SELECT u.id, u.name, u.email, u.role, u.status, u.is_verified, u.created_at, "
+            "SELECT u.id, u.name, u.email, u.role, u.status, "
+            "u.trainer_request_status, u.created_at, "
             "u.subscription_plan, u.subscription_status, "
             "p.goal, p.weight_kg, p.height_cm, p.gender, p.activity_level, "
             "p.full_name, p.date_of_birth, p.bio, p.specialization, p.phone_number, p.city, p.country, "
@@ -335,7 +353,9 @@ def get_user(uid):
         if user.get('role') == 'trainee':
             user['age'] = age_from_dob(user['date_of_birth']) if user.get('date_of_birth') else None
             user['metrics'] = compute_body_metrics(user)
-        if user.get('role') == 'dietitian':
+        # Trainees with a trainer application have certifications too — the
+        # admin reviewing the request needs to see them before approving.
+        if user.get('role') == 'dietitian' or user.get('trainer_request_status') != 'none':
             cursor.execute(
                 "SELECT id, name, file_url, file_type, created_at "
                 "FROM trainer_certifications WHERE user_id = %s ORDER BY created_at",
@@ -363,9 +383,13 @@ def create_user():
         cursor.execute("SELECT id FROM users WHERE email = %s", (body.email,))
         if cursor.fetchone():
             return jsonify({'errors': {'email': 'Email already registered'}}), 422
+        # A trainer created straight from the admin panel never goes through the
+        # application queue, so it is approved on the spot.
         cursor.execute(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (%s,%s,%s,%s)",
-            (body.name, body.email, password_hash, body.role),
+            "INSERT INTO users (name, email, password_hash, role, trainer_request_status) "
+            "VALUES (%s,%s,%s,%s,%s)",
+            (body.name, body.email, password_hash, body.role,
+             'approved' if body.role == 'dietitian' else 'none'),
         )
         user_id = cursor.lastrowid
         cursor.execute("INSERT INTO user_profiles (user_id) VALUES (%s)", (user_id,))
@@ -427,19 +451,87 @@ def delete_user(uid):
 @admin_bp.route('/users/<int:uid>/verify', methods=['PUT'])
 @role_required('admin')
 def verify_trainer(uid):
+    """Approve a trainer application.
+
+    trainer_request_status='approved' is the single marketplace gate: it is what
+    the trainee-facing listing, detail and booking queries check. This is also
+    the only place role becomes 'dietitian'. To take an approved trainer out of
+    circulation, disable the account (users.status) instead — there is no
+    separate un-verify flag.
+    """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT role, is_verified FROM users WHERE id = %s AND deleted_at IS NULL", (uid,))
+        cursor.execute(
+            "SELECT name, role, trainer_request_status "
+            "FROM users WHERE id = %s AND deleted_at IS NULL",
+            (uid,),
+        )
         user = cursor.fetchone()
         if not user:
             return jsonify({'error': 'User not found'}), 404
-        if user['role'] != 'dietitian':
-            return jsonify({'error': 'Only trainers can be verified'}), 400
-        new_val = 0 if user['is_verified'] else 1
-        cursor.execute("UPDATE users SET is_verified = %s WHERE id = %s", (new_val, uid))
+        if user['trainer_request_status'] == 'approved':
+            return jsonify({
+                'role': user['role'],
+                'trainer_request_status': 'approved',
+            })
+        if user['trainer_request_status'] not in ('pending', 'rejected'):
+            return jsonify({'error': 'This user has no trainer request to approve'}), 400
+
+        cursor.execute(
+            "UPDATE users SET role='dietitian', trainer_request_status='approved' "
+            "WHERE id = %s",
+            (uid,),
+        )
+        push(cursor, uid, 'trainer_approved',
+             'Trainer request approved',
+             'Your trainer application was approved. Your trainer dashboard is now available.',
+             uid)
         conn.commit()
-        return jsonify({'is_verified': bool(new_val)})
+        return jsonify({
+            'role': 'dietitian',
+            'trainer_request_status': 'approved',
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@admin_bp.route('/users/<int:uid>/trainer-request/reject', methods=['PUT'])
+@role_required('admin')
+def reject_trainer_request(uid):
+    """Decline a pending trainer application. The applicant keeps their current
+    role — a trainee stays a trainee and may apply again."""
+    body = request.get_json(silent=True) or {}
+    admin_note = (body.get('admin_note') or '').strip()
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT name, trainer_request_status FROM users "
+            "WHERE id = %s AND deleted_at IS NULL",
+            (uid,),
+        )
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        if user['trainer_request_status'] != 'pending':
+            return jsonify({'error': 'No pending trainer request for this user'}), 400
+
+        cursor.execute(
+            "UPDATE users SET trainer_request_status='rejected' WHERE id = %s",
+            (uid,),
+        )
+        message = 'Your trainer application was not approved.'
+        if admin_note:
+            message = f'{message} Reason: {admin_note}'
+        push(cursor, uid, 'trainer_rejected', 'Trainer request declined', message, uid)
+        conn.commit()
+        return jsonify({'trainer_request_status': 'rejected'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1100,44 +1192,23 @@ def update_trainer_assignment_status(aid):
 @admin_bp.route('/stats', methods=['GET'])
 @role_required('admin')
 def stats():
-    """Overall (all-time) KPI counts — no date filter."""
+    """Overall (all-time) KPI counts — no date filter.
+
+    All eleven aggregates come from the sp_admin_stats stored procedure in one
+    round trip. It returns three result sets: scalar totals, orders grouped by
+    status, users grouped by status. Apply it with `python apply_procedures.py`.
+    """
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='trainee' AND deleted_at IS NULL")
-        users_count = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND deleted_at IS NULL")
-        dietitians_count = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM users WHERE role='dietitian' AND is_verified=0 AND deleted_at IS NULL")
-        pending_approvals = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM products WHERE status='active' AND deleted_at IS NULL")
-        products_count = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM orders WHERE deleted_at IS NULL")
-        orders_count = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM product_requests WHERE status='pending'")
-        pending_requests = cursor.fetchone()['total']
-        cursor.execute("SELECT COUNT(*) AS total FROM trainer_assignments WHERE status='pending_admin' AND deleted_at IS NULL")
-        pending_assignments = cursor.fetchone()['total']
+        cursor.callproc('sp_admin_stats')
+        result_sets = [rs.fetchall() for rs in cursor.stored_results()]
+        if len(result_sets) != 3:
+            return jsonify({'error': 'sp_admin_stats returned unexpected results'}), 500
 
-        cursor.execute("SELECT COALESCE(SUM(total_amount), 0) AS total FROM orders WHERE deleted_at IS NULL")
-        total_revenue = float(cursor.fetchone()['total'])
-        cursor.execute(
-            "SELECT COALESCE(SUM(total_amount), 0) AS total FROM orders "
-            "WHERE deleted_at IS NULL AND created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
-        )
-        revenue_30d = float(cursor.fetchone()['total'])
-
-        cursor.execute(
-            "SELECT status, COUNT(*) AS count FROM orders "
-            "WHERE deleted_at IS NULL GROUP BY status"
-        )
-        orders_by_status = {row['status']: row['count'] for row in cursor.fetchall()}
-
-        cursor.execute(
-            "SELECT status, COUNT(*) AS count FROM users "
-            "WHERE role != 'admin' AND deleted_at IS NULL GROUP BY status"
-        )
-        users_by_status_raw = {row['status']: row['count'] for row in cursor.fetchall()}
+        totals = result_sets[0][0]
+        orders_by_status = {row['status']: row['count'] for row in result_sets[1]}
+        users_by_status_raw = {row['status']: row['count'] for row in result_sets[2]}
         users_by_status = [
             {'status': 'Active',   'count': users_by_status_raw.get('active', 0)},
             {'status': 'Pending',  'count': users_by_status_raw.get('pending', 0)},
@@ -1145,15 +1216,15 @@ def stats():
         ]
 
         return jsonify({
-            'users': users_count,
-            'dietitians': dietitians_count,
-            'products': products_count,
-            'orders': orders_count,
-            'pending_requests': pending_requests,
-            'pending_approvals': pending_approvals,
-            'pending_assignments': pending_assignments,
-            'total_revenue': total_revenue,
-            'revenue_30d': revenue_30d,
+            'users': totals['users_count'],
+            'dietitians': totals['dietitians_count'],
+            'products': totals['products_count'],
+            'orders': totals['orders_count'],
+            'pending_requests': totals['pending_requests'],
+            'pending_approvals': totals['pending_approvals'],
+            'pending_assignments': totals['pending_assignments'],
+            'total_revenue': float(totals['total_revenue']),
+            'revenue_30d': float(totals['revenue_30d']),
             'orders_by_status': orders_by_status,
             'users_by_status': users_by_status,
         })
