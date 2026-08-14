@@ -41,7 +41,7 @@ export const RegisterForm = () => {
   async function onSubmit(data: RegisterValues) {
     setServerError("");
     try {
-      await registerUser(data.name, data.email, data.password);
+      await registerUser(data.name.trim(), data.email, data.password);
       navigate("/my-dashboard");
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors) {
@@ -76,6 +76,7 @@ export const RegisterForm = () => {
                   <div className="relative">
                     <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     <Input
+                      nameField
                       placeholder="Jane Doe"
                       autoComplete="name"
                       className="pl-10"

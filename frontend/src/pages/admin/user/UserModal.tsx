@@ -95,13 +95,14 @@ export function UserModal({
       form.setError("password", { message: "Password is required" });
       return;
     }
+    const payload = { ...values, name: values.name.trim() };
     try {
       if (isEdit) {
-        const { password: _pw, ...rest } = values;
+        const { password: _pw, ...rest } = payload;
         await updateUser.mutateAsync({ id: user!.id, ...rest });
         toast.success("User updated");
       } else {
-        await createUser.mutateAsync(values);
+        await createUser.mutateAsync(payload);
         toast.success("User created");
       }
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
@@ -130,7 +131,7 @@ export function UserModal({
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Full name" {...field} />
+                      <Input nameField placeholder="Full name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

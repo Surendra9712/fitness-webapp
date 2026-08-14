@@ -43,7 +43,7 @@ export function Step1Personal() {
                 Full Name <span className="text-destructive">*</span>
               </FormLabel>
               <FormControl>
-                <Input placeholder="Jane Doe" {...field} />
+                <Input nameField placeholder="Jane Doe" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

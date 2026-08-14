@@ -262,7 +262,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
   if (!user) return null;
 
   const links = navLinks[user.role] ?? [];
-  const dashboardPath = getDashboardPath(user.role);
+  // const dashboardPath = getDashboardPath(user.role);
   const profilePath = getProfilePath(user.role);
 
   const sidebarContent = (
@@ -282,7 +282,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         </NavLink>
         <Button
           size={"icon"}
-          className=" size-8 min-w-8"
+          className=" size-8 min-w-8 lg:hidden"
           onClick={() => setOpen(false)}
           aria-label="Close sidebar"
         >

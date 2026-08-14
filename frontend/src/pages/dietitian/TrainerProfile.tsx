@@ -12,7 +12,7 @@ import {
   Briefcase,
 } from "lucide-react";
 import useDietitian from "@/hooks/useDietitian";
-import { cleanName, nameIssue } from "@/lib/name-validation";
+import { trimName, nameIssue } from "@/lib/name-validation";
 import type { AddCertPayload } from "@/hooks/useDietitian";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -220,7 +220,7 @@ export default function TrainerProfile() {
   async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!cleanName(form.full_name)) {
+    if (!trimName(form.full_name)) {
       toast.error("Full name is required.");
       return;
     }
@@ -260,8 +260,8 @@ export default function TrainerProfile() {
     try {
       // 1. Update profile fields + availability
       await update.mutateAsync({
-        name: cleanName(form.name) || undefined,
-        full_name: cleanName(form.full_name) || undefined,
+        name: trimName(form.name) || undefined,
+        full_name: trimName(form.full_name) || undefined,
         date_of_birth: form.date_of_birth || undefined,
         bio: form.bio || undefined,
         specialization: form.specialization || undefined,
@@ -448,6 +448,7 @@ export default function TrainerProfile() {
                 </Label>
                 <Input
                   id="full_name"
+                  nameField
                   value={form.full_name}
                   onChange={(e) => set("full_name", e.target.value)}
                   placeholder="Jane Doe"

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { nameSchema } from "@/lib/name-validation";
+import { isValidPhoneNumber } from "libphonenumber-js";
 
 const positiveStr = (msg: string) =>
   z
@@ -30,7 +31,10 @@ export const profileSchema = z.object({
       return age >= 16;
     }, "You must be at least 16 years old"),
   gender: z.enum(["male", "female", "other", "prefer_not_to_say"]),
-  phone_number: z.string(),
+  phone_number: z
+    .string()
+    .min(1, "Phone number is required")
+    .refine((value) => isValidPhoneNumber(value, "NP"), "Invalid phone number"),
   city: z.string(),
   country: z.string(),
   height_cm: positiveStr("Height is required"),
@@ -78,9 +82,32 @@ export const profileSchema = z.object({
 
 export type ProfileValues = z.infer<typeof profileSchema>;
 
+/**
+ * Every field rendered on each step. `next()` validates the whole list before
+ * advancing, so an invalid value can never be carried into a later step (and,
+ * on the last step, never reaches the server).
+ */
 export const STEP_REQUIRED: Record<number, (keyof ProfileValues)[]> = {
-  1: ["full_name", "date_of_birth", "height_cm", "current_weight_kg"],
-  2: [],
-  3: [],
-  4: [],
+  1: [
+    "full_name",
+    "date_of_birth",
+    "gender",
+    "phone_number",
+    "city",
+    "country",
+    "height_cm",
+    "current_weight_kg",
+    "activity_level",
+    "occupation",
+  ],
+  2: ["primary_goal", "fitness_level", "target_water_ml"],
+  3: [
+    "diet_type",
+    "dietary_restrictions",
+    "other_restrictions",
+    "allergens",
+    "cuisine_preferences",
+    "meals_per_day",
+  ],
+  4: ["health_conditions", "notes"],
 };

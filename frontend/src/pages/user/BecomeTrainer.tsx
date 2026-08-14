@@ -42,6 +42,10 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
 import ProfileSetup from "@/pages/user/profile/ProfileSetup";
+import {
+  isValidPhoneNumber,
+  parsePhoneNumberFromString,
+} from "libphonenumber-js";
 
 const DAYS = [
   "Monday",
@@ -89,7 +93,10 @@ const becomeTrainerSchema = z.object({
     .string()
     .min(1, "Experience years is required")
     .refine((v) => !isNaN(Number(v)), "Must be a number"),
-  phone_number: z.string().optional(),
+  phone_number: z
+    .string()
+    .min(1, "Phone number is required")
+    .refine((value) => isValidPhoneNumber(value, "NP"), "Invalid phone number"),
   city: z.string().optional(),
   country: z.string().optional(),
   profile_image_url: z.string().optional(),
@@ -170,7 +177,7 @@ export default function BecomeTrainer() {
     if (!profile) return;
     reset((prev) => ({
       ...prev,
-      full_name: profile.full_name ?? "",
+      full_name: profile.full_name?.trim() ?? "",
       date_of_birth: profile.date_of_birth
         ? String(profile.date_of_birth).slice(0, 10)
         : "",
@@ -269,7 +276,10 @@ export default function BecomeTrainer() {
             Once approved, your trainer dashboard appears automatically and
             you'll get a notification.
           </p>
-          <Button variant="outline" onClick={() => navigate("/trainee/my-profile")}>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/trainee/my-profile")}
+          >
             Back to profile
           </Button>
         </CardContent>
@@ -348,7 +358,7 @@ export default function BecomeTrainer() {
                         Full Name <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Jane Doe" {...field} />
+                        <Input nameField placeholder="Jane Doe" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -387,7 +397,9 @@ export default function BecomeTrainer() {
                   name="phone_number"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone</FormLabel>
+                      <FormLabel>
+                        Phone<span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="+977 98XXXXXXXX" {...field} />
                       </FormControl>

@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toast } from "sonner";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { isValidPhoneNumber } from "libphonenumber-js";
 
 const DAYS = [
   "Monday",
@@ -106,10 +106,7 @@ const publicBecomeTrainerSchema = z.object({
   phone_number: z
     .string()
     .min(1, "Phone number is required")
-    .refine((value) => {
-      const phone = parsePhoneNumberFromString(value, "NP");
-      return phone?.isValid() ?? false;
-    }, "Invalid phone number"),
+    .refine((value) => isValidPhoneNumber(value, "NP"), "Invalid phone number"),
   city: z.string().optional(),
   country: z.string().optional(),
   profile_image_url: z.string().optional(),
@@ -292,7 +289,7 @@ export default function PublicBecomeTrainer() {
                         Full Name <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Jane Doe" {...field} />
+                        <Input nameField placeholder="Jane Doe" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

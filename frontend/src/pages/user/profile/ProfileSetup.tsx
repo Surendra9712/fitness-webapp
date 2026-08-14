@@ -17,6 +17,7 @@ import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 import { profileSchema, STEP_REQUIRED, type ProfileValues } from "./schema";
 import { STEPS } from "./constants";
@@ -87,6 +88,15 @@ export default function ProfileSetup({
     },
   });
 
+  // Reopening the dialog starts a fresh run — otherwise it would come back up
+  // on the "You're all set" screen from last time.
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setResult(null);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = user as any;
@@ -134,11 +144,36 @@ export default function ProfileSetup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const focusFirstError = () => {
+    const firstField = Object.keys(form.formState.errors)[0];
+    if (firstField)
+      form.setFocus(firstField as Parameters<typeof form.setFocus>[0]);
+  };
+
   const next = async () => {
-    const required = STEP_REQUIRED[step] ?? [];
-    if (required.length > 0 && !(await form.trigger(required))) return;
+    const fields = STEP_REQUIRED[step] ?? [];
+    if (fields.length > 0 && !(await form.trigger(fields))) {
+      focusFirstError();
+      toast.error("Please fix the highlighted fields before continuing.");
+      return;
+    }
     if (step < 4) {
       setStep((s) => s + 1);
+      return;
+    }
+
+    // Final step: re-check every field, not just this step's — an earlier step
+    // may still hold an invalid value if it was edited after being validated.
+    if (!(await form.trigger())) {
+      const firstInvalidStep = Number(
+        Object.keys(STEP_REQUIRED).find((key) =>
+          (STEP_REQUIRED[Number(key)] ?? []).some(
+            (field) => field in form.formState.errors,
+          ),
+        ) ?? step,
+      );
+      setStep(firstInvalidStep);
+      toast.error("Some details are missing or invalid. Please review them.");
       return;
     }
 
@@ -146,7 +181,7 @@ export default function ProfileSetup({
     try {
       const v = form.getValues();
       const payload = {
-        full_name: v.full_name,
+        full_name: v.full_name.trim(),
         date_of_birth: v.date_of_birth,
         gender: v.gender,
         phone_number: v.phone_number,
@@ -184,8 +219,10 @@ export default function ProfileSetup({
         setResult(res);
       }
       setStep(5);
-    } catch {
-      /* add toast if desired */
+    } catch (err) {
+      const message =
+        (err as { message?: string })?.message ?? "Could not save your profile";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -352,7 +389,12 @@ export default function ProfileSetup({
 
         <Button
           className="mt-8 w-full h-12 text-base bg-primary-600 hover:bg-primary-500"
-          onClick={() => (onDone ? onDone() : navigate("/my-dashboard"))}
+          onClick={() => {
+            setStep(1);
+            setResult(null);
+            if (onDone) onDone();
+            else navigate("/my-dashboard");
+          }}
         >
           {onDone ? "Done" : "Go to Dashboard →"}
         </Button>

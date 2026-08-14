@@ -65,7 +65,7 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      await registerUser(data.name, data.email, data.password);
+      await registerUser(data.name.trim(), data.email, data.password);
       navigate(getDashboardPath(user!.role));
     } catch (err) {
       setError((err as Error).message);
@@ -95,7 +95,12 @@ export default function Register() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" placeholder="Jane Doe" {...register("name")} />
+              <Input
+                id="name"
+                nameField
+                placeholder="Jane Doe"
+                {...register("name")}
+              />
               {errors.name && (
                 <p className="text-sm text-red-500">{errors.name.message}</p>
               )}
