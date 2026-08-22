@@ -64,6 +64,10 @@ export const endpoint = {
   uploadCert: "upload/cert",
   uploadChatFile: "upload/chat-file",
   authProfile: "auth/me",
+  authForgotPassword: "auth/forgot-password",
+  authResetPassword: "auth/reset-password",
+  authVerifyResetToken: "auth/reset-password/verify",
+  authChangePassword: "auth/password",
 
   notifications: "notifications",
   notificationsUnreadCount: "notifications/unread-count",

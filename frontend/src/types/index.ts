@@ -182,6 +182,37 @@ export interface Product {
   discounted_price?: number | null;
 }
 
+export interface ProductStats {
+  units_sold: number;
+  revenue: number;
+  order_count: number;
+  review_count: number;
+  avg_rating: number;
+}
+
+export interface ProductOrderRow {
+  order_id: number;
+  status: OrderStatus;
+  created_at: string;
+  quantity: number;
+  price_at_purchase: number;
+  customer_name: string;
+}
+
+export interface ProductReviewRow {
+  id: number;
+  rating: number;
+  comment?: string | null;
+  created_at: string;
+  user_name: string;
+}
+
+export interface ProductDetail extends Product {
+  stats: ProductStats;
+  recent_orders: ProductOrderRow[];
+  recent_reviews: ProductReviewRow[];
+}
+
 export interface GlobalDiscount {
   discount_type: DiscountType;
   discount_value: number;

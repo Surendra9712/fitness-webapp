@@ -26,6 +26,7 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UserManagement from "@/pages/admin/user/UserManagement";
 import UserDetail from "@/pages/admin/user/UserDetail";
 import ProductManagement from "@/pages/admin/product/ProductManagement";
+import AdminProductDetail from "@/pages/admin/product/ProductDetail";
 import ProductRequests from "@/pages/admin/ProductRequests";
 import OrderManagement from "@/pages/admin/OrderManagement";
 import CategoryManagement from "@/pages/admin/category/CategoryManagement";
@@ -55,6 +56,8 @@ import WeeklyReport from "@/pages/user/WeeklyReport";
 import Rewards from "@/pages/user/Rewards";
 import Notifications from "@/pages/user/Notifications";
 import AuthLayout from "./pages/auth/AuthLayout";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import { useState } from "react";
 import { Button } from "./components/ui/button";
 import { Menu, Hand } from "lucide-react";
@@ -167,6 +170,8 @@ export default function App() {
           />
           <Route path="/admin" element={<RoleRedirect />} />
           <Route path="/login" element={<AuthLayout />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route
             path="/register"
             element={<Navigate to="/login?tab=register" replace />}
@@ -239,6 +244,16 @@ export default function App() {
               <ProtectedRoute roles={["admin"]}>
                 <Layout>
                   <ProductManagement />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/product-management/:id"
+            element={
+              <ProtectedRoute roles={["admin"]}>
+                <Layout>
+                  <AdminProductDetail />
                 </Layout>
               </ProtectedRoute>
             }

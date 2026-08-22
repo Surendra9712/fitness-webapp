@@ -20,6 +20,8 @@ import {
   Droplet,
   Award,
   Wheat,
+  KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +32,7 @@ import { GOALS, DIETS, ACTIVITIES, FITNESS } from "./profile/constants";
 import ProfileSetup from "./profile/ProfileSetup";
 import { AvatarModal } from "./profile/AvatarModal";
 import { useAuth } from "@/context/AuthContext";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import type { BodyMetrics } from "@/types";
 
 function asArr(v: unknown): string[] {
@@ -532,6 +535,7 @@ function MetricRowCard({
 export default function Profile() {
   const [modalOpen, setModalOpen] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [metrics, setMetrics] = useState<BodyMetrics | null>(null);
 
   const { user, loading: isLoading, refreshUser } = useAuth();
@@ -1144,6 +1148,32 @@ export default function Profile() {
           </SectionCard>
         </>
       )}
+
+      {/* ── Account Security ──────────────────────────────── */}
+      <SectionCard
+        icon={<ShieldCheck className="h-4 w-4" />}
+        title="Account Security"
+        iconBg="bg-slate-100"
+        iconColor="text-slate-600"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Password</p>
+            <p className="text-xs text-gray-500">
+              Change the password you use to sign in.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => setPasswordModalOpen(true)}>
+            <KeyRound className="mr-2 h-4 w-4" />
+            Change Password
+          </Button>
+        </div>
+      </SectionCard>
+
+      <ChangePasswordDialog
+        open={passwordModalOpen}
+        onOpenChange={setPasswordModalOpen}
+      />
 
       <ProfileSetup
         isOpen={modalOpen}

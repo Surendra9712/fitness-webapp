@@ -706,6 +706,81 @@ def list_products():
         conn.close()
 
 
+@admin_bp.route('/products/<int:pid>', methods=['GET'])
+@role_required('admin')
+def get_product(pid):
+    """Full admin view of a single product: fields, sales stats, reviews and
+    the most recent orders that contain it."""
+    from routes.public import _compute_discounted_price
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            PRODUCT_SELECT + "WHERE p.id = %s AND p.deleted_at IS NULL",
+            (pid,),
+        )
+        product = cursor.fetchone()
+        if not product:
+            return jsonify({'error': 'Product not found'}), 404
+
+        product['discounted_price'] = _compute_discounted_price(
+            product['price'], product.get('discount_type'), product.get('discount_value'),
+            product.get('discount_valid_from'), product.get('discount_valid_to'),
+        )
+
+        # Sales — cancelled orders never moved stock, so they are excluded.
+        cursor.execute(
+            "SELECT COALESCE(SUM(oi.quantity), 0) AS units_sold, "
+            "COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0) AS revenue, "
+            "COUNT(DISTINCT oi.order_id) AS order_count "
+            "FROM order_items oi JOIN orders o ON oi.order_id = o.id "
+            "WHERE oi.product_id = %s AND o.deleted_at IS NULL AND o.status <> 'cancelled'",
+            (pid,),
+        )
+        sales = cursor.fetchone()
+
+        cursor.execute(
+            "SELECT COUNT(*) AS review_count, COALESCE(AVG(rating), 0) AS avg_rating "
+            "FROM product_reviews WHERE product_id = %s",
+            (pid,),
+        )
+        review_stats = cursor.fetchone()
+
+        cursor.execute(
+            "SELECT o.id AS order_id, o.status, o.created_at, "
+            "oi.quantity, oi.price_at_purchase, u.name AS customer_name "
+            "FROM order_items oi JOIN orders o ON oi.order_id = o.id "
+            "JOIN users u ON o.user_id = u.id "
+            "WHERE oi.product_id = %s AND o.deleted_at IS NULL "
+            "ORDER BY o.created_at DESC LIMIT 10",
+            (pid,),
+        )
+        recent_orders = cursor.fetchall()
+
+        cursor.execute(
+            "SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name "
+            "FROM product_reviews r JOIN users u ON r.user_id = u.id "
+            "WHERE r.product_id = %s ORDER BY r.created_at DESC LIMIT 10",
+            (pid,),
+        )
+        recent_reviews = cursor.fetchall()
+
+        product['stats'] = {
+            'units_sold': int(sales['units_sold'] or 0),
+            'revenue': float(sales['revenue'] or 0),
+            'order_count': int(sales['order_count'] or 0),
+            'review_count': int(review_stats['review_count'] or 0),
+            'avg_rating': round(float(review_stats['avg_rating'] or 0), 1),
+        }
+        product['recent_orders'] = recent_orders
+        product['recent_reviews'] = recent_reviews
+        return jsonify(product)
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @admin_bp.route('/products', methods=['POST'])
 @role_required('admin')
 def create_product():

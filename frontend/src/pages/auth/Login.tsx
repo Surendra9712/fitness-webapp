@@ -15,8 +15,9 @@ import { Loader2, Mail, Lock, EyeOff, Eye } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Form } from "@/components/ui/form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
@@ -34,7 +35,7 @@ export const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginValues>({
-    // resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
   const { isSubmitting } = form.formState;
@@ -99,12 +100,12 @@ export const LoginForm = () => {
                   <FormLabel className="text-xs font-semibold uppercase tracking-wide text-gray-600">
                     Password
                   </FormLabel>
-                  <a
-                    href="#"
+                  <Link
+                    to="/forgot-password"
                     className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
                   >
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <FormControl>
                   <div className="relative">

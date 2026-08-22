@@ -10,6 +10,8 @@ import {
   Award,
   FileBadge,
   Briefcase,
+  KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import useDietitian from "@/hooks/useDietitian";
 import { trimName, nameIssue } from "@/lib/name-validation";
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import { toast } from "sonner";
 import type { TrainerCertification, AvailableSlot } from "@/types";
 
@@ -116,6 +119,7 @@ export default function TrainerProfile() {
   const [deletedIds, setDeletedIds] = useState<number[]>([]);
   // Pending new certs (not yet in DB)
   const [newCerts, setNewCerts] = useState<NewCert[]>([]);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
   const {
     GetProfile,
@@ -813,6 +817,36 @@ export default function TrainerProfile() {
           )}
         </Button>
       </form>
+
+      {/* ── Account security ── */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" /> Account Security
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Password</p>
+            <p className="text-xs text-muted-foreground">
+              Change the password you use to sign in.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPasswordModalOpen(true)}
+          >
+            <KeyRound className="mr-2 h-4 w-4" />
+            Change Password
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ChangePasswordDialog
+        open={passwordModalOpen}
+        onOpenChange={setPasswordModalOpen}
+      />
     </div>
   );
 }

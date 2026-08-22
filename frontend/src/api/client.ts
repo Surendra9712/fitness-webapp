@@ -39,6 +39,8 @@ http.interceptors.response.use(
         p !== "/" &&
         p !== "/login" &&
         p !== "/register" &&
+        p !== "/forgot-password" &&
+        p !== "/reset-password" &&
         !p.startsWith("/products") &&
         !p.startsWith("/payment")
       ) {

@@ -1,11 +1,16 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
+import hashlib
 import json
 import datetime
+import os
+import secrets
+from urllib.parse import urlencode
 from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator
 from typing import Literal, Optional, List
 from database.connection import get_connection
 from middleware.auth import generate_token, token_required
+from utils.mailer import send_password_reset
 from utils.validation import pydantic_errors, clean_person_name, validate_person_name
 
 auth_bp = Blueprint('auth', __name__)
@@ -259,6 +264,273 @@ def update_profile():
         )
         conn.commit()
         return jsonify({'message': 'Profile updated'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ── Password: forgot / reset / change ─────────────────────────────────────────
+
+# Long enough that the window for a leaked link is small, long enough that a
+# person can still finish reading the email and typing a new password.
+RESET_TOKEN_TTL_MINUTES = 60
+
+
+def _hash_reset_token(token: str) -> str:
+    """Only the digest is stored, so a database dump yields no usable links."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+class ForgotPasswordSchema(BaseModel):
+    email: EmailStr
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def normalise_email(cls, v):
+        return str(v).strip().lower() if v else v
+
+
+class ResetPasswordSchema(BaseModel):
+    token: str = Field(min_length=1)
+    email: EmailStr
+    password: str = Field(min_length=6)
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def normalise_email(cls, v):
+        return str(v).strip().lower() if v else v
+
+
+class ChangePasswordSchema(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=6)
+
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    try:
+        body = ForgotPasswordSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, name, email, status FROM users "
+            "WHERE email = %s AND deleted_at IS NULL",
+            (body.email,),
+        )
+        user = cursor.fetchone()
+        # Unregistered and disabled addresses are reported explicitly rather
+        # than answered generically. That makes this endpoint an account
+        # enumeration oracle — anyone can probe which emails are registered —
+        # which is an accepted tradeoff here in exchange for a clearer form.
+        if not user:
+            return jsonify({'errors': {
+                'email': 'No account is registered with that email',
+            }}), 404
+        if user['status'] != 'active':
+            return jsonify({'errors': {
+                'email': 'This account is disabled. Contact support for help.',
+            }}), 403
+
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=RESET_TOKEN_TTL_MINUTES)
+
+        # Requesting a new link retires any earlier one, so only the most
+        # recent email in the inbox works.
+        cursor.execute(
+            "UPDATE password_resets SET used_at = UTC_TIMESTAMP() "
+            "WHERE user_id = %s AND used_at IS NULL",
+            (user['id'],),
+        )
+        cursor.execute(
+            "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+            (user['id'], _hash_reset_token(token), expires_at),
+        )
+        conn.commit()
+
+        frontend_url = (os.getenv('FRONTEND_URL') or 'http://localhost:5173').rstrip('/')
+        # Both the token and the address travel in the query string so the
+        # frontend can name the account straight away. Only the token decides
+        # whose password changes, though — `email` is caller-editable and is
+        # therefore treated as display text, never as identity. See
+        # reset_password() below, which looks the user up by token alone.
+        query = urlencode({'token': token, 'email': user['email']})
+        reset_url = f"{frontend_url}/reset-password?{query}"
+        sent = send_password_reset(
+            user['email'], user['name'] or 'there', reset_url, RESET_TOKEN_TTL_MINUTES,
+        )
+
+        payload = {'message': f"We sent a reset link to {user['email']}."}
+        # Without SMTP configured there is no inbox to check, so in dev the link
+        # comes back in the response to keep the flow testable. Never in
+        # production — that would hand any caller a reset link for any email.
+        if not sent and (os.getenv('MODE') or '').strip().lower() == 'dev':
+            payload['dev_reset_url'] = reset_url
+        return jsonify(payload)
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@auth_bp.route('/reset-password/verify', methods=['POST'])
+def verify_reset_token():
+    """Check a token before showing the new-password form, so an expired link
+    says so up front instead of after the user has typed a password twice."""
+    payload = request.get_json() or {}
+    token = payload.get('token', '')
+    email = str(payload.get('email') or '').strip().lower()
+    if not token:
+        return jsonify({'valid': False, 'error': 'Reset token is required'}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT r.id, u.email FROM password_resets r "
+            "JOIN users u ON u.id = r.user_id "
+            "WHERE r.token_hash = %s AND r.used_at IS NULL "
+            "AND r.expires_at > UTC_TIMESTAMP() AND u.deleted_at IS NULL",
+            (_hash_reset_token(token),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'valid': False, 'error': 'This reset link is invalid or has expired'}), 400
+        # An email in the link is optional here, but when present it must match
+        # the token's owner — catching an edited URL before the form renders.
+        if email and email != (row['email'] or '').lower():
+            return jsonify({
+                'valid': False,
+                'error': 'This reset link does not belong to that email address',
+            }), 400
+        return jsonify({'valid': True, 'email': row['email']})
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    try:
+        body = ResetPasswordSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # The account is resolved by TOKEN, never by the submitted email: the
+        # email arrives from a query string the caller can edit, so trusting it
+        # would let someone point a valid link at a different account.
+        cursor.execute(
+            "SELECT r.id, r.user_id, u.email, u.password_hash FROM password_resets r "
+            "JOIN users u ON u.id = r.user_id "
+            "WHERE r.token_hash = %s AND r.used_at IS NULL "
+            "AND r.expires_at > UTC_TIMESTAMP() AND u.deleted_at IS NULL "
+            "AND u.status = 'active'",
+            (_hash_reset_token(body.token),),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'error': 'This reset link is invalid or has expired'}), 400
+
+        # The submitted email is checked in its own right, so a link carrying an
+        # address that no longer has an account reports that plainly.
+        cursor.execute(
+            "SELECT id FROM users WHERE email = %s AND deleted_at IS NULL",
+            (body.email,),
+        )
+        if not cursor.fetchone():
+            return jsonify({'errors': {
+                'email': 'No account is registered with that email',
+            }}), 404
+
+        # Both exist but disagree — the link was edited, or belongs to someone
+        # else's account. Refuse rather than silently resetting the token owner.
+        if body.email != (row['email'] or '').lower():
+            return jsonify({'errors': {
+                'email': 'This reset link does not belong to that email address',
+            }}), 400
+
+        # Reusing the password you already have defeats the point of a reset —
+        # if the old one leaked, setting it again leaves the account exposed.
+        # The token is deliberately left unspent so the user can simply retry
+        # with a different password instead of requesting a whole new email.
+        if bcrypt.checkpw(body.password.encode(), row['password_hash'].encode()):
+            return jsonify({'errors': {
+                'password': 'New password must be different from your current password',
+            }}), 422
+
+        password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (password_hash, row['user_id']),
+        )
+        # Burn every outstanding token for this user, not just the one used —
+        # an older email sitting in the inbox must not still work.
+        cursor.execute(
+            "UPDATE password_resets SET used_at = UTC_TIMESTAMP() "
+            "WHERE user_id = %s AND used_at IS NULL",
+            (row['user_id'],),
+        )
+        conn.commit()
+        return jsonify({'message': 'Password updated. You can now sign in.'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@auth_bp.route('/password', methods=['PUT'])
+@token_required
+def change_password():
+    """Change the signed-in user's password. Works for every role."""
+    try:
+        body = ChangePasswordSchema.model_validate(request.get_json() or {})
+    except ValidationError as exc:
+        return jsonify({'errors': pydantic_errors(exc)}), 422
+
+    if body.current_password == body.new_password:
+        return jsonify({'errors': {
+            'new_password': 'New password must be different from the current one',
+        }}), 422
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT password_hash FROM users WHERE id = %s AND deleted_at IS NULL",
+            (request.user_id,),
+        )
+        user = cursor.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        if not bcrypt.checkpw(body.current_password.encode(), user['password_hash'].encode()):
+            return jsonify({'errors': {'current_password': 'Current password is incorrect'}}), 422
+
+        password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (password_hash, request.user_id),
+        )
+        # A password change should also void any pending reset link.
+        cursor.execute(
+            "UPDATE password_resets SET used_at = UTC_TIMESTAMP() "
+            "WHERE user_id = %s AND used_at IS NULL",
+            (request.user_id,),
+        )
+        conn.commit()
+        return jsonify({'message': 'Password changed'})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500

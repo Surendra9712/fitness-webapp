@@ -13,6 +13,7 @@ import type {
   Exercise,
   Category,
   Product,
+  ProductDetail,
   Order,
   TrainerAssignment,
   ProductRequest,
@@ -68,6 +69,7 @@ interface UseAdminReturn {
   >;
   DeleteExercise: () => UseMutationResult<void, Error, number>;
   GetProducts: (args?: QueryArgs) => UseQueryResult<PaginatedResponse<Product>>;
+  GetProductDetail: (args?: QueryArgs) => UseQueryResult<ProductDetail>;
   CreateProduct: () => UseMutationResult<Product, Error, Omit<Product, "id">>;
   UpdateProduct: () => UseMutationResult<
     Product,
@@ -168,6 +170,7 @@ const useAdmin = (): UseAdminReturn => {
 
   const {
     get: GetProducts,
+    get: GetProductDetail,
     post: CreateProduct,
     update: UpdateProduct,
     delete: DeleteProduct,
@@ -362,6 +365,7 @@ const useAdmin = (): UseAdminReturn => {
     UpdateExercise,
     DeleteExercise,
     GetProducts,
+    GetProductDetail,
     CreateProduct,
     UpdateProduct,
     DeleteProduct,

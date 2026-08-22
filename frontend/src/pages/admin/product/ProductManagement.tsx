@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Package,
   MoreHorizontal,
+  Eye,
   Pencil,
   Trash2,
   ToggleLeft,
@@ -42,6 +44,7 @@ export default function ProductManagement() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const { page, goToPage, resetPage, setPageSize, pageSize } = usePagination();
 
@@ -148,7 +151,14 @@ export default function ProductManagement() {
               <TableBody>
                 {items.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell
+                      className="font-medium cursor-pointer hover:underline"
+                      onClick={() =>
+                        navigate(`/admin/product-management/${p.id}`)
+                      }
+                    >
+                      {p.name}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {p.category_name ?? p.category}
@@ -187,6 +197,14 @@ export default function ProductManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              navigate(`/admin/product-management/${p.id}`)
+                            }
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Detail
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEdit(p)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit
